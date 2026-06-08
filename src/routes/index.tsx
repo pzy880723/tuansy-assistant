@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 import { startProject } from "@/lib/projects.functions";
-import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare, Loader2, Zap, ClipboardList } from "lucide-react";
+import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare, Loader2, ClipboardList } from "lucide-react";
 
 
 export const Route = createFileRoute("/")({
@@ -135,25 +135,7 @@ function HeroStarter() {
 
   return (
     <div className="rounded-3xl border border-white/10 bg-[oklch(0.16_0.012_50/0.7)] p-3 shadow-[0_30px_80px_-20px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-      {/* Mode tabs */}
-      <div className="flex items-center gap-1 rounded-2xl bg-white/[0.04] p-1">
-        <ModeTab
-          active={mode === "draft"}
-          onClick={() => setMode("draft")}
-          icon={<Zap className="h-3.5 w-3.5" />}
-          title="立即开团"
-          hint="直接生成标题、SKU、文案草稿"
-        />
-        <ModeTab
-          active={mode === "plan"}
-          onClick={() => setMode("plan")}
-          icon={<ClipboardList className="h-3.5 w-3.5" />}
-          title="计划模式"
-          hint="先聊清楚再动笔，适合选品阶段"
-        />
-      </div>
-
-      <div className="mt-3 rounded-2xl border border-white/10 bg-[oklch(0.13_0.012_50)] p-3 focus-within:border-[oklch(0.7_0.19_45/0.5)]">
+      <div className="rounded-2xl border border-white/10 bg-[oklch(0.13_0.012_50)] p-3 focus-within:border-[oklch(0.7_0.19_45/0.5)]">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -169,67 +151,62 @@ function HeroStarter() {
           className="block w-full resize-none bg-transparent text-sm leading-relaxed text-white placeholder:text-white/35 focus:outline-none"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => toast.info("图片识别即将上线，先用文字描述吧")}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-white/55 hover:bg-white/5 hover:text-white/80"
-          >
-            <ImagePlus className="h-3.5 w-3.5" /> 加图片
-          </button>
-          <button
-            type="button"
-            onClick={() => void submit()}
-            disabled={loading}
-            className="brand-glow inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> AI 正在识别…
-              </>
-            ) : (
-              <>
-                开始开团 <ArrowRight className="h-3.5 w-3.5" />
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => toast.info("图片识别即将上线，先用文字描述吧")}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-white/55 hover:bg-white/5 hover:text-white/80"
+            >
+              <ImagePlus className="h-3.5 w-3.5" /> 加图片
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <PlanModeChip
+              active={mode === "plan"}
+              onClick={() => setMode(mode === "plan" ? "draft" : "plan")}
+            />
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={loading}
+              className="brand-glow inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> AI 正在识别…
+                </>
+              ) : (
+                <>
+                  {mode === "plan" ? "先聊清楚" : "开始开团"} <ArrowRight className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function ModeTab({
-  active,
-  onClick,
-  icon,
-  title,
-  hint,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  hint: string;
-}) {
+function PlanModeChip({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title="开启后 AI 会先反问澄清，再动笔"
       className={
-        "flex flex-1 flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition " +
+        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs transition " +
         (active
-          ? "bg-gradient-to-br from-[oklch(0.72_0.2_45/0.18)] to-[oklch(0.62_0.22_35/0.1)] text-white shadow-inner ring-1 ring-[oklch(0.7_0.19_45/0.35)]"
-          : "text-white/55 hover:bg-white/[0.04] hover:text-white/80")
+          ? "border-[oklch(0.7_0.19_45/0.55)] bg-[oklch(0.7_0.19_45/0.12)] text-[oklch(0.86_0.14_55)]"
+          : "border-white/12 text-white/55 hover:border-white/25 hover:text-white/80")
       }
     >
-      <span className="flex items-center gap-1.5 text-sm font-semibold">
-        {icon}
-        {title}
-      </span>
-      <span className="text-[11px] leading-tight text-white/45">{hint}</span>
+      <ClipboardList className="h-3.5 w-3.5" />
+      计划模式{active ? " · 开" : ""}
     </button>
   );
 }
+
 
 
 function ProductMockup() {
