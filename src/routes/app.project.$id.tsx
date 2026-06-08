@@ -19,6 +19,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
 import { cn } from "@/lib/utils";
+import { PhoneShell } from "@/components/tuan/PhoneShell";
+import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
+import { ProductTab } from "@/components/tuan/ProductTab";
+import { SettingsTab } from "@/components/tuan/SettingsTab";
+import { SettingSheet } from "@/components/tuan/primitives";
+import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
 
 export const Route = createFileRoute("/app/project/$id")({
   head: () => ({ meta: [{ title: "编辑项目 — 团宝助手" }] }),
