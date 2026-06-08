@@ -1,83 +1,38 @@
 ## 目标
-首页 Banner 新增「开团对话框」，作为发起项目的入口。用户把产品相关的任意文字/图片丢进来，AI 智能判断品类、生成项目标题、落库、跳转编辑页自动开场。新增「计划模式」：AI 先反问澄清，再撰写。
+去掉「立即开团 / 计划模式」双 Tab。默认就是立即开团；计划模式收成一个小切换按钮，放在「开始开团」按钮的左侧。编辑页聊天输入框的发送按钮左侧也加同样的小按钮，让用户在工作台里也能随时切换计划模式来追问澄清。
 
-## 首页 Hero「开团对话框」
+## 首页 HeroStarter 改造（`src/routes/index.tsx`）
 
-替换现有 CTA 区，新组件 `HeroStarter`：
+- 删除整个 ModeTab 行（双 Tab 容器）和 `ModeTab` 子组件。
+- `mode` state 保留，默认 `"draft"`。
+- 输入框下方那一行布局调整：
+  - 左侧：保留「加图片」按钮；它的右边新增「计划模式」小按钮（一颗 chip）：
+    - 未激活：`ClipboardList` 图标 + 「计划模式」文字，浅色描边、透明背景、灰白文字。
+    - 激活：橙色描边 + 橙色淡背景 + 主色文字，并带一个小圆点（"·"）表示开启。
+    - hover 出 tooltip / `title="开启后 AI 会先反问澄清，再动笔"`。
+  - 右侧：「开始开团 →」按钮文案随模式切换：
+    - draft：`开始开团 →`
+    - plan：`先聊清楚 →`
+- 提示小字简化为：`AI 会自动识别品类，生成项目并跳转到工作台`。
 
-- 标题（替换原 H1 文案）：
-  - 主标：**开一场新团，从一句话开始**
-  - 副标：把任意与产品相关的文字或图片丢给我，我帮你想清楚、写明白。
+## 编辑页 ChatPane 改造（`src/routes/app.project.$id.tsx`）
 
-- 对话框（带毛玻璃外壳）：
-  - 顶部双 Tab：「立即开团」/「计划模式」
-    - 立即开团 hint：直接生成标题、SKU、文案草稿
-    - 计划模式 hint：先聊清楚再动笔，适合还在选品阶段
-  - 多行 textarea，占位文案：
-    > 你想开一场什么团？把产品名、卖点、价格档位、产地，或者任何你手上有的资料贴进来，图片也可以一起拖进来。
-  - 左下：📎 上传图片按钮（多图）
-  - 右下：「开始开团 →」主按钮（橙色发光）
-  - 输入框下方一行小字：AI 会自动识别品类，生成项目并跳转到工作台
+- 新增局部 state `planMode: boolean`（默认 false）。
+- 发送框（line 430 那一段）里 `ImagePlus` 按钮右侧加同一个「计划模式」小切换按钮，样式与首页一致（同一种 chip）。
+- `sendText` 行为根据 `planMode` 调整：
+  - 关闭时：照旧发送原文。
+  - 开启时：在用户文本前注入一段指令前缀，例如：`【计划模式】先不要直接动手撰写或调用 update_* 工具，针对下面的需求抛出 3 到 5 个澄清问题让我回答：` + 用户文本。模型的系统提示已经要求中文短句，所以这里只需文字注入，不改 server 端。
+  - 发出后自动关闭 `planMode`（一次性效果，避免误触发后续都被注入）。
+- 历史快照、suggestions 等其它逻辑不动。
 
-- 旁路入口（弱化）：「不急，先逛逛工作台 →」纯文字链接
-
-## 提交流程
-
-1. 用户输入文字（可选附图）→ 选择模式 → 点击「开始开团」
-2. 客户端先把图片（若有）上传到 `product-images` bucket，拿到 URL 列表
-3. 调用新 server fn `startProject({ description, imageUrls, mode })`
-4. 服务端用 Lovable AI（`google/gemini-3-flash-preview`，`generateText` + `Output.object`）一次性产出：
-   ```ts
-   {
-     category: '水果生鲜' | '零食烘焙' | '家居日用' | '美妆个护' | '服饰鞋包' | '母婴儿童' | '其他',
-     projectName: string,        // ≤ 18 字，吸睛
-     productName: string,
-     tags: string[],             // 2-4 个卖点/服务标签
-     seedAssistantText: string,  // 编辑页首条 AI 开场消息
-     autoUserPrompt: string|null,// 立即模式：自动触发撰写的隐形指令；计划模式：null
-     suggestNext: string[]       // 2-4 条快捷追问
-   }
-   ```
-   - 立即模式 `seedAssistantText` 示例：「明白，这是一场**云南阳光玫瑰**的水果团。我先按产地直发的思路把标题、卖点和首版 SKU 拉一版给你，看完再让我调。」
-   - 计划模式 `seedAssistantText` 示例：「开始撰写前，我想先确认 4 件事：一、目标人群是熟客回购还是新客拉新？二、价格档位…」
-5. 服务端写入 `projects` 表：
-   - `name = projectName`
-   - `product = { name: productName, category: [category], tags, description: 用户原文, ... }`
-   - 写入 `project_images`（若有图）
-6. 返回 `{ id, seedMessages: UIMessage[], autoUserPrompt }` 给客户端
-7. 客户端：
-   ```ts
-   localStorage.setItem(`tuanbao.chat.${id}`, JSON.stringify(seedMessages));
-   if (autoUserPrompt) sessionStorage.setItem(`tuanbao.boot.${id}`, autoUserPrompt);
-   navigate({ to: '/app/project/$id', params: { id } });
-   ```
-
-## 编辑页接管
-
-修改 `src/routes/app.project.$id.tsx` 的 ChatPane：
-- 挂载后 useEffect 检查 `sessionStorage[tuanbao.boot.${projectId}]`
-  - 存在 → 自动调用一次 `sendText(boot)`，让 AI 接着撰写；完成后 `removeItem`
-  - 不存在（计划模式）→ 只展示 seedMessages 的问题列表，等用户回复
-
-## 按品类智能撰写
-
-修改 `src/routes/api/chat.ts` system prompt，注入 `product.category[0]`，并增加品类指引段：
-- 水果生鲜：产地、采摘日期、保鲜物流、净重斤数、坏果包赔
-- 零食烘焙：保质期、配料表、口味档位、独立小包
-- 服饰鞋包：面料、尺码表、版型、洗涤说明
-- 美妆个护：成分、功效、适用肤质、备案信息
-- 家居日用：材质、尺寸、场景、保修
-- 母婴儿童：年龄段、安全认证、材质
-
-通用规则（纯文本中文、`suggest_next` 调用）保持不变。
+## 视觉一致性
+- chip 按钮样式抽成一个本文件内的小组件 `PlanModeChip`，首页和编辑页各自有一份（不跨文件复用，避免新增公共文件）；视觉规则一致：圆角全圆、`h-8 px-3`、`text-xs`、icon + 文案，激活态橙色描边+淡橙底+主色文字。
 
 ## 涉及文件
-- 新增：`src/lib/projects.functions.ts` 中 `startProject` server fn
-- 修改：`src/routes/index.tsx`（Hero 区替换为 HeroStarter 组件 + 文案润色）
-- 修改：`src/routes/app.project.$id.tsx`（boot prompt 自动触发）
-- 修改：`src/routes/api/chat.ts`（按品类撰写指引）
+- 修改：`src/routes/index.tsx`
+- 修改：`src/routes/app.project.$id.tsx`
 
 ## 验证
-- 输入"云南阳光玫瑰，2 斤 39.9 / 5 斤 88，产地直发顺丰冷链" + 立即开团 → 跳转后标题/SKU/标签已自动生成
-- 同样输入 + 计划模式 → 跳转后 AI 首条是 3–5 个澄清问题，不写入商品数据
-- 上传 1 张服饰图 + 一句"主推春夏女款" + 立即开团 → AI 识别为「服饰鞋包」，撰写聚焦面料/尺码/版型
+- 首页打开时没有双 Tab，只有一行输入 + 底栏，底栏左下「加图片 · 计划模式」、右下「开始开团 →」。
+- 点一下「计划模式」chip 变橙色，主按钮文案变成「先聊清楚 →」，提交后跳转编辑页第一条 AI 消息是澄清问题。
+- 编辑页输入框左下也有「计划模式」chip，开启后发送的下一条消息会让 AI 回澄清问题而不是直接动手；之后 chip 自动复位。
