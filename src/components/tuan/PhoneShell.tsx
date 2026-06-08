@@ -78,4 +78,3 @@ export function PhoneShell({
   );
 }
 
-void showTopBar;
