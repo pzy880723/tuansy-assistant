@@ -243,7 +243,7 @@ function HeroStarter() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> AI 正在识别…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> 团宝正在识别…
                 </>
               ) : (
                 <>
