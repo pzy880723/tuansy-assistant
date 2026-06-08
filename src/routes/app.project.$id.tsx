@@ -292,6 +292,21 @@ function ChatPane({
 
   const send = () => sendText(input);
 
+  // Auto-trigger the first AI write when arriving from the home "开团" dialog
+  const bootedRef = useRef(false);
+  useEffect(() => {
+    if (bootedRef.current) return;
+    if (typeof window === "undefined") return;
+    if (isLoading) return;
+    const key = `tuanbao.boot.${projectId}`;
+    const boot = window.sessionStorage.getItem(key);
+    if (!boot) return;
+    bootedRef.current = true;
+    window.sessionStorage.removeItem(key);
+    void sendMessage({ text: boot });
+  }, [projectId, isLoading, sendMessage]);
+
+
   const suggestions: string[] = (() => {
     if (isLoading) return [];
     for (let i = messages.length - 1; i >= 0; i--) {

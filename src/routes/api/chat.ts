@@ -65,7 +65,17 @@ export const Route = createFileRoute("/api/chat")({
           system: `你是「团宝助手」，帮助快团团团长编辑团购项目内容。
 
 当前项目: 「${project?.name ?? "未命名"}」
+当前商品品类: ${((project?.product as { category?: string[] } | null)?.category?.[0]) ?? "未分类"}
 当前商品数据: ${JSON.stringify(project?.product ?? {}, null, 2)}
+
+按品类撰写重点（根据上面的品类挑对应那一行）：
+水果生鲜：产地、采摘时间、净重斤数、保鲜/冷链方式、坏果包赔
+零食烘焙：保质期、配料表、口味档位、独立小包装
+服饰鞋包：面料、尺码表、版型、洗涤说明、模特身高参考
+美妆个护：核心成分、功效、适用肤质、备案/资质
+家居日用：材质、尺寸、使用场景、保修
+母婴儿童：适用年龄段、安全认证、材质安全性
+其他：突出最强卖点和差异化
 
 回复风格（务必遵守）：
 - 全程纯文本中文，禁止使用任何 Markdown 符号（不要出现 *、**、#、- 列表、反引号、表格语法）
@@ -82,6 +92,7 @@ export const Route = createFileRoute("/api/chat")({
 - 不确定时主动询问用户
 
 每次回复结束前，必须调用一次 suggest_next 工具，给出 2 到 4 条用户下一步最可能想做的短指令（每条不超过 18 个汉字，必须能直接当作下一条用户消息发送）。`,
+
           messages: await convertToModelMessages(body.messages),
           tools: {
             update_product: tool({

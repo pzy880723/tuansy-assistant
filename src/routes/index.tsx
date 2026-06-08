@@ -1,5 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, Chrome, ImagePlus, MessageSquare } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
+import { startProject } from "@/lib/projects.functions";
+import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare, Loader2, Zap, ClipboardList } from "lucide-react";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -63,36 +68,25 @@ function TopNav() {
 function Hero() {
   return (
     <section className="hero-bg relative overflow-hidden">
-      <div className="mx-auto max-w-6xl px-5 pt-20 pb-24 md:pt-28 md:pb-32">
+      <div className="mx-auto max-w-6xl px-5 pt-20 pb-24 md:pt-24 md:pb-28">
         <div className="mx-auto max-w-3xl text-center">
           <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/70 backdrop-blur">
             <Sparkles className="h-3 w-3 text-[oklch(0.78_0.18_55)]" />
             为快团团团长打造的 AI 工作台
           </div>
           <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
-            把商品图片变成
-            <span className="text-gradient-brand"> 一场完美团购</span>
+            开一场新团，<span className="text-gradient-brand">从一句话开始</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-white/65 md:text-xl">
-            上传图片，用自然语言告诉 AI 你想要什么。
-            <br className="hidden md:inline" />
-            介绍、规格、SKU 自动生成，一键同步到快团团。
+          <p className="mx-auto mt-5 max-w-2xl text-balance text-base text-white/65 md:text-lg">
+            把任意与产品相关的文字丢给我，我帮你想清楚、写明白，再一键同步到快团团。
           </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              to="/app"
-              className="brand-glow inline-flex h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-7 text-base font-semibold text-white transition hover:brightness-110"
-            >
-              免费开始创建 <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/extension"
-              className="inline-flex h-12 items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-6 text-base font-medium text-white/90 backdrop-blur transition hover:bg-white/[0.08]"
-            >
-              <Chrome className="h-4 w-4" /> 下载 Chrome 插件
-            </Link>
-          </div>
-          <p className="mt-4 text-xs text-white/40">无需注册 · 一键开始</p>
+        </div>
+
+        <div className="mx-auto mt-10 max-w-2xl">
+          <HeroStarter />
+          <p className="mt-3 text-center text-xs text-white/40">
+            AI 会自动识别品类，生成项目并跳转到工作台 · <Link to="/app" className="underline-offset-4 hover:text-white/70 hover:underline">不急，先逛逛工作台</Link>
+          </p>
         </div>
 
         {/* Mock product window */}
@@ -104,6 +98,139 @@ function Hero() {
     </section>
   );
 }
+
+function HeroStarter() {
+  const navigate = useNavigate();
+  const start = useServerFn(startProject);
+  const [mode, setMode] = useState<"draft" | "plan">("draft");
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    const value = text.trim();
+    if (value.length < 4) {
+      toast.error("再多说两句吧，比如商品名、卖点、价格档位");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await start({ data: { description: value, mode } });
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          `tuanbao.chat.${res.id}`,
+          JSON.stringify(res.seedMessages),
+        );
+        if (res.autoUserPrompt) {
+          window.sessionStorage.setItem(`tuanbao.boot.${res.id}`, res.autoUserPrompt);
+        }
+      }
+      toast.success(`已识别为「${res.category}」，跳转工作台…`);
+      navigate({ to: "/app/project/$id", params: { id: res.id } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "开团失败，请稍后再试");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-3xl border border-white/10 bg-[oklch(0.16_0.012_50/0.7)] p-3 shadow-[0_30px_80px_-20px_oklch(0_0_0/0.6)] backdrop-blur-xl">
+      {/* Mode tabs */}
+      <div className="flex items-center gap-1 rounded-2xl bg-white/[0.04] p-1">
+        <ModeTab
+          active={mode === "draft"}
+          onClick={() => setMode("draft")}
+          icon={<Zap className="h-3.5 w-3.5" />}
+          title="立即开团"
+          hint="直接生成标题、SKU、文案草稿"
+        />
+        <ModeTab
+          active={mode === "plan"}
+          onClick={() => setMode("plan")}
+          icon={<ClipboardList className="h-3.5 w-3.5" />}
+          title="计划模式"
+          hint="先聊清楚再动笔，适合选品阶段"
+        />
+      </div>
+
+      <div className="mt-3 rounded-2xl border border-white/10 bg-[oklch(0.13_0.012_50)] p-3 focus-within:border-[oklch(0.7_0.19_45/0.5)]">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void submit();
+            }
+          }}
+          rows={4}
+          disabled={loading}
+          placeholder="你想开一场什么团？把产品名、卖点、价格档位、产地，或者任何你手上有的资料贴进来。&#10;例如：云南阳光玫瑰，2 斤 39.9 / 5 斤 88，产地直发顺丰冷链。"
+          className="block w-full resize-none bg-transparent text-sm leading-relaxed text-white placeholder:text-white/35 focus:outline-none"
+        />
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => toast.info("图片识别即将上线，先用文字描述吧")}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-white/55 hover:bg-white/5 hover:text-white/80"
+          >
+            <ImagePlus className="h-3.5 w-3.5" /> 加图片
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={loading}
+            className="brand-glow inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> AI 正在识别…
+              </>
+            ) : (
+              <>
+                开始开团 <ArrowRight className="h-3.5 w-3.5" />
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModeTab({
+  active,
+  onClick,
+  icon,
+  title,
+  hint,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "flex flex-1 flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition " +
+        (active
+          ? "bg-gradient-to-br from-[oklch(0.72_0.2_45/0.18)] to-[oklch(0.62_0.22_35/0.1)] text-white shadow-inner ring-1 ring-[oklch(0.7_0.19_45/0.35)]"
+          : "text-white/55 hover:bg-white/[0.04] hover:text-white/80")
+      }
+    >
+      <span className="flex items-center gap-1.5 text-sm font-semibold">
+        {icon}
+        {title}
+      </span>
+      <span className="text-[11px] leading-tight text-white/45">{hint}</span>
+    </button>
+  );
+}
+
 
 function ProductMockup() {
   return (
