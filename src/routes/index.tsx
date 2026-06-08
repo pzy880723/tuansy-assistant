@@ -74,7 +74,7 @@ function Hero() {
             为快团团团长打造的 AI 工作台
           </div>
           <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
-            开一场新团，<span className="text-gradient-brand">从一句话开始</span>
+            开团，<span className="text-gradient-brand">从一句话开始</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-balance text-base text-white/65 md:text-lg">
             把任意与产品相关的文字丢给我，我帮你想清楚、写明白，再一键同步到快团团。
