@@ -129,23 +129,32 @@ function ProjectEditor() {
       </div>
 
       {/* Split layout */}
-      <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <ChatPane projectId={id} />
-        <PreviewPane
-          projectId={id}
-          project={
-            data?.project
-              ? {
-                  id: data.project.id,
-                  product: (data.project.product ?? undefined) as ProductData | undefined,
-                  intro: (data.project.intro ?? undefined) as IntroData | undefined,
-                  skus: (data.project.skus ?? undefined) as SkuItem[] | undefined,
-                  settings: (data.project.settings ?? undefined) as SettingsData | undefined,
-                }
-              : undefined
-          }
-        />
-      </div>
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId={`project-split-${id}`}
+        className="flex-1 overflow-hidden"
+      >
+        <ResizablePanel defaultSize={42} minSize={24} maxSize={70}>
+          <ChatPane projectId={id} project={data?.project} />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={58} minSize={30}>
+          <PreviewPane
+            projectId={id}
+            project={
+              data?.project
+                ? {
+                    id: data.project.id,
+                    product: (data.project.product ?? undefined) as ProductData | undefined,
+                    intro: (data.project.intro ?? undefined) as IntroData | undefined,
+                    skus: (data.project.skus ?? undefined) as SkuItem[] | undefined,
+                    settings: (data.project.settings ?? undefined) as SettingsData | undefined,
+                  }
+                : undefined
+            }
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
