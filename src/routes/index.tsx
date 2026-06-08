@@ -490,7 +490,7 @@ function Footer() {
   return (
     <footer className="border-t border-white/5 py-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-xs text-white/40 md:flex-row">
-        <div>© {new Date().getFullYear()} 团宝助手 · 让 AI 帮团长更高效</div>
+        <div>© {new Date().getFullYear()} 团宝助手 · 让团宝替团长省心</div>
         <div className="flex items-center gap-5">
           <Link to="/extension" className="hover:text-white/70">Chrome 插件</Link>
           <Link to="/app" className="hover:text-white/70">工作台</Link>
