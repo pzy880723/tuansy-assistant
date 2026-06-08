@@ -14,7 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      copy_versions: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          project_id: string
+          snapshot: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          project_id: string
+          snapshot: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          project_id?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copy_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_images: {
+        Row: {
+          analysis: Json | null
+          created_at: string
+          id: string
+          project_id: string
+          role: string
+          sort_order: number
+          url: string
+        }
+        Insert: {
+          analysis?: Json | null
+          created_at?: string
+          id?: string
+          project_id: string
+          role?: string
+          sort_order?: number
+          url: string
+        }
+        Update: {
+          analysis?: Json | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          role?: string
+          sort_order?: number
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_images_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          delivery: Json
+          id: string
+          intro: Json
+          name: string
+          notes: string | null
+          product: Json
+          schedule: Json
+          skus: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          delivery?: Json
+          id?: string
+          intro?: Json
+          name?: string
+          notes?: string | null
+          product?: Json
+          schedule?: Json
+          skus?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          delivery?: Json
+          id?: string
+          intro?: Json
+          name?: string
+          notes?: string | null
+          product?: Json
+          schedule?: Json
+          skus?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shipping_templates: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
