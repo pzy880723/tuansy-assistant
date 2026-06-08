@@ -460,6 +460,20 @@ function ChatPane({
             className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             disabled={isLoading}
           />
+          <button
+            type="button"
+            onClick={() => setPlanMode((v) => !v)}
+            title="开启后 AI 会先反问澄清，再动笔"
+            className={
+              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] transition " +
+              (planMode
+                ? "border-primary/50 bg-[var(--brand-soft)] text-primary"
+                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
+            }
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            计划{planMode ? " · 开" : ""}
+          </button>
           <Button
             size="sm"
             onClick={send}
@@ -468,6 +482,7 @@ function ChatPane({
           >
             {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           </Button>
+
         </div>
       </div>
     </div>
