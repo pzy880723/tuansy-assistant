@@ -1,0 +1,62 @@
+export type IntroBlock =
+  | { id: string; type: "text"; text: string }
+  | { id: string; type: "image_lg"; url?: string | null }
+  | { id: string; type: "image_sm"; urls: string[] }
+  | { id: string; type: "video"; url?: string | null }
+  | { id: string; type: "tag"; tags: string[] };
+
+export type IntroData = {
+  title?: string;
+  description?: string;
+  blocks?: IntroBlock[];
+  cover_url?: string | null;
+  leader_name?: string;
+  leader_avatar?: string | null;
+};
+
+export type SkuItem = {
+  name: string;
+  price: string;
+  stock: string;
+  image?: string | null;
+  spec?: string;
+};
+
+export type SettingsData = Record<string, string | boolean>;
+
+export const SETTING_DEFAULTS: SettingsData = {
+  // 团购设置
+  delivery_method: "快递",
+  shipping_time: "未选择发货时间",
+  group_period: "发团即开始，7天后结束",
+  notify_targets: "全部订阅成员",
+  // 帮卖
+  resell_copy: "去设置",
+  resell_share: "去设置",
+  resell_assets: "用于分享社群及朋友圈",
+  resell_leaderboard: "激励团长帮卖",
+  // 优惠
+  first_order_discount: "首单专享 提高转化",
+  full_reduce: "激励凑单 提高销量",
+  multi_discount: "刺激多买 提升单量",
+  surprise_redpack: "批量发券 引导购买",
+  // 营销
+  free_share: "增加吸引力 促进复购",
+  group_buy: "发起拼团 高效裂变",
+  lottery: "促进活跃 高效营销",
+  tiered_price: "拉新效果提升75%",
+  gifts: "提升下单欲望",
+  // 隐私
+  forward_setting: "所有人均可转发",
+  follower_display: "只显示匿名头像",
+  admin: "未设置",
+  // 其他
+  allow_coupon: "允许",
+  min_order: "未设置",
+  show_stock: "小于等于20件允许展示",
+  allow_user_copy: "不允许",
+  recommend: "未选择",
+  allow_copy_code: "不允许",
+  category: "未分类",
+  follow_tip: "",
+};
