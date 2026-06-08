@@ -101,23 +101,6 @@ function ProjectEditor() {
 }
 
 
-function SaveBadge({ state }: { state: "idle" | "saving" | "saved" }) {
-  if (state === "idle") return null;
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      {state === "saving" ? (
-        <>
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> 保存中
-        </>
-      ) : (
-        <>
-          <Check className="h-3 w-3 text-[oklch(0.65_0.18_145)]" /> 已保存
-        </>
-      )}
-    </span>
-  );
-}
-
 /* ============== LEFT: AI Chat Pane (live, tool-calling) ============== */
 
 type ProjectSnapshot = {
