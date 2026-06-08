@@ -256,6 +256,7 @@ function ChatPane({
   });
 
   const [input, setInput] = useState("");
+  const [planMode, setPlanMode] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -289,9 +290,14 @@ function ChatPane({
       };
       setHistory((h) => [entry, ...h].slice(0, 30));
     }
-    void sendMessage({ text: value });
+    const payload = planMode
+      ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${value}`
+      : value;
+    void sendMessage({ text: payload });
+    if (planMode) setPlanMode(false);
     setInput("");
   };
+
 
   const send = () => sendText(input);
 
