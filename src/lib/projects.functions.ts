@@ -93,10 +93,33 @@ ${planHint}
           video_url: "",
           spec_groups: [],
         },
+      .insert({
+        name: output.projectName,
+        cover_image_url: data.imageUrls?.[0] ?? null,
+        product: {
+          name: output.productName,
+          category: [output.category],
+          description: data.description,
+          tags: output.tags,
+          weight: null,
+          video_url: "",
+          spec_groups: [],
+        },
       })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      await supabaseAdmin.from("project_images").insert(
+        data.imageUrls.map((url, i) => ({
+          project_id: row.id,
+          url,
+          sort_order: i,
+          role: "product",
+        })),
+      );
+    }
 
     const seedMessages = [
       {
