@@ -56,7 +56,7 @@ export const updateProject = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: z.record(z.string(), z.unknown()) }).parse(d),
   )
   .handler(async ({ data }) => {
-    const { error } = await supabaseAdmin.from("projects").update(data.patch).eq("id", data.id);
+    const { error } = await supabaseAdmin.from("projects").update(data.patch as never).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
