@@ -130,6 +130,7 @@ function ProjectEditor() {
 
       {/* Split layout */}
       <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+        {/* @ts-expect-error react-resizable-panels direction prop */}
         <ResizablePanel defaultSize={38} minSize={20} maxSize={75}>
           <ChatPane projectId={id} project={data?.project ?? null} />
         </ResizablePanel>
