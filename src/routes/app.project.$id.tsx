@@ -117,7 +117,13 @@ function ProjectEditor() {
           projectId={id}
           project={
             data?.project
-              ? { id: data.project.id, product: (data.project.product ?? undefined) as ProductData | undefined }
+              ? {
+                  id: data.project.id,
+                  product: (data.project.product ?? undefined) as ProductData | undefined,
+                  intro: (data.project.intro ?? undefined) as IntroData | undefined,
+                  skus: (data.project.skus ?? undefined) as SkuItem[] | undefined,
+                  settings: (data.project.settings ?? undefined) as SettingsData | undefined,
+                }
               : undefined
           }
         />
