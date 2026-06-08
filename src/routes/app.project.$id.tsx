@@ -452,11 +452,11 @@ function ChatPane({
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 && !isLoading && <ChatEmpty onPick={setInput} />}
         {messages.map((m) => (
-          <MessageRow key={m.id} msg={m} />
+          <MessageRow key={m.id} msg={m} onAnswer={sendText} />
         ))}
         {status === "submitted" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> 思考中…
+            <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想…
           </div>
         )}
         {error && (
