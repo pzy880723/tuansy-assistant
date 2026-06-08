@@ -46,6 +46,7 @@ export const startProject = createServerFn({ method: "POST" })
           suggestNext: z.array(z.string().min(2).max(18)).min(2).max(4),
         }),
       }),
+
       prompt: `你是「团宝助手」的开团策划。用户刚刚提交了一段对想开的团购的描述，请你智能判断品类并准备好接下来在编辑页继续撰写所需的物料。
 
 用户描述：
