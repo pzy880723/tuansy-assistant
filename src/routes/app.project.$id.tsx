@@ -402,6 +402,13 @@ function ToolCard({ part }: { part: ToolPart }) {
 
 /* ============== RIGHT: 快团团 Mock Preview ============== */
 
+import { PhoneShell } from "@/components/tuan/PhoneShell";
+import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
+import { ProductTab } from "@/components/tuan/ProductTab";
+import { SettingsTab } from "@/components/tuan/SettingsTab";
+import { SettingSheet } from "@/components/tuan/primitives";
+import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
+
 type Tab = "intro" | "product" | "settings";
 
 function PreviewPane({
@@ -409,262 +416,103 @@ function PreviewPane({
   project,
 }: {
   projectId: string;
-  project: { id: string; product?: ProductData } | undefined;
+  project:
+    | {
+        id: string;
+        product?: ProductData;
+        intro?: IntroData;
+        skus?: SkuItem[];
+        settings?: SettingsData;
+      }
+    | undefined;
 }) {
-  const [tab, setTab] = useState<Tab>("product");
+  const [tab, setTab] = useState<Tab>("intro");
   const qc = useQueryClient();
   const update = useServerFn(updateProject);
 
-  const product: ProductData =
-    (project?.product as ProductData | undefined) ?? {
-      title: "云南阳光玫瑰 · 现摘现发",
-      subtitle: "产地直采 · 顺丰冷链 · 坏果包赔",
-      skus: [
-        { name: "2 斤装", price: "39.9", stock: "100" },
-        { name: "5 斤装", price: "88.0", stock: "50" },
-      ],
-      tags: ["顺丰", "冷链", "坏果包赔"],
-    };
+  const intro: IntroData = project?.intro ?? { title: "", description: "", blocks: [] };
+  // Derive sku list: prefer project.skus (jsonb array), fall back to product.skus, fall back to a seeded one.
+  const rawSkus: SkuItem[] =
+    (project?.skus && Array.isArray(project.skus) ? (project.skus as SkuItem[]) : null) ??
+    (project?.product?.skus as SkuItem[] | undefined) ??
+    [];
+  const settings: SettingsData = project?.settings ?? {};
 
-  const patchProduct = async (next: ProductData) => {
-    await update({ data: { id: projectId, patch: { product: next } } });
-    qc.invalidateQueries({ queryKey: ["project", projectId] });
+  const debouncedPatch = useRef<{ patch: Record<string, unknown>; t: ReturnType<typeof setTimeout> | null }>({
+    patch: {},
+    t: null,
+  });
+
+  const persist = (patch: Record<string, unknown>) => {
+    debouncedPatch.current.patch = { ...debouncedPatch.current.patch, ...patch };
+    if (debouncedPatch.current.t) clearTimeout(debouncedPatch.current.t);
+    debouncedPatch.current.t = setTimeout(async () => {
+      const p = debouncedPatch.current.patch;
+      debouncedPatch.current.patch = {};
+      try {
+        await update({ data: { id: projectId, patch: p } });
+        qc.invalidateQueries({ queryKey: ["project", projectId] });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "保存失败");
+      }
+    }, 500);
   };
 
+  const setIntro = (next: IntroData) => persist({ intro: next });
+  const setSkus = (next: SkuItem[]) => persist({ skus: next });
+  const setSettings = (next: SettingsData) => persist({ settings: next });
+
+  // Bottom sheet state
+  const [sheet, setSheet] = useState<{
+    open: boolean;
+    key: string;
+    title: string;
+    options?: string[];
+  }>({ open: false, key: "", title: "" });
+
+  const openSetting = (key: string, title: string, options?: string[]) =>
+    setSheet({ open: true, key, title, options });
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[oklch(0.97_0.01_70)]">
+    <div className="flex h-full flex-col overflow-hidden bg-[oklch(0.97_0.005_240)]">
       <div className="flex items-center justify-between border-b bg-background px-4 py-2.5">
-        <div className="inline-flex rounded-full border bg-muted/50 p-0.5 text-sm">
-          {(
-            [
-              { v: "intro", label: "团购介绍" },
-              { v: "product", label: "团购商品" },
-              { v: "settings", label: "团购设置" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.v}
-              onClick={() => setTab(t.v)}
-              className={cn(
-                "rounded-full px-3.5 py-1 text-xs font-medium transition",
-                tab === t.v
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="text-[11px] text-muted-foreground">
-          点击任意元素直接编辑 ↓
-        </div>
+        <div className="text-[12px] font-medium text-muted-foreground">快团团 · 高保真预览</div>
+        <div className="text-[11px] text-muted-foreground">点击任意字段直接编辑</div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
-        <PhoneFrame>
-          {tab === "intro" && <IntroMock />}
-          {tab === "product" && (
-            <ProductMock product={product} onChange={patchProduct} />
+        <PhoneShell tab={tab} onTabChange={setTab}>
+          {tab === "intro" && (
+            <div className="space-y-2">
+              <IntroTab intro={intro} onChange={setIntro} />
+              <div className="px-2 pb-3">
+                <ProductEntryCard count={rawSkus.length} />
+              </div>
+            </div>
           )}
-          {tab === "settings" && <SettingsMock />}
-        </PhoneFrame>
-      </div>
-    </div>
-  );
-}
-
-function PhoneFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-[390px]">
-      <div className="overflow-hidden rounded-[36px] border-[10px] border-[oklch(0.18_0.012_50)] bg-white shadow-[0_30px_60px_-20px_oklch(0_0_0/0.35)]">
-        <div className="flex items-center justify-between bg-[oklch(0.18_0.012_50)] px-5 py-1.5 text-[10px] text-white/80">
-          <span>9:41</span>
-          <span>•••</span>
-        </div>
-        <div className="bg-white">{children}</div>
-      </div>
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">
-        快团团 · 商品详情预览
-      </p>
-    </div>
-  );
-}
-
-/* ---- Intro mock ---- */
-function IntroMock() {
-  return (
-    <div className="space-y-3 p-3">
-      <EditableBlock label="活动标题" defaultValue="🍇 云南阳光玫瑰开团 · 限时 48 小时" className="text-base font-bold" />
-      <div className="aspect-[4/3] rounded-xl bg-gradient-to-br from-[oklch(0.88_0.06_85)] to-[oklch(0.7_0.15_45)]" />
-      <EditableBlock
-        label="正文"
-        defaultValue="云南海拔 1800 米葡萄园直采，皮薄肉脆，咬下去一口爆汁。今年第一批头茬果，限量预定！"
-        className="text-sm leading-relaxed text-[oklch(0.3_0.025_50)]"
-        multiline
-      />
-      <div className="flex flex-wrap gap-1.5">
-        {["产地直发", "顺丰冷链", "坏果包赔"].map((t) => (
-          <span key={t} className="rounded-full bg-[oklch(0.97_0.04_70)] px-2 py-0.5 text-[10px] font-medium text-[oklch(0.62_0.22_35)]">
-            {t}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ---- Product mock ---- */
-function ProductMock({
-  product,
-  onChange,
-}: {
-  product: ProductData;
-  onChange: (next: ProductData) => void;
-}) {
-  return (
-    <div>
-      <div className="relative aspect-[4/3] bg-gradient-to-br from-[oklch(0.88_0.06_85)] to-[oklch(0.7_0.15_45)]">
-        <button
-          className="absolute right-3 top-3 rounded-full bg-black/40 px-2 py-0.5 text-[10px] text-white backdrop-blur"
-          onClick={() => toast.info("图片编辑即将上线")}
-        >
-          更换封面
-        </button>
-      </div>
-      <div className="space-y-3 p-3">
-        <EditableBlock
-          label="商品标题"
-          defaultValue={product.title ?? ""}
-          className="text-base font-bold"
-          onSave={(v) => onChange({ ...product, title: v })}
-        />
-        <EditableBlock
-          label="副标题"
-          defaultValue={product.subtitle ?? ""}
-          className="text-xs text-[oklch(0.5_0.03_60)]"
-          onSave={(v) => onChange({ ...product, subtitle: v })}
-        />
-
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.5_0.03_60)]">
-            规格 / SKU
-          </div>
-          {(product.skus ?? []).map((sku, i) => (
-            <SkuEditableRow
-              key={i}
-              sku={sku}
-              onChange={(next) => {
-                const skus = [...(product.skus ?? [])];
-                skus[i] = next;
-                onChange({ ...product, skus });
-              }}
+          {tab === "product" && (
+            <ProductTab
+              skus={rawSkus}
+              onChange={setSkus}
+              settings={settings}
+              onOpenSetting={openSetting}
             />
-          ))}
-          <button
-            className="w-full rounded-lg border border-dashed py-1.5 text-xs text-[oklch(0.5_0.03_60)] hover:border-[oklch(0.7_0.19_45)] hover:text-[oklch(0.62_0.22_35)]"
-            onClick={() =>
-              onChange({
-                ...product,
-                skus: [...(product.skus ?? []), { name: "新规格", price: "0", stock: "0" }],
-              })
-            }
-          >
-            + 增加规格
-          </button>
-        </div>
-
-        <button className="mt-2 h-10 w-full rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-sm font-bold text-white shadow-[0_8px_24px_oklch(0.7_0.19_45/0.4)]">
-          参 团 购 买
-        </button>
+          )}
+          {tab === "settings" && (
+            <SettingsTab settings={settings} onOpenSetting={openSetting} />
+          )}
+        </PhoneShell>
       </div>
-    </div>
-  );
-}
 
-function SkuEditableRow({ sku, onChange }: { sku: Sku; onChange: (s: Sku) => void }) {
-  return (
-    <div className="flex items-center gap-2 rounded-xl bg-[oklch(0.97_0.015_70)] px-2.5 py-2">
-      <input
-        value={sku.name}
-        onChange={(e) => onChange({ ...sku, name: e.target.value })}
-        className="flex-1 min-w-0 bg-transparent text-xs font-medium outline-none focus:bg-white focus:ring-1 focus:ring-[oklch(0.7_0.19_45/0.4)] rounded px-1.5 py-0.5"
-      />
-      <div className="flex items-center text-xs font-bold text-[oklch(0.62_0.22_35)]">
-        <span className="text-[10px]">¥</span>
-        <input
-          value={sku.price}
-          onChange={(e) => onChange({ ...sku, price: e.target.value })}
-          className="w-14 bg-transparent text-right outline-none focus:bg-white focus:ring-1 focus:ring-[oklch(0.7_0.19_45/0.4)] rounded px-1 py-0.5"
-        />
-      </div>
-      <span className="text-[10px] text-[oklch(0.5_0.03_60)]">库</span>
-      <input
-        value={sku.stock}
-        onChange={(e) => onChange({ ...sku, stock: e.target.value })}
-        className="w-10 bg-transparent text-right text-[10px] text-[oklch(0.5_0.03_60)] outline-none focus:bg-white focus:ring-1 focus:ring-[oklch(0.7_0.19_45/0.4)] rounded px-1 py-0.5"
+      <SettingSheet
+        open={sheet.open}
+        onOpenChange={(b) => setSheet((s) => ({ ...s, open: b }))}
+        title={sheet.title}
+        initialValue={String(settings[sheet.key] ?? "")}
+        options={sheet.options}
+        onSave={(v) => setSettings({ ...settings, [sheet.key]: v })}
       />
     </div>
   );
 }
 
-/* ---- Settings mock ---- */
-function SettingsMock() {
-  const rows = [
-    { k: "团购时间", v: "立即开始 · 48 小时后结束" },
-    { k: "发货方式", v: "顺丰快递（包邮）" },
-    { k: "运费模板", v: "默认模板" },
-    { k: "售后服务", v: "坏果包赔 · 24 小时内反馈" },
-  ];
-  return (
-    <div className="space-y-2 p-3">
-      {rows.map((r) => (
-        <button
-          key={r.k}
-          onClick={() => toast.info(`「${r.k}」设置即将上线`)}
-          className="flex w-full items-center justify-between rounded-xl bg-[oklch(0.97_0.015_70)] px-3 py-3 text-left transition hover:bg-[oklch(0.97_0.04_70)]"
-        >
-          <span className="text-xs font-semibold text-[oklch(0.3_0.025_50)]">{r.k}</span>
-          <span className="text-xs text-[oklch(0.5_0.03_60)]">{r.v} ›</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/* ---- Editable block primitive ---- */
-function EditableBlock({
-  label,
-  defaultValue,
-  className,
-  multiline,
-  onSave,
-}: {
-  label: string;
-  defaultValue: string;
-  className?: string;
-  multiline?: boolean;
-  onSave?: (v: string) => void;
-}) {
-  const [value, setValue] = useState(defaultValue);
-  useEffect(() => setValue(defaultValue), [defaultValue]);
-  const Tag = multiline ? "textarea" : "input";
-  return (
-    <div className="group relative">
-      <Tag
-        value={value}
-        onChange={(e) => setValue((e.target as HTMLInputElement).value)}
-        onBlur={() => onSave?.(value)}
-        aria-label={label}
-        rows={multiline ? 3 : undefined}
-        className={cn(
-          "w-full resize-none rounded-lg bg-transparent px-2 py-1 outline-none transition hover:bg-[oklch(0.97_0.015_70)] focus:bg-white focus:ring-1 focus:ring-[oklch(0.7_0.19_45/0.4)]",
-          className,
-        )}
-      />
-      <span className="pointer-events-none absolute -top-4 left-2 hidden text-[9px] uppercase tracking-wider text-[oklch(0.5_0.03_60)] group-focus-within:block">
-        {label}
-      </span>
-    </div>
-  );
-}
