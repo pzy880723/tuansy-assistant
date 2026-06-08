@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -36,7 +36,7 @@ type ProductData = {
 
 function ProjectEditor() {
   const { id } = Route.useParams();
-  const router = useRouter();
+  
   const qc = useQueryClient();
   const get = useServerFn(getProject);
   const update = useServerFn(updateProject);
