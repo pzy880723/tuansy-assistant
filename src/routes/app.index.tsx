@@ -2,8 +2,10 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Trash2, Package, Clock } from "lucide-react";
+import { Plus, Trash2, Package, MoreHorizontal, Pencil, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,22 +15,56 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { createProject, deleteProject, listProjects } from "@/lib/projects.functions";
+import {
+  createProject,
+  deleteProject,
+  listProjects,
+  updateProjectMeta,
+} from "@/lib/projects.functions";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "我的项目 — 团宝助手" }] }),
   component: AppIndex,
 });
 
+type ProjectRow = {
+  id: string;
+  name: string;
+  status: string;
+  cover_image_url: string | null;
+  product_name: string;
+  updated_at: string;
+  created_at: string;
+  images: string[];
+};
+
 function AppIndex() {
   const list = useServerFn(listProjects);
   const create = useServerFn(createProject);
+  const update = useServerFn(updateProjectMeta);
   const del = useServerFn(deleteProject);
   const router = useRouter();
   const qc = useQueryClient();
+
+  const [dialog, setDialog] = useState<
+    { mode: "create" } | { mode: "edit"; project: ProjectRow } | null
+  >(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["projects"],
@@ -36,11 +72,24 @@ function AppIndex() {
   });
 
   const createMut = useMutation({
-    mutationFn: async () => create({ data: {} }),
+    mutationFn: async (input: { name: string; product_name: string }) =>
+      create({ data: input }),
     onSuccess: ({ id }) => {
       toast.success("已创建项目");
       qc.invalidateQueries({ queryKey: ["projects"] });
+      setDialog(null);
       router.navigate({ to: "/app/project/$id", params: { id } });
+    },
+    onError: (e) => toast.error(String(e)),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: async (input: { id: string; name: string; product_name: string }) =>
+      update({ data: input }),
+    onSuccess: () => {
+      toast.success("已保存");
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      setDialog(null);
     },
     onError: (e) => toast.error(String(e)),
   });
@@ -53,7 +102,7 @@ function AppIndex() {
     },
   });
 
-  const projects = data?.projects ?? [];
+  const projects = (data?.projects ?? []) as ProjectRow[];
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-10">
@@ -61,12 +110,11 @@ function AppIndex() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">我的项目</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            每个项目对应一场快团团团购，AI 帮你写完整流程。
+            每个项目对应一场快团团团购。
           </p>
         </div>
         <Button
-          onClick={() => createMut.mutate()}
-          disabled={createMut.isPending}
+          onClick={() => setDialog({ mode: "create" })}
           className="brand-glow h-10 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-5 font-semibold text-white hover:brightness-110"
         >
           <Plus className="h-4 w-4" /> 新建项目
@@ -76,35 +124,58 @@ function AppIndex() {
       {isLoading ? (
         <SkeletonGrid />
       ) : projects.length === 0 ? (
-        <EmptyState onCreate={() => createMut.mutate()} loading={createMut.isPending} />
+        <EmptyState onCreate={() => setDialog({ mode: "create" })} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} onDelete={() => delMut.mutate(p.id)} />
+            <ProjectCard
+              key={p.id}
+              project={p}
+              onEdit={() => setDialog({ mode: "edit", project: p })}
+              onDelete={() => delMut.mutate(p.id)}
+            />
           ))}
         </div>
       )}
+
+      <ProjectMetaDialog
+        open={dialog !== null}
+        onOpenChange={(o) => !o && setDialog(null)}
+        mode={dialog?.mode ?? "create"}
+        initialName={dialog?.mode === "edit" ? dialog.project.name : ""}
+        initialProductName={dialog?.mode === "edit" ? dialog.project.product_name : ""}
+        pending={createMut.isPending || updateMut.isPending}
+        onSubmit={(values) => {
+          if (dialog?.mode === "edit") {
+            updateMut.mutate({ id: dialog.project.id, ...values });
+          } else {
+            createMut.mutate(values);
+          }
+        }}
+      />
     </main>
   );
 }
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="overflow-hidden rounded-2xl border bg-card">
-          <div className="aspect-[4/3] animate-pulse bg-muted" />
-          <div className="space-y-2 p-4">
-            <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="rounded-2xl border bg-card p-4">
+          <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="aspect-square animate-pulse rounded-lg bg-muted" />
+            <div className="aspect-square animate-pulse rounded-lg bg-muted" />
+            <div className="aspect-square animate-pulse rounded-lg bg-muted" />
           </div>
+          <div className="mt-3 h-3 w-1/2 animate-pulse rounded bg-muted" />
         </div>
       ))}
     </div>
   );
 }
 
-function EmptyState({ onCreate, loading }: { onCreate: () => void; loading: boolean }) {
+function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-dashed bg-gradient-to-b from-[var(--brand-soft)] to-card p-16 text-center">
       <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(closest-side,oklch(0.7_0.19_45/0.18),transparent)]" />
@@ -119,7 +190,6 @@ function EmptyState({ onCreate, loading }: { onCreate: () => void; loading: bool
         <Button
           className="brand-glow mt-7 h-11 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-6 font-semibold text-white hover:brightness-110"
           onClick={onCreate}
-          disabled={loading}
         >
           <Plus className="h-4 w-4" /> 创建第一个项目
         </Button>
@@ -128,58 +198,93 @@ function EmptyState({ onCreate, loading }: { onCreate: () => void; loading: bool
   );
 }
 
-type ProjectRow = {
-  id: string;
-  name: string;
-  status: string;
-  cover_image_url: string | null;
-  updated_at: string;
-};
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日发布`;
+}
 
-function ProjectCard({ project, onDelete }: { project: ProjectRow; onDelete: () => void }) {
-  const [open, setOpen] = useState(false);
+function ProjectCard({
+  project,
+  onEdit,
+  onDelete,
+}: {
+  project: ProjectRow;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const slots = [0, 1, 2];
   return (
-    <div className="group relative overflow-hidden rounded-2xl border bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_20px_40px_-20px_oklch(0.7_0.19_45/0.35)]">
-      <Link to="/app/project/$id" params={{ id: project.id }} className="block">
-        <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-[var(--brand-soft)] to-muted">
-          {project.cover_image_url ? (
-            <img
-              src={project.cover_image_url}
-              alt={project.name}
-              className="h-full w-full object-cover transition group-hover:scale-105"
-            />
-          ) : (
-            <div className="grid h-full w-full place-items-center text-primary/40">
-              <Package className="h-12 w-12" />
-            </div>
-          )}
-          <div className="absolute left-3 top-3 inline-flex items-center rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground backdrop-blur">
-            {project.status === "draft" ? "草稿" : project.status}
-          </div>
+    <div className="group relative rounded-2xl border bg-card p-4 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_20px_40px_-20px_oklch(0.7_0.19_45/0.35)]">
+      <Link
+        to="/app/project/$id"
+        params={{ id: project.id }}
+        className="block"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="line-clamp-2 flex-1 text-[15px] font-semibold leading-snug">
+            {project.name}
+          </h3>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {formatDate(project.created_at)}
+          </span>
         </div>
-        <div className="p-4">
-          <div className="truncate font-semibold">{project.name}</div>
-          <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {new Date(project.updated_at).toLocaleString("zh-CN", {
-              month: "numeric",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {slots.map((i) => {
+            const url = project.images[i];
+            return (
+              <div
+                key={i}
+                className="aspect-square overflow-hidden rounded-lg bg-muted"
+              >
+                {url ? (
+                  <img
+                    src={url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-muted-foreground/40">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 truncate text-xs text-muted-foreground">
+          {project.product_name || <span className="italic">未填写商品名称</span>}
         </div>
       </Link>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogTrigger asChild>
-          <button
-            className="absolute right-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-full bg-background/95 text-muted-foreground opacity-0 shadow transition group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="删除"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </AlertDialogTrigger>
+
+      <div className="absolute right-2.5 top-2.5">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="grid h-7 w-7 place-items-center rounded-full bg-background/95 text-muted-foreground opacity-0 shadow transition group-hover:opacity-100 hover:bg-muted"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="操作"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onSelect={() => onEdit()}>
+              <Pencil className="h-3.5 w-3.5" /> 编辑信息
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => setConfirmOpen(true)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> 删除
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>删除「{project.name}」？</AlertDialogTitle>
@@ -194,5 +299,85 @@ function ProjectCard({ project, onDelete }: { project: ProjectRow; onDelete: () 
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function ProjectMetaDialog({
+  open,
+  onOpenChange,
+  mode,
+  initialName,
+  initialProductName,
+  pending,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: "create" | "edit";
+  initialName: string;
+  initialProductName: string;
+  pending: boolean;
+  onSubmit: (values: { name: string; product_name: string }) => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [productName, setProductName] = useState(initialProductName);
+
+  // reset state when dialog opens with new initial values
+  const [lastOpen, setLastOpen] = useState(false);
+  if (open !== lastOpen) {
+    setLastOpen(open);
+    if (open) {
+      setName(initialName);
+      setProductName(initialProductName);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === "edit" ? "编辑项目信息" : "新建项目"}</DialogTitle>
+          <DialogDescription>
+            填写团购标题和商品名称，稍后可在编辑器中继续完善。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="title">团购标题</Label>
+            <Input
+              id="title"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例如：口碑王👑袜中爱马仕‼️"
+              maxLength={120}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="product">商品名称</Label>
+            <Input
+              id="product"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              placeholder="例如：日本 ZoeJenko 隐形船袜"
+              maxLength={120}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button
+            onClick={() =>
+              onSubmit({ name: name.trim() || "未命名项目", product_name: productName.trim() })
+            }
+            disabled={pending}
+            className="bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-white hover:brightness-110"
+          >
+            {pending ? "保存中…" : mode === "edit" ? "保存" : "创建并进入编辑"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
