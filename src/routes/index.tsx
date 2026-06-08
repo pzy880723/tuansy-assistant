@@ -472,7 +472,7 @@ function FinalCta() {
     <section className="hero-bg border-t border-white/5">
       <div className="mx-auto max-w-3xl px-5 py-24 text-center">
         <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
-          今天就让 AI 帮你<br />开第一场团
+          今天就让团宝陪你<br />开第一场团
         </h2>
         <p className="mt-4 text-white/60">无需注册，打开就用。</p>
         <Link
