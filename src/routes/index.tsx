@@ -1,178 +1,317 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus, Trash2, Package } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
-import { createProject, deleteProject, listProjects } from "@/lib/projects.functions";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, Chrome, ImagePlus, MessageSquare } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "团宝助手 — 项目列表" },
-      { name: "description", content: "团宝助手：一键从文案到快团团商品上架" },
+      { title: "团宝助手 — AI 驱动的快团团商品工作台" },
+      {
+        name: "description",
+        content:
+          "上传商品图片，自然语言对话，AI 自动生成介绍、规格、SKU，一键同步到快团团。专为团长打造的智能内容工作台。",
+      },
+      { property: "og:title", content: "团宝助手 — AI 驱动的快团团商品工作台" },
+      {
+        property: "og:description",
+        content: "上传图片，对话改稿，一键同步快团团。",
+      },
     ],
   }),
-  component: Index,
+  component: Landing,
 });
 
-function Index() {
-  const list = useServerFn(listProjects);
-  const create = useServerFn(createProject);
-  const del = useServerFn(deleteProject);
-  const router = useRouter();
-  const qc = useQueryClient();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => list(),
-  });
-
-  const createMut = useMutation({
-    mutationFn: async () => create({ data: {} }),
-    onSuccess: ({ id }) => {
-      toast.success("已创建项目");
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      router.navigate({ to: "/project/$id", params: { id } });
-    },
-    onError: (e) => toast.error(String(e)),
-  });
-
-  const delMut = useMutation({
-    mutationFn: async (id: string) => del({ data: { id } }),
-    onSuccess: () => {
-      toast.success("已删除");
-      qc.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-
-  const projects = data?.projects ?? [];
-
+function Landing() {
   return (
-    <AppShell
-      right={
-        <Button onClick={() => createMut.mutate()} disabled={createMut.isPending} size="sm">
-          <Plus className="h-4 w-4" /> 新建项目
-        </Button>
-      }
-    >
-      <h1 className="mb-4 text-2xl font-bold tracking-tight">我的项目</h1>
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">加载中…</div>
-      ) : projects.length === 0 ? (
-        <EmptyState onCreate={() => createMut.mutate()} loading={createMut.isPending} />
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onDelete={() => delMut.mutate(p.id)}
-            />
-          ))}
-        </div>
-      )}
-    </AppShell>
-  );
-}
-
-function EmptyState({ onCreate, loading }: { onCreate: () => void; loading: boolean }) {
-  return (
-    <div className="rounded-xl border border-dashed bg-card p-10 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--brand-soft)]">
-        <Package className="h-7 w-7 text-primary" />
-      </div>
-      <h2 className="mt-4 text-lg font-semibold">还没有项目</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        创建第一个团购项目，上传图片+粘贴文案，让 AI 一键生成完整商品信息
-      </p>
-      <Button className="mt-5" onClick={onCreate} disabled={loading}>
-        <Plus className="h-4 w-4" /> 创建第一个项目
-      </Button>
+    <div className="surface-ink min-h-screen">
+      <TopNav />
+      <Hero />
+      <Logos />
+      <Features />
+      <HowItWorks />
+      <FinalCta />
+      <Footer />
     </div>
   );
 }
 
-type ProjectRow = {
-  id: string;
-  name: string;
-  status: string;
-  cover_image_url: string | null;
-  updated_at: string;
-};
-
-function ProjectCard({
-  project,
-  onDelete,
-}: {
-  project: ProjectRow;
-  onDelete: () => void;
-}) {
-  const [open, setOpen] = useState(false);
+function TopNav() {
   return (
-    <Card className="group relative overflow-hidden p-0">
-      <Link
-        to="/project/$id"
-        params={{ id: project.id }}
-        className="block"
-      >
-        <div className="aspect-[4/3] bg-[var(--brand-soft)]">
-          {project.cover_image_url ? (
-            <img
-              src={project.cover_image_url}
-              alt={project.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="grid h-full w-full place-items-center text-primary/60">
-              <Package className="h-10 w-10" />
-            </div>
-          )}
+    <header className="sticky top-0 z-40 border-b border-white/5 bg-[oklch(0.13_0.012_50/0.8)] backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
+        <Link to="/" className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-sm font-bold text-white shadow-[0_4px_16px_oklch(0.7_0.19_45/0.5)]">
+            团
+          </span>
+          <span className="font-semibold tracking-tight">团宝助手</span>
+        </Link>
+        <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
+          <a href="#features" className="hover:text-white">产品能力</a>
+          <a href="#how" className="hover:text-white">工作流程</a>
+          <Link to="/extension" className="hover:text-white">Chrome 插件</Link>
+        </nav>
+        <Link
+          to="/app"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-medium text-[oklch(0.15_0.02_50)] transition hover:bg-white/90"
+        >
+          进入工作台 <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+function Hero() {
+  return (
+    <section className="hero-bg relative overflow-hidden">
+      <div className="mx-auto max-w-6xl px-5 pt-20 pb-24 md:pt-28 md:pb-32">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/70 backdrop-blur">
+            <Sparkles className="h-3 w-3 text-[oklch(0.78_0.18_55)]" />
+            为快团团团长打造的 AI 工作台
+          </div>
+          <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
+            把商品图片变成
+            <span className="text-gradient-brand"> 一场完美团购</span>
+          </h1>
+          <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-white/65 md:text-xl">
+            上传图片，用自然语言告诉 AI 你想要什么。
+            <br className="hidden md:inline" />
+            介绍、规格、SKU 自动生成，一键同步到快团团。
+          </p>
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              to="/app"
+              className="brand-glow inline-flex h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-7 text-base font-semibold text-white transition hover:brightness-110"
+            >
+              免费开始创建 <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/extension"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-6 text-base font-medium text-white/90 backdrop-blur transition hover:bg-white/[0.08]"
+            >
+              <Chrome className="h-4 w-4" /> 下载 Chrome 插件
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-white/40">无需注册 · 一键开始</p>
         </div>
-        <div className="p-3">
-          <div className="truncate font-medium">{project.name}</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {new Date(project.updated_at).toLocaleString("zh-CN")}
+
+        {/* Mock product window */}
+        <div className="relative mx-auto mt-16 max-w-5xl">
+          <div className="absolute -inset-x-10 -inset-y-10 -z-10 bg-[radial-gradient(closest-side,oklch(0.7_0.19_45/0.35),transparent)]" />
+          <ProductMockup />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProductMockup() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[oklch(0.16_0.012_50)] shadow-[0_40px_120px_-20px_oklch(0_0_0/0.6)]">
+      <div className="flex items-center gap-1.5 border-b border-white/5 px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.65_0.18_25)]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.78_0.16_85)]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.72_0.16_145)]" />
+        <span className="ml-3 text-[11px] text-white/35">tuanbao.app · 编辑「云南阳光玫瑰」</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr]">
+        {/* Chat side */}
+        <div className="border-b border-white/5 p-5 md:border-b-0 md:border-r">
+          <div className="space-y-3">
+            <ChatBubble role="user">把封面图换得更有食欲一点，价格档位改成 2 斤装 39.9，5 斤装 88</ChatBubble>
+            <ChatBubble role="ai">
+              已更新封面与 2 个 SKU。要不要顺便生成一段「产地直发 · 顺丰冷链」的卖点段落？
+            </ChatBubble>
+          </div>
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-2">
+            <ImagePlus className="h-4 w-4 text-white/50" />
+            <span className="flex-1 text-sm text-white/40">告诉 AI 你想怎么改…</span>
+            <button className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-white">
+              <Send className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
-      </Link>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogTrigger asChild>
-          <button
-            className="absolute right-2 top-2 rounded-md bg-background/80 p-1.5 opacity-0 transition group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="删除"
+        {/* Preview side */}
+        <div className="bg-[oklch(0.96_0.01_70)] p-5 text-[oklch(0.18_0.02_50)]">
+          <div className="mx-auto max-w-[280px] overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-xl">
+            <div className="aspect-[4/3] bg-gradient-to-br from-[oklch(0.85_0.08_80)] to-[oklch(0.7_0.15_45)]" />
+            <div className="space-y-2 p-3.5">
+              <div className="text-sm font-bold leading-snug">云南阳光玫瑰 · 现摘现发</div>
+              <div className="text-[10px] text-[oklch(0.5_0.03_60)]">产地直采 · 顺丰冷链 · 坏果包赔</div>
+              <div className="mt-2 space-y-1.5">
+                <SkuRow name="2 斤装" price="39.9" />
+                <SkuRow name="5 斤装" price="88.0" />
+              </div>
+              <button className="mt-2 h-8 w-full rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-xs font-semibold text-white">
+                参 团
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatBubble({ role, children }: { role: "user" | "ai"; children: React.ReactNode }) {
+  if (role === "user") {
+    return (
+      <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-md bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] px-3.5 py-2 text-sm text-white">
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-[85%] rounded-2xl rounded-tl-md border border-white/10 bg-white/[0.04] px-3.5 py-2 text-sm text-white/85">
+      {children}
+    </div>
+  );
+}
+
+function SkuRow({ name, price }: { name: string; price: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-[oklch(0.97_0.015_70)] px-2.5 py-1.5">
+      <span className="text-xs">{name}</span>
+      <span className="text-xs font-bold text-[oklch(0.62_0.22_35)]">¥{price}</span>
+    </div>
+  );
+}
+
+function Logos() {
+  return (
+    <section className="border-y border-white/5 bg-[oklch(0.11_0.012_50)] py-6">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-5 text-xs uppercase tracking-[0.18em] text-white/35">
+        <span>已被 1000+ 团长信赖</span>
+        <span>·</span>
+        <span>水果生鲜</span>
+        <span>·</span>
+        <span>零食烘焙</span>
+        <span>·</span>
+        <span>家居日用</span>
+        <span>·</span>
+        <span>美妆个护</span>
+      </div>
+    </section>
+  );
+}
+
+function Features() {
+  const features = [
+    {
+      icon: Wand2,
+      title: "AI 识图填写",
+      desc: "上传产品图，AI 自动识别品类、卖点、规格，自动填好商品基础信息。",
+    },
+    {
+      icon: Layers,
+      title: "介绍块编辑器",
+      desc: "大图、小图、视频、文字、标签自由编排，一段话生成整段介绍。",
+    },
+    {
+      icon: Boxes,
+      title: "SKU 矩阵生成",
+      desc: "输入规格组，自动生成 SKU 笛卡尔积，批量改价、改库存、套模板。",
+    },
+    {
+      icon: MessageSquare,
+      title: "对话即所得",
+      desc: "右侧是真实的快团团预览，左侧自然语言告诉 AI 怎么改，所改即所见。",
+    },
+  ];
+  return (
+    <section id="features" className="mx-auto max-w-6xl px-5 py-24">
+      <div className="mx-auto max-w-2xl text-center">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[oklch(0.78_0.18_55)]">
+          核心能力
+        </div>
+        <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
+          把繁琐的录入，<br />交给会读图的 AI
+        </h2>
+        <p className="mt-4 text-white/55">
+          团长不用再为「写文案、配 SKU、传图片」内耗。打开团宝，开口就行。
+        </p>
+      </div>
+      <div className="mt-14 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {features.map((f) => (
+          <div
+            key={f.title}
+            className="group relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] p-7 transition hover:border-[oklch(0.7_0.19_45/0.4)] hover:bg-white/[0.04]"
           >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除「{project.name}」？</AlertDialogTitle>
-            <AlertDialogDescription>
-              此操作不可撤销，项目内的图片、文案、SKU 都会一并删除。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={onDelete}>确认删除</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
+            <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-[oklch(0.7_0.19_45/0.08)] blur-3xl transition group-hover:bg-[oklch(0.7_0.19_45/0.18)]" />
+            <div className="relative">
+              <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_8px_24px_oklch(0.7_0.19_45/0.4)]">
+                <f.icon className="h-5 w-5" />
+              </div>
+              <h3 className="mt-5 text-xl font-semibold">{f.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/55">{f.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    { n: "01", title: "上传商品图片", desc: "拖入或粘贴，多张也行。" },
+    { n: "02", title: "对 AI 提需求", desc: "「便宜点的家庭装 + 顺丰发货」。" },
+    { n: "03", title: "一键同步快团团", desc: "Chrome 插件自动填写，无需复制粘贴。" },
+  ];
+  return (
+    <section id="how" className="border-t border-white/5 bg-[oklch(0.11_0.012_50)] py-24">
+      <div className="mx-auto max-w-6xl px-5">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[oklch(0.78_0.18_55)]">
+            工作流程
+          </div>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
+            三步，开一场新团购
+          </h2>
+        </div>
+        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
+          {steps.map((s) => (
+            <div key={s.n} className="rounded-2xl border border-white/8 bg-white/[0.02] p-7">
+              <div className="text-5xl font-bold text-gradient-brand">{s.n}</div>
+              <h3 className="mt-4 text-xl font-semibold">{s.title}</h3>
+              <p className="mt-2 text-sm text-white/55">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCta() {
+  return (
+    <section className="hero-bg border-t border-white/5">
+      <div className="mx-auto max-w-3xl px-5 py-24 text-center">
+        <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
+          今天就让 AI 帮你<br />开第一场团
+        </h2>
+        <p className="mt-4 text-white/60">无需注册，打开就用。</p>
+        <Link
+          to="/app"
+          className="brand-glow mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-7 text-base font-semibold text-white transition hover:brightness-110"
+        >
+          进入工作台 <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-white/5 py-8">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-xs text-white/40 md:flex-row">
+        <div>© {new Date().getFullYear()} 团宝助手 · 让 AI 帮团长更高效</div>
+        <div className="flex items-center gap-5">
+          <Link to="/extension" className="hover:text-white/70">Chrome 插件</Link>
+          <Link to="/app" className="hover:text-white/70">工作台</Link>
+        </div>
+      </div>
+    </footer>
   );
 }
