@@ -7,13 +7,11 @@ type Tab = "intro" | "product" | "settings";
 export function PhoneShell({
   tab,
   onTabChange,
-  showTopBar = true,
   header,
   children,
 }: {
   tab: Tab;
   onTabChange: (t: Tab) => void;
-  showTopBar?: boolean;
   header?: ReactNode;
   children: ReactNode;
 }) {
