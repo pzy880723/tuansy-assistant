@@ -1,73 +1,103 @@
-## 1. 改文案：开始开团 → 快速开团
 
-`src/routes/index.tsx` 第 179 行：
+## 目标
 
-- 非计划模式按钮文案 `开始开团` → `快速开团`
-- 计划模式保持 `先聊清楚`
+1. 去掉"AI / AI 对话"字眼，全面替换为拟人化的"团宝"形象（含头像、名字、口吻）。
+2. 团宝问问题时不再把 4 个问题挤在一段话里，而是渲染成可点选的问卷卡片，用户点完选项后点"确认"再发送，参考 Lovable 计划模式的体验。
 
-## 2. 计划模式按钮点了"没反应"
+---
 
-代码上 `onClick` 是接的，问题更像是视觉变化太弱——非激活态白色 12% 描边，激活态橙色 55% 描边 + 半透明橙色背景，在深色卡片上几乎看不出差别。修法：
+## 1. 团宝形象设计
 
-- 激活态用实色橙色填充：`bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-white border-transparent`，加一个左侧白色小圆点指示灯。
-- 非激活态颜色拉强一点：`border-white/25 text-white/75`。
-- 文案改成"计划模式 已开"/"计划模式"，并在切换时 `toast.success("已开启计划模式")` / `toast("已关闭计划模式")`，让人立刻知道点中了。
-- 工作台 `ChatPane` 里那个一样样式的小按钮也做同样的处理。
+- 生成一只品牌吉祥物头像（橙色暖色调，与现有 brand 色一致）：
+  - 形象：一个圆滚滚的"礼盒/快递包裹"小人，头顶蝴蝶结手柄、脸颊有腮红、笑眼，手里抱着一个小价签，整体扁平矢量风，干净白底。
+  - 文件：`src/assets/tuanbao-avatar.png`（透明背景 PNG，512×512，premium 质量保证细节）。
+- 在以下位置用团宝头像替换原本的 `AI` 圆圈 / `Sparkles` 图标：
+  - `src/routes/app.project.$id.tsx` 聊天面板顶栏（397 行附近的"AI 对话" → "团宝"）。
+  - `MessageRow` 里 assistant 一侧的头像（原"AI"两字圆圈）。
+  - `src/routes/index.tsx` 首页 hero 的角色出场处（若有 AI 字样的徽章）。
+  - 浏览器 favicon 暂不动（成本与范围控制）。
+- 文案口吻调整（仅前端展示文本，不动业务）：
+  - "AI 对话" → "和团宝聊聊"
+  - "AI 正在思考" → "团宝在想…"
+  - "AI 驱动的…" 等首页/工作台副标题里的"AI"统一替换为"团宝"（保留 SEO 关键词的 meta title 不变，避免影响搜索）。
 
-## 3. 加图片真正能用 + 拖拽 + 粘贴 + 批量
+## 2. 问卷式提问（核心交互改造）
 
-### 后端
+### 体验目标
+团宝在需要补充信息时，不再输出一段把 4 个问题串在一起的文字，而是发出一张"问卷卡片"：
+- 每个问题独立成行；
+- 每题给 3–5 个常见选项（多选/单选由问题决定），并允许"其他（填写）"；
+- 卡片底部一个主按钮「确认并发送」+ 次按钮「跳过」；
+- 用户点确认后，把"问题 → 选择"汇总成一条用户消息回给团宝，团宝据此继续。
 
-`src/lib/projects.functions.ts` 新增 `uploadProductImage`（POST，`requireSupabaseAuth` 不加，因为目前其他 fn 也都用 admin）：
+### 后端：新增 `ask_questions` 工具
 
-- 输入：`{ projectId?: string; filename: string; mimeType: string; dataBase64: string }`，校验 mime 是 `image/*`、base64 解码后 ≤ 8MB。
-- 通过 `supabaseAdmin.storage.from("product-images").upload(<uuid>.<ext>, bytes, { contentType, upsert: false })`。
-- 用 `getPublicUrl` 拿地址；存在 `projectId` 时 `insert` 到 `project_images(project_id, url, sort_order)`。
-- 返回 `{ url }`。
+在 `src/routes/api/chat.ts` 的 `tools` 中新增：
 
-`product-images` 桶现在是 private——这一步用 `supabase--storage_update_bucket` 把它切成 public，方便 AI 模型按 URL 直接读取图片（团购商品图本身就是公开素材，没有隐私问题）。如果工作区禁公开桶就退回到 server fn 内用 `createSignedUrl(7d)`。
+```ts
+ask_questions: tool({
+  description:
+    "当需要向用户确认多个信息时调用，不要把多个问题塞进一段文字里。每次最多 4 个问题，每个问题给 2-5 个候选选项。",
+  inputSchema: z.object({
+    intro: z.string().max(40).describe("一句话说明为什么要问，例如：先确认几个细节，我好写文案"),
+    questions: z.array(z.object({
+      id: z.string(),
+      question: z.string().max(40),
+      multi: z.boolean().default(false),
+      options: z.array(z.string().max(20)).min(2).max(5),
+      allowOther: z.boolean().default(true),
+    })).min(1).max(4),
+  }),
+  execute: async (input) => ({ ok: true, ...input }),
+}),
+```
 
-`startProject` 扩展：
+并在 system prompt 里追加规则：
+- "当需要向用户确认 2 个及以上信息时，必须调用 `ask_questions`，禁止把多个问题写在文字回复里。"
+- "单个开放性问题可以直接用文字问。"
 
-- 入参增加 `imageUrls: string[]`（最多 9 张）。
-- 给模型的 prompt 末尾追加"用户还上传了 N 张商品图，可作为品类判断依据：<url 列表>"。
-- 项目入库后把这些 URL 写入 `project_images`，第一张同时写到 `projects.cover_image_url`。
+### 前端：渲染问卷卡片
 
-### 前端通用 hook
+在 `src/routes/app.project.$id.tsx` 的 `MessageRow` 内，遍历 `message.parts` 时：
+- 识别 `type === 'tool-ask_questions'` 且 `state === 'output-available'` 的 part。
+- 渲染一个 `<QuestionnaireCard>`（新建组件，放同文件或 `src/components/chat/questionnaire-card.tsx`）：
+  - 顶部一行 `intro` 文案 + 团宝小头像。
+  - 每个问题一个 block：标题 + 选项 chips（单选高亮一项，多选可选多项），末尾可选 `+ 其他`（点开变 input）。
+  - 底部：`确认并发送` / `跳过` 两个按钮。
+- 卡片维护本地 state（answers map）。点"确认"时：
+  - 把回答拼成一段中文文本，例如：
+    ```
+    1. 核心客群：通勤白领
+    2. 材质：真皮 / 内里隔层
+    3. 团购价：200–300
+    4. 发货：3 天内、顺丰
+    ```
+  - 调 `sendText(...)` 作为新的用户消息发出。
+  - 卡片切换为"已提交"只读态，禁止重复点。
+- 已答过的卡片重新挂载（如刷新历史）时，从 `tool` part 的 `result`/UI state 还原只读态即可（简单做法：本地用 `useState` 标记已发送的 questionId 集合，仅区分"未提交/已提交"两态）。
 
-新建 `src/lib/use-image-attachments.ts`：
+### 配套清理
+- 移除 `ChatEmpty` 与首屏建议里类似"帮我想几个问题问我"这种鼓励团宝写长问句的引导。
+- `suggestions`（`suggest_next`）保持不变，问卷与建议并存：问卷在回复主体里，建议在输入框上方。
 
-- state：`attachments: { id, previewUrl, uploading, url? }[]`，`dragActive: boolean`
-- `addFiles(files)`：过滤 `image/*`、限制 ≤ 9 张、单张 ≤ 8MB；客户端 canvas 压缩到长边 1600px；`URL.createObjectURL` 出缩略图；并行调 `uploadProductImage` 拿回 url 回填。
-- `bindDragHandlers(): { onDragEnter, onDragOver, onDragLeave, onDrop }` 给任意容器用。
-- `bindPasteHandler(): onPaste` 给 textarea 用，取 `clipboardData.files`（已经支持一次性多张）。
-- `remove(id)` / `clear()` / `getUrls()`。
+---
 
-### 首页 `HeroStarter`
+## 技术细节速览
 
-- 用 hook 接管外层 `div` 的拖拽事件；`dragActive` 时把容器边框加成橙色虚线（`outline-dashed outline-[oklch(0.7_0.19_45)]`）。
-- textarea 加 `onPaste`。
-- "加图片"按钮触发隐藏的 `<input type="file" accept="image/*" multiple>`，`onChange` 调 `addFiles`。
-- textarea 下方渲染缩略图条（圆角小图 + 右上角 ×；正在上传时盖一层 spinner）。
-- 提交时把 `getUrls()` 一起传给 `startProject`，并要求至少有一张图或文字 ≥ 4 字。
+| 改动 | 文件 |
+| --- | --- |
+| 生成团宝头像 | `src/assets/tuanbao-avatar.png`（新增，imagegen premium） |
+| 顶栏 / Assistant 头像 / 文案 | `src/routes/app.project.$id.tsx` |
+| 首页与工作台对外文案 | `src/routes/index.tsx`、`src/routes/app.index.tsx`、`src/routes/app.tsx` |
+| 新 `ask_questions` 工具 + system prompt | `src/routes/api/chat.ts` |
+| 问卷卡片组件 | `src/components/chat/questionnaire-card.tsx`（新增） |
 
-### 工作台 `ChatPane`
+不涉及数据库迁移，不动 `convertToModelMessages` 流程，AI SDK 工具 part 已天然走 `message.parts`，前端无需新协议。
 
-- 同一个 hook，给最外层 flex 容器绑拖拽；输入区 textarea 绑粘贴；"图片附件"按钮接 file input。
-- 输入框上方显示同样的缩略图条。
-- 发送时把附件转成 AI SDK 的 file part 一起发：`sendMessage({ text, files: [{ type: "file", mediaType, url }, ...] })`。
-- `/api/chat` 已用 `convertToModelMessages`，可以直接把 file parts 传给 Gemini，不用改后端。
+---
 
-## 涉及文件
+## 不在本次范围
 
-- `src/routes/index.tsx`（按钮文案 + 计划按钮样式 + 图片附件 UI）
-- `src/routes/app.project.$id.tsx`（计划按钮样式 + 图片附件 UI + 发送时带 file part）
-- `src/lib/projects.functions.ts`（新增 `uploadProductImage`，`startProject` 接收 `imageUrls`）
-- 新建 `src/lib/use-image-attachments.ts`（hook）
-- `supabase--storage_update_bucket` 把 `product-images` 改 public
-
-## 不动
-
-- AI prompt 的品类规则、撰写口径
-- `/api/chat` 路由本身
-- 不引新依赖（拖拽/粘贴/压缩全部用浏览器原生 API）
+- 不改 SEO 用的 page title / meta（仍保留"团宝助手 — AI 驱动…"，避免搜索流量回退）。
+- 不调整聊天历史持久化结构。
+- 不重做首页整体视觉，只替换 AI 相关词与角色出场处。

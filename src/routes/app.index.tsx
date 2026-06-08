@@ -185,7 +185,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         </div>
         <h2 className="mt-6 text-2xl font-bold">开第一场团</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          上传商品图，告诉 AI 你想怎么卖，让团宝帮你生成完整的快团团内容。
+          上传商品图，告诉团宝你想怎么卖，团宝会帮你生成完整的快团团内容。
         </p>
         <Button
           className="brand-glow mt-7 h-11 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-6 font-semibold text-white hover:brightness-110"

@@ -72,7 +72,7 @@ function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/70 backdrop-blur">
             <Sparkles className="h-3 w-3 text-[oklch(0.78_0.18_55)]" />
-            为快团团团长打造的 AI 工作台
+            团宝，为快团团团长打造的开团搭子
           </div>
           <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
             开团，<span className="text-gradient-brand">从一句话开始</span>
@@ -85,7 +85,7 @@ function Hero() {
         <div className="mx-auto mt-10 max-w-2xl">
           <HeroStarter />
           <p className="mt-3 text-center text-xs text-white/40">
-            AI 会自动识别品类，生成项目并跳转到工作台 · <Link to="/app" className="underline-offset-4 hover:text-white/70 hover:underline">不急，先逛逛工作台</Link>
+            团宝会自动识别品类，生成项目并跳转到工作台 · <Link to="/app" className="underline-offset-4 hover:text-white/70 hover:underline">不急，先逛逛工作台</Link>
           </p>
         </div>
 
@@ -149,7 +149,7 @@ function HeroStarter() {
   const togglePlan = () => {
     setMode((m) => {
       const next = m === "plan" ? "draft" : "plan";
-      if (next === "plan") toast.success("已开启计划模式：AI 会先反问澄清");
+      if (next === "plan") toast.success("已开启计划模式：团宝会先反问澄清");
       else toast("已关闭计划模式");
       return next;
     });
@@ -243,7 +243,7 @@ function HeroStarter() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> AI 正在识别…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> 团宝正在识别…
                 </>
               ) : (
                 <>
@@ -268,7 +268,7 @@ function PlanModeChip({ active, onClick }: { active: boolean; onClick: () => voi
     <button
       type="button"
       onClick={onClick}
-      title="开启后 AI 会先反问澄清，再动笔"
+      title="开启后团宝会先反问澄清，再动笔"
       className={
         "inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition " +
         (active
@@ -309,7 +309,7 @@ function ProductMockup() {
           </div>
           <div className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-2">
             <ImagePlus className="h-4 w-4 text-white/50" />
-            <span className="flex-1 text-sm text-white/40">告诉 AI 你想怎么改…</span>
+            <span className="flex-1 text-sm text-white/40">告诉团宝你想怎么改…</span>
             <button className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-white">
               <Send className="h-3.5 w-3.5" />
             </button>
@@ -384,7 +384,7 @@ function Features() {
     {
       icon: Wand2,
       title: "AI 识图填写",
-      desc: "上传产品图，AI 自动识别品类、卖点、规格，自动填好商品基础信息。",
+      desc: "上传产品图，团宝自动识别品类、卖点、规格，自动填好商品基础信息。",
     },
     {
       icon: Layers,
@@ -399,7 +399,7 @@ function Features() {
     {
       icon: MessageSquare,
       title: "对话即所得",
-      desc: "右侧是真实的快团团预览，左侧自然语言告诉 AI 怎么改，所改即所见。",
+      desc: "右侧是真实的快团团预览，左侧自然语言告诉团宝怎么改，所改即所见。",
     },
   ];
   return (
@@ -409,7 +409,7 @@ function Features() {
           核心能力
         </div>
         <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
-          把繁琐的录入，<br />交给会读图的 AI
+          把繁琐的录入，<br />交给会读图的团宝
         </h2>
         <p className="mt-4 text-white/55">
           团长不用再为「写文案、配 SKU、传图片」内耗。打开团宝，开口就行。
@@ -472,7 +472,7 @@ function FinalCta() {
     <section className="hero-bg border-t border-white/5">
       <div className="mx-auto max-w-3xl px-5 py-24 text-center">
         <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
-          今天就让 AI 帮你<br />开第一场团
+          今天就让团宝陪你<br />开第一场团
         </h2>
         <p className="mt-4 text-white/60">无需注册，打开就用。</p>
         <Link
@@ -490,7 +490,7 @@ function Footer() {
   return (
     <footer className="border-t border-white/5 py-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-xs text-white/40 md:flex-row">
-        <div>© {new Date().getFullYear()} 团宝助手 · 让 AI 帮团长更高效</div>
+        <div>© {new Date().getFullYear()} 团宝助手 · 让团宝替团长省心</div>
         <div className="flex items-center gap-5">
           <Link to="/extension" className="hover:text-white/70">Chrome 插件</Link>
           <Link to="/app" className="hover:text-white/70">工作台</Link>

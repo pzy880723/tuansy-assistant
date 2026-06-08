@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/chat")({
         const result = streamText({
           model,
           stopWhen: stepCountIs(50),
-          system: `你是「团宝助手」，帮助快团团团长编辑团购项目内容。
+          system: `你是「团宝」，一只圆滚滚的橙色礼盒小精灵，是快团团团长的开团搭子。说话像真人助理一样自然、利落、有温度，不端架子、不寒暄。
 
 当前项目: 「${project?.name ?? "未命名"}」
 当前商品品类: ${((project?.product as { category?: string[] } | null)?.category?.[0]) ?? "未分类"}
@@ -82,6 +82,7 @@ export const Route = createFileRoute("/api/chat")({
 - 多条信息用"一、二、三"或直接换行分段，不要用项目符号
 - 控制在 3 到 6 行内，简洁、像真人助理一样说话
 - 不寒暄、不重复用户的话、不要"好的，我来帮你..."这种开场
+- 自称"团宝"，不要说"AI"或"助手"
 
 工作原则：
 - 用户描述意图时，主动调用工具修改预览，不要只是回复文字
@@ -90,6 +91,12 @@ export const Route = createFileRoute("/api/chat")({
 - 修改后用一句中文简短确认所做改动
 - 价格保留 1 位小数，库存为整数字符串
 - 不确定时主动询问用户
+
+询问用户信息时（极其重要）：
+- 一次需要确认 2 个及以上信息时，必须调用 ask_questions 工具发出问卷，禁止把多个问题塞进一段文字里
+- 每个问题给 2 到 5 个最常见的候选选项，让用户点选；问题文案精简到 20 字内
+- 单个开放性问题（比如让用户描述卖点）可以直接用一句话问
+- 调用 ask_questions 时，不要再额外用文字重复同样的问题
 
 每次回复结束前，必须调用一次 suggest_next 工具，给出 2 到 4 条用户下一步最可能想做的短指令（每条不超过 18 个汉字，必须能直接当作下一条用户消息发送）。`,
 
@@ -130,6 +137,29 @@ export const Route = createFileRoute("/api/chat")({
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, count: skus.length };
               },
+            }),
+            ask_questions: tool({
+              description:
+                "需要向用户确认 2 个及以上信息时必须调用，禁止把多个问题塞进文字回复里。每个问题给 2-5 个常见候选选项，用户点击即可作答。",
+              inputSchema: z.object({
+                intro: z
+                  .string()
+                  .max(40)
+                  .describe("一句话说明为什么要问，例如：先确认几个细节我好写文案"),
+                questions: z
+                  .array(
+                    z.object({
+                      id: z.string().describe("简短英文/拼音 id，例如 audience"),
+                      question: z.string().max(40).describe("问题文案，20 字内"),
+                      multi: z.boolean().describe("是否多选，默认 false"),
+                      options: z.array(z.string().max(20)).min(2).max(5),
+                      allow_other: z.boolean().describe("是否允许用户填写其他，默认 true"),
+                    }),
+                  )
+                  .min(1)
+                  .max(4),
+              }),
+              execute: async (input) => ({ ok: true, ...input }),
             }),
             suggest_next: tool({
               description:
