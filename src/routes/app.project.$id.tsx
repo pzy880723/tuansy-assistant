@@ -143,23 +143,49 @@ function SaveBadge({ state }: { state: "idle" | "saving" | "saved" }) {
   );
 }
 
-/* ============== LEFT: AI Chat Pane (skeleton) ============== */
-
-type Msg = { role: "user" | "ai"; text: string };
+/* ============== LEFT: AI Chat Pane (live, tool-calling) ============== */
 
 function ChatPane({ projectId }: { projectId: string }) {
   const storageKey = `tuanbao.chat.${projectId}`;
-  const [messages, setMessages] = useState<Msg[]>(() => {
+  const qc = useQueryClient();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const initial: UIMessage[] = (() => {
     if (typeof window === "undefined") return [];
     try {
       const raw = window.localStorage.getItem(storageKey);
-      return raw ? (JSON.parse(raw) as Msg[]) : [];
+      return raw ? (JSON.parse(raw) as UIMessage[]) : [];
     } catch {
       return [];
     }
+  })();
+
+  const transport = useRef(
+    new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest: ({ messages, body }) => ({
+        body: { ...body, messages, projectId },
+      }),
+    }),
+  ).current;
+
+  const { messages, sendMessage, status, error } = useChat({
+    id: projectId,
+    messages: initial,
+    transport,
+    onError: (e) => toast.error(e.message ?? "对话出错"),
+    onFinish: () => {
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+    onToolCall: () => {
+      // Refresh preview as soon as a tool runs server-side
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+    },
   });
+
   const [input, setInput] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const isLoading = status === "submitted" || status === "streaming";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -167,22 +193,19 @@ function ChatPane({ projectId }: { projectId: string }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, storageKey]);
 
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [projectId, status]);
+
   const send = () => {
     const text = input.trim();
-    if (!text) return;
-    setMessages((m) => [
-      ...m,
-      { role: "user", text },
-      {
-        role: "ai",
-        text: "（AI 引擎即将接入）收到，我会读取右侧预览并据此调整。先在右侧直接点击就能改字、改图、改 SKU。",
-      },
-    ]);
+    if (!text || isLoading) return;
+    void sendMessage({ text });
     setInput("");
   };
 
   return (
-    <div className="flex h-full flex-col border-b bg-card md:border-b-0 md:border-r">
+    <div className="flex h-full min-h-0 flex-col border-b bg-card md:border-b-0 md:border-r">
       <div className="flex items-center gap-2 border-b px-4 py-3">
         <Sparkles className="h-4 w-4 text-primary" />
         <div className="text-sm font-semibold">AI 对话</div>
@@ -191,11 +214,21 @@ function ChatPane({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-5">
-        {messages.length === 0 && <ChatEmpty onPick={setInput} />}
-        {messages.map((m, i) => (
-          <MessageRow key={i} msg={m} />
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
+        {messages.length === 0 && !isLoading && <ChatEmpty onPick={setInput} />}
+        {messages.map((m) => (
+          <MessageRow key={m.id} msg={m} />
         ))}
+        {status === "submitted" && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> 思考中…
+          </div>
+        )}
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {error.message}
+          </div>
+        )}
       </div>
 
       <div className="border-t p-3">
@@ -203,12 +236,13 @@ function ChatPane({ projectId }: { projectId: string }) {
           <button
             type="button"
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => toast.info("拖入或选择图片即将上线")}
+            onClick={() => toast.info("图片附件即将上线")}
             aria-label="上传图片"
           >
             <ImagePlus className="h-4 w-4" />
           </button>
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -220,14 +254,15 @@ function ChatPane({ projectId }: { projectId: string }) {
             rows={1}
             placeholder="告诉 AI 你想怎么改 (Enter 发送 · Shift+Enter 换行)"
             className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            disabled={isLoading}
           />
           <Button
             size="sm"
             onClick={send}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
             className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
           >
-            <Send className="h-3.5 w-3.5" />
+            {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           </Button>
         </div>
       </div>
@@ -237,10 +272,10 @@ function ChatPane({ projectId }: { projectId: string }) {
 
 function ChatEmpty({ onPick }: { onPick: (s: string) => void }) {
   const samples = [
-    "生成一段「产地直发、顺丰冷链」的卖点段落",
     "把价格档位改成 2 斤 39.9、5 斤 88",
-    "封面图换成更有食欲的暖色调",
-    "加一个「坏果包赔」的服务标签",
+    "标题改成更有食欲一点",
+    "副标题加上「现摘现发 24 小时直达」",
+    "加一个 1 斤试吃装 19.9 元",
   ];
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
@@ -266,25 +301,102 @@ function ChatEmpty({ onPick }: { onPick: (s: string) => void }) {
   );
 }
 
-function MessageRow({ msg }: { msg: Msg }) {
+type ToolPart = {
+  type: string;
+  toolName?: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+  errorText?: string;
+};
+
+function MessageRow({ msg }: { msg: UIMessage }) {
+  const text = msg.parts
+    .filter((p) => p.type === "text")
+    .map((p) => (p as { type: "text"; text: string }).text)
+    .join("");
+
+  const toolParts = msg.parts.filter((p) => p.type.startsWith("tool-")) as ToolPart[];
+
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] px-3.5 py-2 text-sm text-white shadow-sm">
-          {msg.text}
+        <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] px-3.5 py-2 text-sm text-white shadow-sm whitespace-pre-wrap">
+          {text}
         </div>
       </div>
     );
   }
+
   return (
     <div className="flex gap-2.5">
       <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-[10px] font-bold text-white">
         AI
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-muted px-3.5 py-2 text-sm leading-relaxed">
-        {msg.text}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {toolParts.map((part, i) => (
+          <ToolCard key={i} part={part} />
+        ))}
+        {text && (
+          <div className="max-w-[95%] rounded-2xl rounded-tl-md bg-muted px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap">
+            {text}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function ToolCard({ part }: { part: ToolPart }) {
+  const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
+  const label =
+    name === "update_product" ? "更新商品信息" : name === "update_skus" ? "更新 SKU" : name;
+  const isRunning = part.state === "input-streaming" || part.state === "input-available";
+  const hasOutput = part.state === "output-available";
+  const failed = part.state === "output-error" || !!part.errorText;
+
+  return (
+    <details className="group max-w-[95%] overflow-hidden rounded-xl border bg-background/70">
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs">
+        <span
+          className={cn(
+            "grid h-5 w-5 place-items-center rounded-md",
+            failed
+              ? "bg-destructive/15 text-destructive"
+              : hasOutput
+                ? "bg-[oklch(0.92_0.08_145)] text-[oklch(0.45_0.12_145)]"
+                : "bg-[var(--brand-soft)] text-primary",
+          )}
+        >
+          {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
+        </span>
+        <span className="font-medium">{label}</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {failed ? "失败" : hasOutput ? "已应用" : isRunning ? "执行中" : ""}
+        </span>
+      </summary>
+      <div className="space-y-2 border-t bg-muted/30 px-3 py-2 text-[11px]">
+        {part.input != null && (
+          <div>
+            <div className="mb-1 font-semibold text-muted-foreground">输入</div>
+            <pre className="overflow-x-auto rounded bg-background p-2 leading-relaxed">
+              {JSON.stringify(part.input, null, 2)}
+            </pre>
+          </div>
+        )}
+        {part.output != null && (
+          <div>
+            <div className="mb-1 font-semibold text-muted-foreground">结果</div>
+            <pre className="overflow-x-auto rounded bg-background p-2 leading-relaxed">
+              {JSON.stringify(part.output, null, 2)}
+            </pre>
+          </div>
+        )}
+        {part.errorText && (
+          <div className="text-destructive">{part.errorText}</div>
+        )}
+      </div>
+    </details>
   );
 }
 
