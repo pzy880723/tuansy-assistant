@@ -12,13 +12,13 @@ import {
   ImagePlus,
   RotateCcw,
   Send,
-  Sparkles,
   MessageSquare,
   Wrench,
   Loader2,
   ClipboardList,
   X,
 } from "lucide-react";
+import tuanbaoAvatar from "@/assets/tuanbao-avatar.png.asset.json";
 import { useImageAttachments } from "@/lib/use-image-attachments";
 import {
   ResizableHandle,
