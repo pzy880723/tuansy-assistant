@@ -174,10 +174,37 @@ function SaveBadge({ state }: { state: "idle" | "saving" | "saved" }) {
 
 /* ============== LEFT: AI Chat Pane (live, tool-calling) ============== */
 
-function ChatPane({ projectId }: { projectId: string }) {
+type ProjectSnapshot = {
+  name?: string;
+  product?: unknown;
+  intro?: unknown;
+  skus?: unknown;
+  settings?: unknown;
+};
+type HistoryEntry = {
+  id: string;
+  ts: number;
+  label: string;
+  snapshot: ProjectSnapshot;
+  messageIndex: number;
+};
+
+function ChatPane({
+  projectId,
+  project,
+}: {
+  projectId: string;
+  project: ProjectSnapshot | null;
+}) {
   const storageKey = `tuanbao.chat.${projectId}`;
+  const historyKey = `tuanbao.history.${projectId}`;
   const qc = useQueryClient();
+  const update = useServerFn(updateProject);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const projectRef = useRef<ProjectSnapshot | null>(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
 
   const initial: UIMessage[] = (() => {
     if (typeof window === "undefined") return [];
@@ -189,6 +216,20 @@ function ChatPane({ projectId }: { projectId: string }) {
     }
   })();
 
+  const [history, setHistory] = useState<HistoryEntry[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(historyKey);
+      return raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(historyKey, JSON.stringify(history));
+  }, [history, historyKey]);
+
   const transport = useRef(
     new DefaultChatTransport({
       api: "/api/chat",
@@ -198,7 +239,7 @@ function ChatPane({ projectId }: { projectId: string }) {
     }),
   ).current;
 
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, setMessages, status, error } = useChat({
     id: projectId,
     messages: initial,
     transport,
@@ -207,7 +248,6 @@ function ChatPane({ projectId }: { projectId: string }) {
       qc.invalidateQueries({ queryKey: ["project", projectId] });
     },
     onToolCall: () => {
-      // Refresh preview as soon as a tool runs server-side
       qc.invalidateQueries({ queryKey: ["project", projectId] });
     },
   });
@@ -229,8 +269,49 @@ function ChatPane({ projectId }: { projectId: string }) {
   const send = () => {
     const text = input.trim();
     if (!text || isLoading) return;
+    const snap = projectRef.current;
+    if (snap) {
+      const entry: HistoryEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ts: Date.now(),
+        label: text.length > 40 ? text.slice(0, 40) + "…" : text,
+        snapshot: {
+          name: snap.name,
+          product: snap.product,
+          intro: snap.intro,
+          skus: snap.skus,
+          settings: snap.settings,
+        },
+        messageIndex: messages.length,
+      };
+      setHistory((h) => [entry, ...h].slice(0, 30));
+    }
     void sendMessage({ text });
     setInput("");
+  };
+
+  const rollback = async (entry: HistoryEntry) => {
+    try {
+      await update({
+        data: {
+          id: projectId,
+          patch: {
+            name: entry.snapshot.name ?? "未命名项目",
+            product: entry.snapshot.product ?? null,
+            intro: entry.snapshot.intro ?? null,
+            skus: entry.snapshot.skus ?? null,
+            settings: entry.snapshot.settings ?? null,
+          },
+        },
+      });
+      setMessages(messages.slice(0, entry.messageIndex));
+      setHistory((h) => h.filter((x) => x.ts < entry.ts));
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("已回滚到该版本");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "回滚失败");
+    }
   };
 
   return (
@@ -238,10 +319,49 @@ function ChatPane({ projectId }: { projectId: string }) {
       <div className="flex items-center gap-2 border-b px-4 py-3">
         <Sparkles className="h-4 w-4 text-primary" />
         <div className="text-sm font-semibold">AI 对话</div>
-        <div className="ml-auto text-[11px] text-muted-foreground">
-          会话保存在本浏览器
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="ml-auto inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+            >
+              <History className="h-3 w-3" /> 历史 {history.length > 0 && `(${history.length})`}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-0">
+            <div className="border-b px-3 py-2 text-xs font-medium">历史回滚</div>
+            <div className="max-h-80 overflow-y-auto">
+              {history.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  暂无历史，发送消息后会自动记录此前版本
+                </div>
+              ) : (
+                history.map((h) => (
+                  <div
+                    key={h.id}
+                    className="flex items-center gap-2 border-b px-3 py-2 last:border-b-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs">{h.label}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(h.ts).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => rollback(h)}
+                      className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+                    >
+                      <RotateCcw className="h-3 w-3" /> 回滚
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
+
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 && !isLoading && <ChatEmpty onPick={setInput} />}
