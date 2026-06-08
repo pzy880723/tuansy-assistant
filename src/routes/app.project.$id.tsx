@@ -266,15 +266,15 @@ function ChatPane({
     inputRef.current?.focus();
   }, [projectId, status]);
 
-  const send = () => {
-    const text = input.trim();
-    if (!text || isLoading) return;
+  const sendText = (text: string) => {
+    const value = text.trim();
+    if (!value || isLoading) return;
     const snap = projectRef.current;
     if (snap) {
       const entry: HistoryEntry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         ts: Date.now(),
-        label: text.length > 40 ? text.slice(0, 40) + "…" : text,
+        label: value.length > 40 ? value.slice(0, 40) + "…" : value,
         snapshot: {
           name: snap.name,
           product: snap.product,
@@ -286,9 +286,26 @@ function ChatPane({
       };
       setHistory((h) => [entry, ...h].slice(0, 30));
     }
-    void sendMessage({ text });
+    void sendMessage({ text: value });
     setInput("");
   };
+
+  const send = () => sendText(input);
+
+  const suggestions: string[] = (() => {
+    if (isLoading) return [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== "assistant") continue;
+      const part = m.parts.find(
+        (p) => p.type === "tool-suggest_next",
+      ) as { output?: { suggestions?: string[] } } | undefined;
+      const list = part?.output?.suggestions;
+      if (Array.isArray(list) && list.length) return list.slice(0, 4);
+      return [];
+    }
+    return [];
+  })();
 
   const rollback = async (entry: HistoryEntry) => {
     try {
@@ -381,6 +398,20 @@ function ChatPane({
       </div>
 
       <div className="border-t p-3">
+        {suggestions.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => sendText(s)}
+                className="rounded-full border border-[oklch(0.85_0.08_55)] bg-[oklch(0.98_0.03_60)] px-3 py-1 text-[11px] text-[oklch(0.45_0.15_40)] transition hover:border-primary/60 hover:bg-[var(--brand-soft)] hover:text-primary"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
           <button
             type="button"
@@ -463,9 +494,13 @@ function MessageRow({ msg }: { msg: UIMessage }) {
   const text = msg.parts
     .filter((p) => p.type === "text")
     .map((p) => (p as { type: "text"; text: string }).text)
-    .join("");
+    .join("")
+    .replace(/\*\*/g, "")
+    .replace(/(^|\s)\*(?!\s)/g, "$1");
 
-  const toolParts = msg.parts.filter((p) => p.type.startsWith("tool-")) as ToolPart[];
+  const toolParts = msg.parts.filter(
+    (p) => p.type.startsWith("tool-") && p.type !== "tool-suggest_next",
+  ) as ToolPart[];
 
   if (msg.role === "user") {
     return (
