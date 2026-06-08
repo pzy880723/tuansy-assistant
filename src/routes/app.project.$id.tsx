@@ -550,7 +550,7 @@ function ChatPane({
           <button
             type="button"
             onClick={togglePlan}
-            title="开启后 AI 会先反问澄清，再动笔"
+            title="开启后团宝会先反问澄清，再动笔"
             className={
               "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition " +
               (planMode
