@@ -129,13 +129,9 @@ function ProjectEditor() {
       </div>
 
       {/* Split layout */}
-      <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId={`project-split-${id}`}
-        className="flex-1 overflow-hidden"
-      >
+      <ResizablePanelGroup className="flex-1 overflow-hidden">
         <ResizablePanel defaultSize={42} minSize={24} maxSize={70}>
-          <ChatPane projectId={id} project={data?.project} />
+          <ChatPane projectId={id} project={data?.project ?? null} />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={58} minSize={30}>
