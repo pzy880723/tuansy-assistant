@@ -544,7 +544,7 @@ function ChatPane({
               }
             }}
             rows={1}
-            placeholder="告诉 AI 你想怎么改，或拖/粘贴图片进来 (Enter 发送)"
+            placeholder="告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送)"
             className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             disabled={isLoading}
           />
