@@ -17,7 +17,9 @@ import {
   Wrench,
   Loader2,
   ClipboardList,
+  X,
 } from "lucide-react";
+import { useImageAttachments } from "@/lib/use-image-attachments";
 import {
   ResizableHandle,
   ResizablePanel,
