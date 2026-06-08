@@ -138,6 +138,29 @@ export const Route = createFileRoute("/api/chat")({
                 return { ok: true, count: skus.length };
               },
             }),
+            ask_questions: tool({
+              description:
+                "需要向用户确认 2 个及以上信息时必须调用，禁止把多个问题塞进文字回复里。每个问题给 2-5 个常见候选选项，用户点击即可作答。",
+              inputSchema: z.object({
+                intro: z
+                  .string()
+                  .max(40)
+                  .describe("一句话说明为什么要问，例如：先确认几个细节我好写文案"),
+                questions: z
+                  .array(
+                    z.object({
+                      id: z.string().describe("简短英文/拼音 id，例如 audience"),
+                      question: z.string().max(40).describe("问题文案，20 字内"),
+                      multi: z.boolean().describe("是否多选，默认 false"),
+                      options: z.array(z.string().max(20)).min(2).max(5),
+                      allow_other: z.boolean().describe("是否允许用户填写其他，默认 true"),
+                    }),
+                  )
+                  .min(1)
+                  .max(4),
+              }),
+              execute: async (input) => ({ ok: true, ...input }),
+            }),
             suggest_next: tool({
               description:
                 "在回复末尾给出 2 到 4 条用户下一步可能想做的快速操作建议，每条不超过 18 个汉字。每次回复都要调用一次。",
