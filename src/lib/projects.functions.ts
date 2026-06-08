@@ -17,6 +17,7 @@ const CATEGORIES = [
 const StartProjectInput = z.object({
   description: z.string().min(1).max(4000),
   mode: z.enum(["draft", "plan"]),
+  imageUrls: z.array(z.string().url()).max(9).optional(),
 });
 
 export const startProject = createServerFn({ method: "POST" })
@@ -44,6 +45,11 @@ export const startProject = createServerFn({ method: "POST" })
       suggestNext: z.array(z.string().min(2).max(18)).min(2).max(4),
     });
 
+    const imageHint =
+      data.imageUrls && data.imageUrls.length > 0
+        ? `\n用户还上传了 ${data.imageUrls.length} 张商品图，可以结合图片内容判断品类与卖点：\n${data.imageUrls.map((u, i) => `${i + 1}. ${u}`).join("\n")}\n`
+        : "";
+
     const { text: raw } = await generateText({
       model,
       prompt: `你是「团宝助手」的开团策划。用户刚刚提交了一段对想开的团购的描述，请你智能判断品类并准备好接下来在编辑页继续撰写所需的物料。
@@ -52,7 +58,7 @@ export const startProject = createServerFn({ method: "POST" })
 """
 ${data.description}
 """
-
+${imageHint}
 ${planHint}
 
 只返回一个 JSON 对象（不要任何 Markdown 代码块、不要解释文字），结构如下：
@@ -78,6 +84,7 @@ ${planHint}
       .from("projects")
       .insert({
         name: output.projectName,
+        cover_image_url: data.imageUrls?.[0] ?? null,
         product: {
           name: output.productName,
           category: [output.category],
@@ -91,6 +98,17 @@ ${planHint}
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      await supabaseAdmin.from("project_images").insert(
+        data.imageUrls.map((url, i) => ({
+          project_id: row.id,
+          url,
+          sort_order: i,
+          role: "product",
+        })),
+      );
+    }
 
     const seedMessages = [
       {
@@ -116,6 +134,44 @@ ${planHint}
       category: output.category,
     };
   });
+
+
+const UploadImageInput = z.object({
+  projectId: z.string().uuid().optional(),
+  filename: z.string().min(1).max(200),
+  mimeType: z.string().regex(/^image\/[a-zA-Z0-9.+-]+$/),
+  dataBase64: z.string().min(1).max(15_000_000),
+});
+
+export const uploadProductImage = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => UploadImageInput.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bytes = Buffer.from(data.dataBase64, "base64");
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("图片超过 8MB");
+
+    const extFromMime = data.mimeType.split("/")[1]?.split("+")[0] ?? "jpg";
+    const extFromName = data.filename.includes(".")
+      ? data.filename.split(".").pop()!.toLowerCase()
+      : "";
+    const ext = (extFromName || extFromMime).slice(0, 5);
+    const path = `${data.projectId ?? "starter"}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("product-images")
+      .upload(path, bytes, { contentType: data.mimeType, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("product-images")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signErr || !signed?.signedUrl) throw new Error(signErr?.message ?? "签发链接失败");
+
+    return { url: signed.signedUrl, path };
+  });
+
+
+
 
 
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {

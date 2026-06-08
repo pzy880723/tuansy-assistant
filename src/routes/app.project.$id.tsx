@@ -17,7 +17,9 @@ import {
   Wrench,
   Loader2,
   ClipboardList,
+  X,
 } from "lucide-react";
+import { useImageAttachments } from "@/lib/use-image-attachments";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -256,6 +258,8 @@ function ChatPane({
   const [input, setInput] = useState("");
   const [planMode, setPlanMode] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const img = useImageAttachments({ projectId });
   const isLoading = status === "submitted" || status === "streaming";
 
   useEffect(() => {
@@ -270,13 +274,19 @@ function ChatPane({
 
   const sendText = (text: string) => {
     const value = text.trim();
-    if (!value || isLoading) return;
+    const files = img.getReadyFiles();
+    if (!value && files.length === 0) return;
+    if (isLoading) return;
+    if (img.uploading) {
+      toast.error("图片还在上传，稍等一下");
+      return;
+    }
     const snap = projectRef.current;
     if (snap) {
       const entry: HistoryEntry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         ts: Date.now(),
-        label: value.length > 40 ? value.slice(0, 40) + "…" : value,
+        label: value.length > 40 ? value.slice(0, 40) + "…" : value || `${files.length} 张图片`,
         snapshot: {
           name: snap.name,
           product: snap.product,
@@ -291,13 +301,34 @@ function ChatPane({
     const payload = planMode
       ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${value}`
       : value;
-    void sendMessage({ text: payload });
+
+    if (files.length > 0) {
+      const parts: Array<
+        { type: "text"; text: string } | { type: "file"; mediaType: string; url: string }
+      > = [];
+      if (payload) parts.push({ type: "text", text: payload });
+      for (const f of files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
+      void sendMessage({ role: "user", parts });
+    } else {
+      void sendMessage({ text: payload });
+    }
+
     if (planMode) setPlanMode(false);
     setInput("");
+    img.clear();
   };
 
 
   const send = () => sendText(input);
+
+  const togglePlan = () => {
+    setPlanMode((v) => {
+      const next = !v;
+      if (next) toast.success("已开启计划模式：AI 会先反问澄清");
+      else toast("已关闭计划模式");
+      return next;
+    });
+  };
 
   // Auto-trigger the first AI write when arriving from the home "开团" dialog
   const bootedRef = useRef(false);
@@ -354,7 +385,13 @@ function ChatPane({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col border-b bg-card md:border-b-0 md:border-r">
+    <div
+      {...img.dragHandlers}
+      className={
+        "relative flex h-full min-h-0 flex-col border-b bg-card md:border-b-0 md:border-r " +
+        (img.dragActive ? "ring-2 ring-primary/60 ring-inset" : "")
+      }
+    >
       <div className="flex items-center gap-2 border-b px-4 py-3">
         <Sparkles className="h-4 w-4 text-primary" />
         <div className="text-sm font-semibold">AI 对话</div>
@@ -434,12 +471,54 @@ function ChatPane({
             ))}
           </div>
         )}
+        {img.attachments.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {img.attachments.map((a) => (
+              <div
+                key={a.id}
+                className="group relative h-14 w-14 overflow-hidden rounded-md border bg-muted"
+              >
+                <img src={a.previewUrl} alt="" className="h-full w-full object-cover" />
+                {a.uploading && (
+                  <div className="absolute inset-0 grid place-items-center bg-black/40">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                  </div>
+                )}
+                {a.error && (
+                  <div className="absolute inset-0 grid place-items-center bg-destructive/80 text-[10px] text-white">
+                    失败
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => img.remove(a.id)}
+                  className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
+                  aria-label="移除"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            void img.addFiles(e.target.files);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
         <div className="flex items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
           <button
             type="button"
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => toast.info("图片附件即将上线")}
+            onClick={() => fileInputRef.current?.click()}
             aria-label="上传图片"
+            title="添加图片（也可直接拖入或粘贴）"
           >
             <ImagePlus className="h-4 w-4" />
           </button>
@@ -447,6 +526,7 @@ function ChatPane({
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={img.onPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -454,28 +534,33 @@ function ChatPane({
               }
             }}
             rows={1}
-            placeholder="告诉 AI 你想怎么改 (Enter 发送 · Shift+Enter 换行)"
+            placeholder="告诉 AI 你想怎么改，或拖/粘贴图片进来 (Enter 发送)"
             className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             disabled={isLoading}
           />
           <button
             type="button"
-            onClick={() => setPlanMode((v) => !v)}
+            onClick={togglePlan}
             title="开启后 AI 会先反问澄清，再动笔"
             className={
-              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] transition " +
+              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition " +
               (planMode
-                ? "border-primary/50 bg-[var(--brand-soft)] text-primary"
+                ? "border-transparent bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_4px_14px_-4px_oklch(0.7_0.19_45/0.55)]"
                 : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
             }
           >
+            <span
+              className={
+                "h-1.5 w-1.5 rounded-full " + (planMode ? "bg-white" : "bg-muted-foreground/60")
+              }
+            />
             <ClipboardList className="h-3.5 w-3.5" />
-            计划{planMode ? " · 开" : ""}
+            {planMode ? "计划 已开" : "计划"}
           </button>
           <Button
             size="sm"
             onClick={send}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && img.getReadyFiles().length === 0) || isLoading}
             className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
           >
             {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -483,6 +568,11 @@ function ChatPane({
 
         </div>
       </div>
+      {img.dragActive && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-background/90 text-sm font-medium text-primary">
+          松开即可加入图片
+        </div>
+      )}
     </div>
   );
 }
