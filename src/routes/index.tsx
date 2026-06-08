@@ -384,7 +384,7 @@ function Features() {
     {
       icon: Wand2,
       title: "AI 识图填写",
-      desc: "上传产品图，AI 自动识别品类、卖点、规格，自动填好商品基础信息。",
+      desc: "上传产品图，团宝自动识别品类、卖点、规格，自动填好商品基础信息。",
     },
     {
       icon: Layers,
