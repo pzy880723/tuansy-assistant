@@ -136,6 +136,44 @@ ${planHint}
   });
 
 
+const UploadImageInput = z.object({
+  projectId: z.string().uuid().optional(),
+  filename: z.string().min(1).max(200),
+  mimeType: z.string().regex(/^image\/[a-zA-Z0-9.+-]+$/),
+  dataBase64: z.string().min(1).max(15_000_000),
+});
+
+export const uploadProductImage = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => UploadImageInput.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bytes = Buffer.from(data.dataBase64, "base64");
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("图片超过 8MB");
+
+    const extFromMime = data.mimeType.split("/")[1]?.split("+")[0] ?? "jpg";
+    const extFromName = data.filename.includes(".")
+      ? data.filename.split(".").pop()!.toLowerCase()
+      : "";
+    const ext = (extFromName || extFromMime).slice(0, 5);
+    const path = `${data.projectId ?? "starter"}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("product-images")
+      .upload(path, bytes, { contentType: data.mimeType, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("product-images")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signErr || !signed?.signedUrl) throw new Error(signErr?.message ?? "签发链接失败");
+
+    return { url: signed.signedUrl, path };
+  });
+
+
+
+
+
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: projects, error } = await supabaseAdmin
