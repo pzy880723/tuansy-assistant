@@ -409,7 +409,7 @@ function Features() {
           核心能力
         </div>
         <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
-          把繁琐的录入，<br />交给会读图的 AI
+          把繁琐的录入，<br />交给会读图的团宝
         </h2>
         <p className="mt-4 text-white/55">
           团长不用再为「写文案、配 SKU、传图片」内耗。打开团宝，开口就行。
