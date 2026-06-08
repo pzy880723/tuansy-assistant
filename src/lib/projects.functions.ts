@@ -34,20 +34,18 @@ export const startProject = createServerFn({ method: "POST" })
         ? "用户选择了【计划模式】：不要立即撰写文案，seedAssistantText 要先抛出 3 到 5 个针对该品类的关键澄清问题（如目标人群、价格档位、产地/材质、配送方式等），帮助用户先想清楚再动笔。autoUserPrompt 必须为 null。"
         : "用户选择了【立即开团】：seedAssistantText 是一句不超过 60 字的开场，告诉用户你已经识别出品类、马上动笔。autoUserPrompt 是一段 30 到 80 字的隐形指令，作为用户的第一条消息触发 AI 立刻调用 update_product 与 update_skus 生成首版标题、卖点、标签和 SKU。";
 
-    const { experimental_output: output } = await generateText({
-      model,
-      experimental_output: Output.object({
-        schema: z.object({
-          category: z.enum(CATEGORIES),
-          projectName: z.string().min(2).max(18),
-          productName: z.string().min(2).max(30),
-          tags: z.array(z.string().min(1).max(10)).min(2).max(4),
-          seedAssistantText: z.string().min(10).max(260),
-          autoUserPrompt: z.string().max(200).nullable(),
-          suggestNext: z.array(z.string().min(2).max(18)).min(2).max(4),
-        }),
-      }),
+    const OutputSchema = z.object({
+      category: z.enum(CATEGORIES),
+      projectName: z.string().min(2).max(18),
+      productName: z.string().min(2).max(30),
+      tags: z.array(z.string().min(1).max(10)).min(2).max(4),
+      seedAssistantText: z.string().min(10).max(260),
+      autoUserPrompt: z.string().max(200).nullable(),
+      suggestNext: z.array(z.string().min(2).max(18)).min(2).max(4),
+    });
 
+    const { text: raw } = await generateText({
+      model,
       prompt: `你是「团宝助手」的开团策划。用户刚刚提交了一段对想开的团购的描述，请你智能判断品类并准备好接下来在编辑页继续撰写所需的物料。
 
 用户描述：
@@ -57,14 +55,24 @@ ${data.description}
 
 ${planHint}
 
-要求：
-一、category 从给定枚举里挑一个最贴近的；
-二、projectName 是给团长自己看的项目名，要吸睛、口语化、不超过 18 个字，比如「云南阳光玫瑰团」「春夏宽松直筒裤」；
-三、productName 是商品本身的名字；
-四、tags 给 2 到 4 个最能打动顾客的服务/卖点短标签，每个不超过 10 字；
-五、所有文案使用纯文本中文，不要任何 Markdown 符号；
-六、suggestNext 给 2 到 4 条用户进入编辑页后可能想点的快捷指令，每条不超过 18 字。`,
+只返回一个 JSON 对象（不要任何 Markdown 代码块、不要解释文字），结构如下：
+{
+  "category": 在 ${CATEGORIES.join(" / ")} 中挑一个最贴近的,
+  "projectName": "给团长看的项目名，吸睛口语化，不超过 18 个汉字",
+  "productName": "商品本身的名字，不超过 30 字",
+  "tags": ["2 到 4 个服务或卖点短标签，每个不超过 10 字"],
+  "seedAssistantText": "编辑页首条 AI 开场消息，纯文本中文，不超过 260 字",
+  "autoUserPrompt": "立即模式下为一段 30 到 80 字的隐形指令；计划模式下必须为 null",
+  "suggestNext": ["2 到 4 条用户可能想点的快捷指令，每条不超过 18 字"]
+}
+
+所有文案使用纯文本中文，不要任何 Markdown 符号。`,
     });
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("AI 返回格式异常，请重试");
+    const output = OutputSchema.parse(JSON.parse(jsonMatch[0]));
+
 
     const { data: row, error } = await supabaseAdmin
       .from("projects")
