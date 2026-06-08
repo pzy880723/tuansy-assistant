@@ -463,9 +463,13 @@ function MessageRow({ msg }: { msg: UIMessage }) {
   const text = msg.parts
     .filter((p) => p.type === "text")
     .map((p) => (p as { type: "text"; text: string }).text)
-    .join("");
+    .join("")
+    .replace(/\*\*/g, "")
+    .replace(/(^|\s)\*(?!\s)/g, "$1");
 
-  const toolParts = msg.parts.filter((p) => p.type.startsWith("tool-")) as ToolPart[];
+  const toolParts = msg.parts.filter(
+    (p) => p.type.startsWith("tool-") && p.type !== "tool-suggest_next",
+  ) as ToolPart[];
 
   if (msg.role === "user") {
     return (
