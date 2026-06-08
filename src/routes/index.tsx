@@ -149,7 +149,7 @@ function HeroStarter() {
   const togglePlan = () => {
     setMode((m) => {
       const next = m === "plan" ? "draft" : "plan";
-      if (next === "plan") toast.success("已开启计划模式：AI 会先反问澄清");
+      if (next === "plan") toast.success("已开启计划模式：团宝会先反问澄清");
       else toast("已关闭计划模式");
       return next;
     });
