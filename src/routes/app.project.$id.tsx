@@ -103,34 +103,8 @@ function ProjectEditor() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      {/* Editor header */}
-      <div className="flex items-center gap-3 border-b bg-background/80 px-5 py-2.5 backdrop-blur">
-        <Link
-          to="/app"
-          className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> 项目
-        </Link>
-        <div className="h-4 w-px bg-border" />
-        <input
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-base font-semibold outline-none placeholder:text-muted-foreground"
-          placeholder="未命名项目"
-        />
-        <SaveBadge state={savingName} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full"
-          onClick={() => toast.info("同步导出页即将上线")}
-        >
-          <ExternalLink className="h-3.5 w-3.5" /> 同步到快团团
-        </Button>
-      </div>
-
-      {/* Split layout */}
+    <div className="flex h-[calc(100vh-2.75rem)] flex-col">
+      {/* Split layout — header is provided by the app TopBar in /app layout */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
         <ResizablePanel defaultSize="38%" minSize="20%" maxSize="75%">
           <ChatPane projectId={id} project={data?.project ?? null} />
@@ -156,6 +130,7 @@ function ProjectEditor() {
     </div>
   );
 }
+
 
 function SaveBadge({ state }: { state: "idle" | "saving" | "saved" }) {
   if (state === "idle") return null;
