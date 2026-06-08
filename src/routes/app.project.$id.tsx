@@ -596,12 +596,17 @@ function ChatEmpty({ onPick }: { onPick: (s: string) => void }) {
   ];
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
-      <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_12px_28px_oklch(0.7_0.19_45/0.4)]">
-        <MessageSquare className="h-6 w-6" />
-      </div>
-      <h3 className="mt-5 text-lg font-semibold">和 AI 一起编排你的团购</h3>
+      <img
+        src={tuanbaoAvatar.url}
+        alt="团宝"
+        width={80}
+        height={80}
+        loading="lazy"
+        className="h-20 w-20 drop-shadow-[0_12px_24px_oklch(0.7_0.19_45/0.35)]"
+      />
+      <h3 className="mt-4 text-lg font-semibold">嗨，我是团宝</h3>
       <p className="mt-1.5 max-w-xs text-xs text-muted-foreground">
-        右侧是真实的快团团预览。点击直接改，或者用自然语言告诉 AI 怎么改。
+        右侧是真实的快团团预览。点击直接改，或者把你想要的告诉我。
       </p>
       <div className="mt-6 grid w-full max-w-sm gap-2">
         {samples.map((s) => (
@@ -627,7 +632,24 @@ type ToolPart = {
   errorText?: string;
 };
 
-function MessageRow({ msg }: { msg: UIMessage }) {
+type AskQuestionsOutput = {
+  intro?: string;
+  questions?: Array<{
+    id: string;
+    question: string;
+    multi?: boolean;
+    options: string[];
+    allow_other?: boolean;
+  }>;
+};
+
+function MessageRow({
+  msg,
+  onAnswer,
+}: {
+  msg: UIMessage;
+  onAnswer: (text: string) => void;
+}) {
   const text = msg.parts
     .filter((p) => p.type === "text")
     .map((p) => (p as { type: "text"; text: string }).text)
@@ -651,13 +673,28 @@ function MessageRow({ msg }: { msg: UIMessage }) {
 
   return (
     <div className="flex gap-2.5">
-      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-[10px] font-bold text-white">
-        AI
-      </div>
+      <img
+        src={tuanbaoAvatar.url}
+        alt="团宝"
+        width={28}
+        height={28}
+        loading="lazy"
+        className="h-7 w-7 shrink-0 rounded-full bg-[var(--brand-soft)] object-contain"
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {toolParts.map((part, i) => (
-          <ToolCard key={i} part={part} />
-        ))}
+        {toolParts.map((part, i) => {
+          if (part.type === "tool-ask_questions") {
+            return (
+              <Questionnaire
+                key={i}
+                data={part.output as AskQuestionsOutput | undefined}
+                state={part.state}
+                onAnswer={onAnswer}
+              />
+            );
+          }
+          return <ToolCard key={i} part={part} />;
+        })}
         {text && (
           <div className="max-w-[95%] rounded-2xl rounded-tl-md bg-muted px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap">
             {text}
@@ -667,6 +704,154 @@ function MessageRow({ msg }: { msg: UIMessage }) {
     </div>
   );
 }
+
+function Questionnaire({
+  data,
+  state,
+  onAnswer,
+}: {
+  data: AskQuestionsOutput | undefined;
+  state: string | undefined;
+  onAnswer: (text: string) => void;
+}) {
+  const questions = data?.questions ?? [];
+  const [picks, setPicks] = useState<Record<string, string[]>>({});
+  const [others, setOthers] = useState<Record<string, string>>({});
+  const [otherOpen, setOtherOpen] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  if (state !== "output-available" || questions.length === 0) {
+    return (
+      <div className="max-w-[95%] rounded-2xl border border-dashed bg-background/60 px-3.5 py-3 text-xs text-muted-foreground">
+        团宝正在准备几个小问题…
+      </div>
+    );
+  }
+
+  const toggle = (qid: string, opt: string, multi: boolean) => {
+    if (submitted) return;
+    setPicks((prev) => {
+      const cur = prev[qid] ?? [];
+      if (multi) {
+        return {
+          ...prev,
+          [qid]: cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt],
+        };
+      }
+      return { ...prev, [qid]: cur[0] === opt ? [] : [opt] };
+    });
+  };
+
+  const confirm = () => {
+    if (submitted) return;
+    const lines = questions.map((q, idx) => {
+      const chosen = [...(picks[q.id] ?? [])];
+      const other = otherOpen[q.id] ? others[q.id]?.trim() : "";
+      if (other) chosen.push(other);
+      const answer = chosen.length > 0 ? chosen.join(" / ") : "（跳过）";
+      return `${idx + 1}. ${q.question} → ${answer}`;
+    });
+    setSubmitted(true);
+    onAnswer(lines.join("\n"));
+  };
+
+  const skip = () => {
+    if (submitted) return;
+    setSubmitted(true);
+    onAnswer("（先跳过这些问题，直接按你的判断来）");
+  };
+
+  return (
+    <div className="max-w-[95%] overflow-hidden rounded-2xl border bg-background shadow-sm">
+      <div className="flex items-center gap-2 border-b bg-[var(--brand-soft)]/60 px-3.5 py-2.5">
+        <ClipboardList className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs font-medium">{data?.intro ?? "团宝想先确认几件事"}</span>
+      </div>
+      <div className="space-y-3 px-3.5 py-3">
+        {questions.map((q, idx) => {
+          const cur = picks[q.id] ?? [];
+          return (
+            <div key={q.id}>
+              <div className="mb-1.5 text-xs font-medium">
+                <span className="text-muted-foreground">{idx + 1}.</span> {q.question}
+                {q.multi && (
+                  <span className="ml-1.5 text-[10px] text-muted-foreground">（可多选）</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {q.options.map((opt) => {
+                  const active = cur.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      disabled={submitted}
+                      onClick={() => toggle(q.id, opt, !!q.multi)}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-[11px] transition",
+                        active
+                          ? "border-transparent bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white shadow-sm"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                        submitted && "opacity-60",
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+                {(q.allow_other ?? true) && !otherOpen[q.id] && (
+                  <button
+                    type="button"
+                    disabled={submitted}
+                    onClick={() => setOtherOpen((p) => ({ ...p, [q.id]: true }))}
+                    className="rounded-full border border-dashed px-3 py-1 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  >
+                    + 其他
+                  </button>
+                )}
+              </div>
+              {otherOpen[q.id] && (
+                <input
+                  type="text"
+                  disabled={submitted}
+                  value={others[q.id] ?? ""}
+                  onChange={(e) =>
+                    setOthers((p) => ({ ...p, [q.id]: e.target.value }))
+                  }
+                  placeholder="自己写一个…"
+                  className="mt-1.5 w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary/60"
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-3.5 py-2">
+        {submitted ? (
+          <span className="text-[11px] text-muted-foreground">已提交</span>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={skip}
+              className="rounded-md px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              跳过
+            </button>
+            <button
+              type="button"
+              onClick={confirm}
+              className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] px-3 py-1 text-[11px] font-medium text-white shadow-sm hover:brightness-110"
+            >
+              <Check className="h-3 w-3" /> 确认并发送
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function ToolCard({ part }: { part: ToolPart }) {
   const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
