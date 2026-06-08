@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
 import { cn } from "@/lib/utils";
-import { PhoneShell } from "@/components/tuan/PhoneShell";
+import { PhoneShell as TuanPhoneShell } from "@/components/tuan/PhoneShell";
 import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
 import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
@@ -487,7 +487,7 @@ function PreviewPane({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
-        <PhoneShell tab={tab} onTabChange={setTab}>
+        <TuanPhoneShell tab={tab} onTabChange={setTab}>
           {tab === "intro" && (
             <div className="space-y-2">
               <IntroTab intro={intro} onChange={setIntro} />
@@ -507,7 +507,7 @@ function PreviewPane({
           {tab === "settings" && (
             <SettingsTab settings={settings} onOpenSetting={openSetting} />
           )}
-        </PhoneShell>
+        </TuanPhoneShell>
       </div>
 
       <SettingSheet
