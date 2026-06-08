@@ -74,7 +74,7 @@ export const Route = createFileRoute("/api/chat")({
 - 修改后用一句中文简短确认所做改动
 - 价格保留 1 位小数，库存为整数字符串
 - 不确定时主动询问用户`,
-          messages: convertToModelMessages(body.messages),
+          messages: await convertToModelMessages(body.messages),
           tools: {
             update_product: tool({
               description:
