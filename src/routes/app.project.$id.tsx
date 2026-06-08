@@ -1,13 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import {
-  ArrowLeft,
   Check,
-  ExternalLink,
   History,
   ImagePlus,
   RotateCcw,
@@ -56,43 +54,14 @@ type ProductData = {
 
 function ProjectEditor() {
   const { id } = Route.useParams();
-  
-  const qc = useQueryClient();
+
   const get = useServerFn(getProject);
-  const update = useServerFn(updateProject);
 
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
     queryFn: () => get({ data: { id } }),
   });
 
-  const [name, setName] = useState("");
-  const [savingName, setSavingName] = useState<"idle" | "saving" | "saved">("idle");
-  const nameDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (data?.project) setName(data.project.name);
-  }, [data?.project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const updateMut = useMutation({
-    mutationFn: (patch: Record<string, unknown>) =>
-      update({ data: { id, patch } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["project", id] });
-      qc.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-
-  const handleNameChange = (v: string) => {
-    setName(v);
-    setSavingName("saving");
-    if (nameDebounce.current) clearTimeout(nameDebounce.current);
-    nameDebounce.current = setTimeout(async () => {
-      await updateMut.mutateAsync({ name: v || "未命名项目" });
-      setSavingName("saved");
-      setTimeout(() => setSavingName("idle"), 1500);
-    }, 600);
-  };
 
   if (isLoading) {
     return (
@@ -103,34 +72,8 @@ function ProjectEditor() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      {/* Editor header */}
-      <div className="flex items-center gap-3 border-b bg-background/80 px-5 py-2.5 backdrop-blur">
-        <Link
-          to="/app"
-          className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> 项目
-        </Link>
-        <div className="h-4 w-px bg-border" />
-        <input
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-base font-semibold outline-none placeholder:text-muted-foreground"
-          placeholder="未命名项目"
-        />
-        <SaveBadge state={savingName} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full"
-          onClick={() => toast.info("同步导出页即将上线")}
-        >
-          <ExternalLink className="h-3.5 w-3.5" /> 同步到快团团
-        </Button>
-      </div>
-
-      {/* Split layout */}
+    <div className="flex h-[calc(100vh-2.75rem)] flex-col">
+      {/* Split layout — header is provided by the app TopBar in /app layout */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
         <ResizablePanel defaultSize="38%" minSize="20%" maxSize="75%">
           <ChatPane projectId={id} project={data?.project ?? null} />
@@ -157,22 +100,6 @@ function ProjectEditor() {
   );
 }
 
-function SaveBadge({ state }: { state: "idle" | "saving" | "saved" }) {
-  if (state === "idle") return null;
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      {state === "saving" ? (
-        <>
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> 保存中
-        </>
-      ) : (
-        <>
-          <Check className="h-3 w-3 text-[oklch(0.65_0.18_145)]" /> 已保存
-        </>
-      )}
-    </span>
-  );
-}
 
 /* ============== LEFT: AI Chat Pane (live, tool-calling) ============== */
 
@@ -391,19 +318,17 @@ function ChatPane({
         (img.dragActive ? "ring-2 ring-primary/60 ring-inset" : "")
       }
     >
-      <div className="flex items-center gap-2 border-b px-4 py-3">
+      <div className="flex items-center gap-2 border-b px-3 py-1.5">
         <img
           src={tuanbaoAvatar.url}
           alt="团宝"
-          width={28}
-          height={28}
+          width={20}
+          height={20}
           loading="lazy"
-          className="h-7 w-7 rounded-full bg-[var(--brand-soft)] object-contain"
+          className="h-5 w-5 rounded-full bg-[var(--brand-soft)] object-contain"
         />
-        <div className="flex flex-col leading-tight">
-          <div className="text-sm font-semibold">团宝</div>
-          <div className="text-[10px] text-muted-foreground">你的开团搭子 · 随时在线</div>
-        </div>
+        <div className="text-xs font-semibold">团宝</div>
+        <div className="text-[10px] text-muted-foreground">你的开团搭子</div>
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -974,10 +899,11 @@ function PreviewPane({
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[oklch(0.97_0.005_240)]">
-      <div className="flex items-center justify-between border-b bg-background px-4 py-2.5">
-        <div className="text-[12px] font-medium text-muted-foreground">快团团 · 高保真预览</div>
-        <div className="text-[11px] text-muted-foreground">点击任意字段直接编辑</div>
+      <div className="flex items-center justify-between border-b bg-background px-3 py-1.5">
+        <div className="text-[11px] font-medium text-muted-foreground">快团团 · 高保真预览</div>
+        <div className="text-[10px] text-muted-foreground">点击任意字段直接编辑</div>
       </div>
+
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
