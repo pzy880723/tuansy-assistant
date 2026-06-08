@@ -8,13 +8,25 @@ import {
   ArrowLeft,
   Check,
   ExternalLink,
+  History,
   ImagePlus,
+  RotateCcw,
   Send,
   Sparkles,
   MessageSquare,
   Wrench,
   Loader2,
 } from "lucide-react";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
