@@ -12,7 +12,7 @@ import {
   ImagePlus,
   RotateCcw,
   Send,
-  MessageSquare,
+  Wrench,
   Wrench,
   Loader2,
   ClipboardList,
