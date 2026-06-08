@@ -72,7 +72,7 @@ function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/70 backdrop-blur">
             <Sparkles className="h-3 w-3 text-[oklch(0.78_0.18_55)]" />
-            为快团团团长打造的 AI 工作台
+            团宝，为快团团团长打造的开团搭子
           </div>
           <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
             开团，<span className="text-gradient-brand">从一句话开始</span>
