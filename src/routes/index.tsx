@@ -309,7 +309,7 @@ function ProductMockup() {
           </div>
           <div className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-2">
             <ImagePlus className="h-4 w-4 text-white/50" />
-            <span className="flex-1 text-sm text-white/40">告诉 AI 你想怎么改…</span>
+            <span className="flex-1 text-sm text-white/40">告诉团宝你想怎么改…</span>
             <button className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-white">
               <Send className="h-3.5 w-3.5" />
             </button>
