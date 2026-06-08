@@ -130,11 +130,11 @@ function ProjectEditor() {
 
       {/* Split layout */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
-        <ResizablePanel defaultSize={38} minSize={20} maxSize={75}>
+        <ResizablePanel defaultSize="38%" minSize="20%" maxSize="75%">
           <ChatPane projectId={id} project={data?.project ?? null} />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={62} minSize={25}>
+        <ResizablePanel defaultSize="62%" minSize="25%">
           <PreviewPane
             projectId={id}
             project={
