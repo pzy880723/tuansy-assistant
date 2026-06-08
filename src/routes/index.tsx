@@ -268,7 +268,7 @@ function PlanModeChip({ active, onClick }: { active: boolean; onClick: () => voi
     <button
       type="button"
       onClick={onClick}
-      title="开启后 AI 会先反问澄清，再动笔"
+      title="开启后团宝会先反问澄清，再动笔"
       className={
         "inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition " +
         (active
