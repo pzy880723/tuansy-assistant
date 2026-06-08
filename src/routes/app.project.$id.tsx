@@ -101,7 +101,14 @@ function ProjectEditor() {
       {/* Split layout */}
       <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         <ChatPane projectId={id} />
-        <PreviewPane projectId={id} project={data?.project} />
+        <PreviewPane
+          projectId={id}
+          project={
+            data?.project
+              ? { id: data.project.id, product: (data.project.product ?? undefined) as ProductData | undefined }
+              : undefined
+          }
+        />
       </div>
     </div>
   );
