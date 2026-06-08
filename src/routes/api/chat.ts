@@ -67,13 +67,21 @@ export const Route = createFileRoute("/api/chat")({
 当前项目: 「${project?.name ?? "未命名"}」
 当前商品数据: ${JSON.stringify(project?.product ?? {}, null, 2)}
 
+回复风格（务必遵守）：
+- 全程纯文本中文，禁止使用任何 Markdown 符号（不要出现 *、**、#、- 列表、反引号、表格语法）
+- 多条信息用"一、二、三"或直接换行分段，不要用项目符号
+- 控制在 3 到 6 行内，简洁、像真人助理一样说话
+- 不寒暄、不重复用户的话、不要"好的，我来帮你..."这种开场
+
 工作原则：
 - 用户描述意图时，主动调用工具修改预览，不要只是回复文字
 - 修改商品基础信息（标题、副标题、标签）调用 update_product
 - 修改、新增或删除 SKU 调用 update_skus（传完整的 SKU 数组）
 - 修改后用一句中文简短确认所做改动
 - 价格保留 1 位小数，库存为整数字符串
-- 不确定时主动询问用户`,
+- 不确定时主动询问用户
+
+每次回复结束前，必须调用一次 suggest_next 工具，给出 2 到 4 条用户下一步最可能想做的短指令（每条不超过 18 个汉字，必须能直接当作下一条用户消息发送）。`,
           messages: await convertToModelMessages(body.messages),
           tools: {
             update_product: tool({
@@ -111,6 +119,14 @@ export const Route = createFileRoute("/api/chat")({
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, count: skus.length };
               },
+            }),
+            suggest_next: tool({
+              description:
+                "在回复末尾给出 2 到 4 条用户下一步可能想做的快速操作建议，每条不超过 18 个汉字。每次回复都要调用一次。",
+              inputSchema: z.object({
+                suggestions: z.array(z.string().min(2).max(24)).min(2).max(4),
+              }),
+              execute: async ({ suggestions }) => ({ ok: true, suggestions }),
             }),
           },
         });
