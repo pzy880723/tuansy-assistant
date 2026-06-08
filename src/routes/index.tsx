@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { startProject } from "@/lib/projects.functions";
-import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare, Loader2, ClipboardList } from "lucide-react";
+import { useImageAttachments } from "@/lib/use-image-attachments";
+import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare, Loader2, ClipboardList, X } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
