@@ -398,6 +398,20 @@ function ChatPane({
       </div>
 
       <div className="border-t p-3">
+        {suggestions.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => sendText(s)}
+                className="rounded-full border border-[oklch(0.85_0.08_55)] bg-[oklch(0.98_0.03_60)] px-3 py-1 text-[11px] text-[oklch(0.45_0.15_40)] transition hover:border-primary/60 hover:bg-[var(--brand-soft)] hover:text-primary"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
           <button
             type="button"
