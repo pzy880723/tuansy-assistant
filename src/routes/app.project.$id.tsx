@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Wrench,
   Loader2,
-} from "lucide-react";
+  ClipboardList,
+
 import {
   ResizableHandle,
   ResizablePanel,
