@@ -393,8 +393,18 @@ function ChatPane({
       }
     >
       <div className="flex items-center gap-2 border-b px-4 py-3">
-        <Sparkles className="h-4 w-4 text-primary" />
-        <div className="text-sm font-semibold">AI 对话</div>
+        <img
+          src={tuanbaoAvatar.url}
+          alt="团宝"
+          width={28}
+          height={28}
+          loading="lazy"
+          className="h-7 w-7 rounded-full bg-[var(--brand-soft)] object-contain"
+        />
+        <div className="flex flex-col leading-tight">
+          <div className="text-sm font-semibold">团宝</div>
+          <div className="text-[10px] text-muted-foreground">你的开团搭子 · 随时在线</div>
+        </div>
         <Popover>
           <PopoverTrigger asChild>
             <button
