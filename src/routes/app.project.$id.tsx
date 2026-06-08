@@ -258,6 +258,8 @@ function ChatPane({
   const [input, setInput] = useState("");
   const [planMode, setPlanMode] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const img = useImageAttachments({ projectId });
   const isLoading = status === "submitted" || status === "streaming";
 
   useEffect(() => {
@@ -272,13 +274,19 @@ function ChatPane({
 
   const sendText = (text: string) => {
     const value = text.trim();
-    if (!value || isLoading) return;
+    const files = img.getReadyFiles();
+    if (!value && files.length === 0) return;
+    if (isLoading) return;
+    if (img.uploading) {
+      toast.error("图片还在上传，稍等一下");
+      return;
+    }
     const snap = projectRef.current;
     if (snap) {
       const entry: HistoryEntry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         ts: Date.now(),
-        label: value.length > 40 ? value.slice(0, 40) + "…" : value,
+        label: value.length > 40 ? value.slice(0, 40) + "…" : value || `${files.length} 张图片`,
         snapshot: {
           name: snap.name,
           product: snap.product,
@@ -293,13 +301,34 @@ function ChatPane({
     const payload = planMode
       ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${value}`
       : value;
-    void sendMessage({ text: payload });
+
+    if (files.length > 0) {
+      const parts: Array<
+        { type: "text"; text: string } | { type: "file"; mediaType: string; url: string }
+      > = [];
+      if (payload) parts.push({ type: "text", text: payload });
+      for (const f of files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
+      void sendMessage({ role: "user", parts });
+    } else {
+      void sendMessage({ text: payload });
+    }
+
     if (planMode) setPlanMode(false);
     setInput("");
+    img.clear();
   };
 
 
   const send = () => sendText(input);
+
+  const togglePlan = () => {
+    setPlanMode((v) => {
+      const next = !v;
+      if (next) toast.success("已开启计划模式：AI 会先反问澄清");
+      else toast("已关闭计划模式");
+      return next;
+    });
+  };
 
   // Auto-trigger the first AI write when arriving from the home "开团" dialog
   const bootedRef = useRef(false);
