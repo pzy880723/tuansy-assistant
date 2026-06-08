@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("projects")
     .select("id, name, status, cover_image_url, updated_at, created_at")
@@ -16,6 +16,7 @@ export const createProject = createServerFn({ method: "POST" })
     z.object({ name: z.string().min(1).max(120).optional() }).parse(d),
   )
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("projects")
       .insert({ name: data.name ?? "未命名项目" })
@@ -28,6 +29,7 @@ export const createProject = createServerFn({ method: "POST" })
 export const deleteProject = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("projects").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -36,6 +38,7 @@ export const deleteProject = createServerFn({ method: "POST" })
 export const getProject = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: project, error } = await supabaseAdmin
       .from("projects")
       .select("*")
@@ -56,6 +59,7 @@ export const updateProject = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: z.record(z.string(), z.unknown()) }).parse(d),
   )
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("projects").update(data.patch as never).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
