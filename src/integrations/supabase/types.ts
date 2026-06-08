@@ -95,6 +95,7 @@ export type Database = {
           notes: string | null
           product: Json
           schedule: Json
+          settings: Json
           skus: Json
           status: string
           updated_at: string
@@ -109,6 +110,7 @@ export type Database = {
           notes?: string | null
           product?: Json
           schedule?: Json
+          settings?: Json
           skus?: Json
           status?: string
           updated_at?: string
@@ -123,6 +125,7 @@ export type Database = {
           notes?: string | null
           product?: Json
           schedule?: Json
+          settings?: Json
           skus?: Json
           status?: string
           updated_at?: string

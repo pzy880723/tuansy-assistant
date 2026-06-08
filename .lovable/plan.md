@@ -1,40 +1,84 @@
-## 目标
 
-把 `/app` 列表里巨大的封面卡片换成参考图那种紧凑的"团购小卡"，并补全增删改查。
+# 把右侧预览改造成 1:1 高保真快团团编辑界面
 
-## 卡片样式（参考截图）
+目标：右侧预览完全按你给的真机截图重做（介绍 / 商品 / 设置 三个 Tab，含真机顶部 bar、底部「保存并预览」「发布团购」绿色按钮），所有字段就地点击直接编辑，左侧 AI 也能改。
 
-每张卡片自上而下：
-- 顶部一行：**标题**（粗体，2 行截断）+ 右侧灰色小字 **`YYYY年M月D日发布`**
-- 中间：**三张图横向并排**（1:1，圆角，gap-2，若不足 3 张用占位灰块补齐）
-- 底部一行：**商品名称**（小字 muted）+ 右侧 hover 出现的 ⋯ 菜单（编辑 / 删除）
+## 视觉框架（PhoneFrame 重做）
 
-去掉：价格区间、佣金、自由定价、已结束、分享按钮、统计数据等所有无用字段。
+- 不再做"深色刘海手机壳"，改成贴近截图的浅灰圆角微信小程序外壳：
+  - 顶部：`< 返回` 圆形按钮 + 右上角 `··· — ◯` 胶囊
+  - 底部固定栏：左白底绿字「保存并预览」、右大绿色按钮「发布团购」
+  - 中间内容区滑动，背景 `#F4F5F7`，卡片 `#FFFFFF` + 16px 圆角
+- Tab 切换从胶囊改成截图同款：`介绍 / 商品 / 设置`，激活项绿色文字 + 下方短绿色下划线
+- 主色统一为快团团绿 `oklch(0.72 0.17 152)`（≈ #07C160 系），全部硬编码红橙色全部清掉
 
-列表布局：`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`，卡片整体可点击进入编辑器。
+## 介绍 Tab（IntroMock）
 
-## CRUD 交互
+按截图 1、2 完全重做：
 
-- **新建**：右上"新建项目"按钮 → 弹出对话框输入"标题"+"商品名称" → 创建后跳转 `/app/project/$id`
-- **编辑（基础字段）**：卡片右上 ⋯ → "编辑信息" → 同款对话框，预填后保存
-- **删除**：⋯ → "删除"，沿用现有 AlertDialog 确认
-- **进入完整编辑**：点击卡片主体 → 已有的双栏编辑器（标题/商品名同步显示）
+1. **顶部团长卡片**（含背景图位）
+   - 背景图占位（"设置背景图"按钮在右上）
+   - 左下：头像方块 + 团长名行内可编辑 + 省略
+2. **团购介绍卡片**
+   - 标题行：`团购介绍` + 右上「素材导入」「复制已有团购」描边按钮
+   - 标题输入框：`请输入团购活动标题`
+   - 内容输入框：`请输入团购活动内容`（多行）
+   - 下方工具栏：`大图 / 小图 / 视频 / 文字 / 标签 / 加粉 / 承诺` 7 个图标按钮（lucide 图标 + 中文标签，2 行排列）
+3. **介绍内容块列表**（来自 `project.intro.blocks`）
+   - 每个 block 卡片右上有「上移 / 下移 / 置顶 / 添加 / 删除」5 个小描边按钮
+   - block.type 支持：`text` / `image_lg` / `image_sm` / `video` / `tag`
+   - 行内编辑文字 / 上传位
+4. **团购商品**入口卡片（标题 + ⇆ 切换旧版 + 素材导入 + 从商品库导入 + 搜索框 + `+ 添加商品` 大按钮）
 
-## 技术改动
+## 商品 Tab（ProductMock）
 
-1. `src/lib/projects.functions.ts`
-   - `createProject` 入参扩展为 `{ name?, product_name? }`；插入时同步写 `product.name`
-   - `listProjects` 多选 `product`（取 `product.name`）、`updated_at`，并从 `project_images` 拉取每个项目的前 3 张图（用一次 `in()` 查询批量取，按 `project_id` 分组）
-   - 新增 `updateProjectMeta({ id, name, product_name })`：更新 `name` 同时合并 `product.name`
+按截图 4 重做：
 
-2. `src/routes/app.index.tsx`
-   - 重写卡片为上面描述的紧凑布局
-   - 新建/编辑共用一个 `ProjectMetaDialog` 组件（标题 + 商品名两个输入）
-   - 时间显示用 `created_at` 格式化为 `YYYY年M月D日发布`
-   - 三图位用 `project.images?.slice(0,3)`，缺位 `bg-muted`
+- 商品卡片：左 100×100 图（带「剩 N 件」黑色蒙层）+ 右标题（可改）+ ✏ 编辑按钮 + 红色 ¥价格 + 灰色规格描述
+- 右上「添加 / 删除」两个小描边按钮
+- 卡片下方 `+ 添加商品` 大描边绿按钮
+- 下方折叠一个简版「团购设置」卡片（物流方式 / 发货时间 / 团购时间 / 开团通知推送 / 更多团购设置 ›），点击行可改
 
-3. 编辑器页面（`app.project.$id.tsx`）保持原样，仅依赖现有字段，无需改动。
+字段映射：现有 `projects.skus[]` 数组（name/price/stock）→ 每个 SKU 渲染成一张商品卡片（多商品支持），完整 CRUD。
 
-## 不动的部分
+## 设置 Tab（SettingsMock）
 
-数据库 schema、AI Chat、编辑器双栏、其他路由都保持现状。本次只改列表卡片样式 + 增删改查表单。
+按截图 3、5、6、7 分成 5 个分组卡片：
+
+1. **团购设置**：物流方式 / 发货时间 / 团购时间 / 开团通知推送 / 更多团购设置（展开）
+2. **帮卖设置**：4 行
+3. **优惠设置**：4 行（团首单优惠 / 团满减优惠 / 多件多折 / 团惊喜红包，带「设置加曝光」小红 chip）
+4. **营销设置**：5 行
+5. **隐私设置**：3 行
+6. **其他设置**：8 行
+
+每行：左灰底标题，右浅灰当前值 + `›` 箭头。点击行 → 弹出底部 Sheet（用 shadcn `Sheet` from bottom）做行内编辑（输入 / 选择 / 开关），保存写回 `project.delivery / schedule / settings`（新增 jsonb 字段 `settings`）。
+
+## 编辑落库
+
+所有行内修改 → 复用现有 `updateProject` server fn，debounce 600ms 自动保存（沿用现有 `updateMut` 模式），存到对应 jsonb 字段：
+
+- 介绍标题/正文 → `intro.title` / `intro.blocks`
+- 商品卡片 → `skus[]`
+- 设置项 → `delivery` / `schedule` / 新增 `settings` jsonb
+
+AI 工具（已有 `update_product` / `update_skus`）扩展：再加 `update_intro` 和 `update_settings` 两个 tool，让左侧自然语言也能改这两块。
+
+## 数据库
+
+需要给 `projects` 表加一个 `settings` jsonb 字段，默认 `{}`（一条 migration，含 GRANT 重申）。其他字段已存在不动。
+
+## 技术细节
+
+- 文件改动：
+  - 重写 `src/routes/app.project.$id.tsx` 里的 `PreviewPane / PhoneFrame / IntroMock / ProductMock / SettingsMock`
+  - 抽出 `src/components/tuan/*`：`PhoneShell.tsx`、`IntroTab.tsx`、`ProductTab.tsx`、`SettingsTab.tsx`、`SettingRow.tsx`、`SettingSheet.tsx`、`BlockToolbar.tsx`
+  - 扩 `src/routes/api/chat.ts` 工具集：加 `update_intro` / `update_settings`
+- 新依赖：无（用现有 shadcn `Sheet` `Dialog` `Input` `Textarea` `Switch`；已安装）
+- 不动：首页、项目列表、AI 对话 UI 框架、其他路由
+
+## 不做的事
+
+- 不做真正的图片上传后端（"设置背景图 / 大图 / 视频" 先用占位 + toast「即将上线」）
+- 不做拼团、抽奖、阶梯价等高级营销玩法的真实逻辑（只做设置项 UI + 落库存值）
+- 不加用户登录
