@@ -414,12 +414,6 @@ function ToolCard({ part }: { part: ToolPart }) {
 
 /* ============== RIGHT: 快团团 Mock Preview ============== */
 
-import { PhoneShell } from "@/components/tuan/PhoneShell";
-import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
-import { ProductTab } from "@/components/tuan/ProductTab";
-import { SettingsTab } from "@/components/tuan/SettingsTab";
-import { SettingSheet } from "@/components/tuan/primitives";
-import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
 
 type Tab = "intro" | "product" | "settings";
 
