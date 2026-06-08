@@ -899,10 +899,11 @@ function PreviewPane({
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[oklch(0.97_0.005_240)]">
-      <div className="flex items-center justify-between border-b bg-background px-4 py-2.5">
-        <div className="text-[12px] font-medium text-muted-foreground">快团团 · 高保真预览</div>
-        <div className="text-[11px] text-muted-foreground">点击任意字段直接编辑</div>
+      <div className="flex items-center justify-between border-b bg-background px-3 py-1.5">
+        <div className="text-[11px] font-medium text-muted-foreground">快团团 · 高保真预览</div>
+        <div className="text-[10px] text-muted-foreground">点击任意字段直接编辑</div>
       </div>
+
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
