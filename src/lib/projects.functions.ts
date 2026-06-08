@@ -45,6 +45,11 @@ export const startProject = createServerFn({ method: "POST" })
       suggestNext: z.array(z.string().min(2).max(18)).min(2).max(4),
     });
 
+    const imageHint =
+      data.imageUrls && data.imageUrls.length > 0
+        ? `\n用户还上传了 ${data.imageUrls.length} 张商品图，可以结合图片内容判断品类与卖点：\n${data.imageUrls.map((u, i) => `${i + 1}. ${u}`).join("\n")}\n`
+        : "";
+
     const { text: raw } = await generateText({
       model,
       prompt: `你是「团宝助手」的开团策划。用户刚刚提交了一段对想开的团购的描述，请你智能判断品类并准备好接下来在编辑页继续撰写所需的物料。
@@ -53,7 +58,7 @@ export const startProject = createServerFn({ method: "POST" })
 """
 ${data.description}
 """
-
+${imageHint}
 ${planHint}
 
 只返回一个 JSON 对象（不要任何 Markdown 代码块、不要解释文字），结构如下：
