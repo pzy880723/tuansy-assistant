@@ -17,6 +17,7 @@ const CATEGORIES = [
 const StartProjectInput = z.object({
   description: z.string().min(1).max(4000),
   mode: z.enum(["draft", "plan"]),
+  imageUrls: z.array(z.string().url()).max(9).optional(),
 });
 
 export const startProject = createServerFn({ method: "POST" })
