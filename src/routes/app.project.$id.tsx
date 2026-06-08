@@ -56,43 +56,14 @@ type ProductData = {
 
 function ProjectEditor() {
   const { id } = Route.useParams();
-  
-  const qc = useQueryClient();
+
   const get = useServerFn(getProject);
-  const update = useServerFn(updateProject);
 
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
     queryFn: () => get({ data: { id } }),
   });
 
-  const [name, setName] = useState("");
-  const [savingName, setSavingName] = useState<"idle" | "saving" | "saved">("idle");
-  const nameDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (data?.project) setName(data.project.name);
-  }, [data?.project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const updateMut = useMutation({
-    mutationFn: (patch: Record<string, unknown>) =>
-      update({ data: { id, patch } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["project", id] });
-      qc.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-
-  const handleNameChange = (v: string) => {
-    setName(v);
-    setSavingName("saving");
-    if (nameDebounce.current) clearTimeout(nameDebounce.current);
-    nameDebounce.current = setTimeout(async () => {
-      await updateMut.mutateAsync({ name: v || "未命名项目" });
-      setSavingName("saved");
-      setTimeout(() => setSavingName("idle"), 1500);
-    }, 600);
-  };
 
   if (isLoading) {
     return (
