@@ -399,7 +399,7 @@ function Features() {
     {
       icon: MessageSquare,
       title: "对话即所得",
-      desc: "右侧是真实的快团团预览，左侧自然语言告诉 AI 怎么改，所改即所见。",
+      desc: "右侧是真实的快团团预览，左侧自然语言告诉团宝怎么改，所改即所见。",
     },
   ];
   return (
