@@ -29,16 +29,16 @@ export function writeSession(user: {
     maxAge: MAX_AGE,
   });
   // Public, JS-readable cookie for client-side display + route guard.
+  // NOTE: setCookie() URL-encodes the value itself — do NOT pre-encode here,
+  // or the browser ends up with a double-encoded string the client can't parse.
   setCookie(
     PUBLIC_COOKIE,
-    encodeURIComponent(
-      JSON.stringify({
-        id: user.id,
-        nickname: user.nickname,
-        phone: user.phone ?? null,
-        wechat: !!user.wechat_openid,
-      }),
-    ),
+    JSON.stringify({
+      id: user.id,
+      nickname: user.nickname,
+      phone: user.phone ?? null,
+      wechat: !!user.wechat_openid,
+    }),
     { httpOnly: false, sameSite: "lax", secure: true, path: "/", maxAge: MAX_AGE },
   );
 }
