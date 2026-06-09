@@ -12,7 +12,19 @@ const PUBLIC_COOKIE = "tuan_user"; // readable from client for display only
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 export function readSessionUserId(): string | null {
-  return getCookie(SESSION_COOKIE) ?? null;
+  const sessionUserId = getCookie(SESSION_COOKIE);
+  if (sessionUserId) return sessionUserId;
+
+  // Development mock fallback: the client writes this display cookie
+  // immediately after login, while the httpOnly cookie can lag in preview RPCs.
+  const publicUser = getCookie(PUBLIC_COOKIE);
+  if (!publicUser) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(publicUser)) as { id?: unknown };
+    return typeof parsed.id === "string" ? parsed.id : null;
+  } catch {
+    return null;
+  }
 }
 
 export function writeSession(user: {
