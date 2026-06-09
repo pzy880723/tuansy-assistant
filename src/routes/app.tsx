@@ -9,7 +9,12 @@ import { getProject, updateProject } from "@/lib/projects.functions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
-import { clearAuthCookies, notifyAuthChange, useCurrentUser } from "@/lib/use-current-user";
+import {
+  clearAuthCookies,
+  notifyAuthChange,
+  setAuthSessionError,
+  useCurrentUser,
+} from "@/lib/use-current-user";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "工作台 — 团宝助手" }] }),
@@ -29,9 +34,11 @@ function AppLayout() {
     queryFn: async () => {
       const res = await currentUser();
       if (!res.user) {
+        const message = "登录会话已失效，请重新登录一次";
         clearAuthCookies();
+        setAuthSessionError(message);
         notifyAuthChange();
-        toast.error("登录会话已失效，请重新登录一次");
+        toast.error(message);
         navigate({ to: "/auth", replace: true, search: { redirect: pathname } });
       }
       return res;

@@ -30,10 +30,10 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const [tab, setTab] = useState<"phone" | "wechat">("phone");
+  const [sessionError, setSessionError] = useState(() => readAuthCookieError());
   const navigate = useNavigate();
   const logout = useServerFn(signOut);
   const { redirect } = useSearch({ from: "/auth" });
-  const sessionError = readAuthCookieError();
   const safeRedirect = redirect && redirect !== "/auth" && !redirect.startsWith("/auth?") ? redirect : "/app";
   const goNext = () => navigate({ to: safeRedirect, replace: true });
 
@@ -44,6 +44,7 @@ function AuthPage() {
       // Client-side cleanup below is enough to let the next login overwrite the mock session.
     }
     clearAuthCookies();
+    setSessionError(null);
     notifyAuthChange();
     toast.success("已清理旧会话，请重新登录一次");
   };
