@@ -119,7 +119,7 @@ export function IntroTab({
             value={intro.title ?? ""}
             onChange={(v) => onChange({ ...intro, title: v })}
             placeholder="请输入团购活动标题"
-            className="text-[14px] font-medium text-[#1a1a1a]"
+            className="text-[18px] font-bold text-[#1a1a1a] placeholder:font-normal placeholder:text-[#c8c9cc]"
           />
         </div>
         <div className="py-2">
