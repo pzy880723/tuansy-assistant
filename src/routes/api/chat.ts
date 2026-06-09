@@ -25,6 +25,18 @@ const SkuSchema = z.object({
   desc: z.string().optional().describe("规格说明，可选"),
 });
 
+const IntroBlockSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), text: z.string() }),
+  z.object({ type: z.literal("image_lg"), url: z.string().nullable().optional() }),
+  z.object({ type: z.literal("image_sm"), urls: z.array(z.string()) }),
+  z.object({ type: z.literal("video"), url: z.string().nullable().optional() }),
+  z.object({ type: z.literal("tag"), tags: z.array(z.string()) }),
+]);
+
+function genBlockId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
