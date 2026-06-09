@@ -13,9 +13,13 @@ function readPublicCookie(): ClientUser | null {
     .split("; ")
     .find((c) => c.startsWith("tuan_user="));
   if (!match) return null;
+  const raw = match.slice("tuan_user=".length);
   try {
-    return JSON.parse(decodeURIComponent(match.split("=")[1])) as ClientUser;
+    return JSON.parse(decodeURIComponent(raw)) as ClientUser;
   } catch {
+    // Stale / double-encoded cookie from an older build — clear it so the user
+    // isn't stuck in an auth-redirect loop, then force a fresh login.
+    document.cookie = "tuan_user=; Max-Age=0; path=/";
     return null;
   }
 }
