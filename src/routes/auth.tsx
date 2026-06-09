@@ -110,10 +110,13 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSend = async () => {
+    setError(null);
     if (!/^1[3-9]\d{9}$/.test(phone)) {
       toast.error("请输入正确的手机号");
+      setError("手机号格式不正确，请检查后重新输入。");
       return;
     }
     try {
@@ -130,14 +133,18 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
         });
       }, 1000);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "发送失败");
+      const message = e instanceof Error ? e.message : "发送失败";
+      setError(`验证码发送失败：${message}`);
+      toast.error(message);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (code.length !== 6) {
       toast.error("请输入 6 位验证码");
+      setError("验证码需要填写 6 位数字，开发期固定为 123456。");
       return;
     }
     setSubmitting(true);
@@ -153,7 +160,9 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
       toast.success("登录成功");
       onSuccess();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "登录失败");
+      const message = err instanceof Error ? err.message : "登录失败";
+      setError(`登录失败：${message}。请确认验证码为 123456；如果仍失败，请点击上方“重新登录”清理旧会话后再试。`);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -161,6 +170,11 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+          {error}
+        </div>
+      ) : null}
       <div>
         <label className="mb-1 block text-xs font-medium text-foreground">手机号</label>
         <Input
@@ -204,7 +218,9 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
 function WechatForm({ onSuccess }: { onSuccess: () => void }) {
   const login = useServerFn(wechatMockLogin);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const handleClick = async () => {
+    setError(null);
     setLoading(true);
     try {
       const res = await login();
@@ -218,13 +234,20 @@ function WechatForm({ onSuccess }: { onSuccess: () => void }) {
       toast.success("微信登录成功");
       onSuccess();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "登录失败");
+      const message = err instanceof Error ? err.message : "登录失败";
+      setError(`微信模拟登录失败：${message}。请点击“重新登录”清理旧会话后再试。`);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
   return (
     <div className="space-y-3">
+      {error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+          {error}
+        </div>
+      ) : null}
       <div className="grid h-44 place-items-center rounded-xl border-2 border-dashed border-border bg-muted/40">
         <div className="text-center">
           <QrCode className="mx-auto h-16 w-16 text-muted-foreground/60" />
