@@ -157,7 +157,7 @@ SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
                 const next = { ...intro, ...patch };
                 const { error } = await supabaseAdmin
                   .from("projects")
-                  .update({ intro: next })
+                  .update({ intro: next as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, updated: Object.keys(input) };
