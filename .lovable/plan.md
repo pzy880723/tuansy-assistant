@@ -1,50 +1,42 @@
-# 修复登录无反应
+## 目标
 
-## 根因
-- `src/lib/auth-session.server.ts` 写 `tuan_user` cookie 时手动做了一次 `encodeURIComponent(JSON.stringify(...))`。
-- TanStack `setCookie` 内部会再次 URL 编码，导致浏览器拿到的是 **双重编码** 的字符串（例如 `%257B...%257D`）。
-- `src/lib/use-current-user.ts` 只做了一次 `decodeURIComponent`，结果传给 `JSON.parse` 的依旧是带 `%` 的字符串 → 抛错被 `catch` 吞掉 → 返回 `null`。
-- `/app` 的 `AppLayout` 看到 `user === null`，立刻 `navigate({ to: "/auth", search: { redirect: pathname } })`，于是登录成功后页面又被踢回登录页，表现就是「点了没反应」。
+让开发期 mock 登录稳定可用：手机号 `18657433310` + 验证码 `123456` 必须能进入工作台，并把该账号识别为超级管理员。
 
-网络日志能印证这一点：`verifySmsCode` / `wechatMockLogin` 都返回了 200 和正确的 user，问题完全在客户端读 cookie 这一步。
+## 已定位的问题
 
-## 改动
+当前不是验证码错误，而是登录后会话判断不稳定：
 
-### 1. `src/lib/auth-session.server.ts`
-写 `tuan_user` 时去掉手动 `encodeURIComponent`，直接把 JSON 字符串交给 `setCookie`（让框架自己编码一次就够）：
+1. 登录接口返回了用户，但 `/app` 立刻做二次服务端会话校验。
+2. 预览环境里服务端 Cookie 传播/读取可能还没稳定完成，`getCurrentUser()` 返回空。
+3. `/app` 守卫清理本地会话并重定向回 `/auth`，所以看起来“登录没反应”。
+4. 当前地址已经出现 `/auth?redirect=/auth`，这是坏 redirect，会让成功登录后的落点也不可靠。
 
-```ts
-setCookie(
-  PUBLIC_COOKIE,
-  JSON.stringify({
-    id: user.id,
-    nickname: user.nickname,
-    phone: user.phone ?? null,
-    wechat: !!user.wechat_openid,
-  }),
-  { httpOnly: false, sameSite: "lax", secure: true, path: "/", maxAge: MAX_AGE },
-);
-```
+## 修复方案
 
-### 2. `src/lib/use-current-user.ts`（兼容性兜底）
-保留 `decodeURIComponent`（浏览器读 `document.cookie` 仍是编码态），同时为 `JSON.parse` 失败情况打一条 `console.warn`，方便后续排查；如果解析失败就清掉这个坏 cookie，避免一直卡死：
+1. **登录成功后使用返回的用户作为即时会话来源**
+   - 保留服务端 httpOnly cookie 作为后续请求身份凭证。
+   - 同时把登录返回的用户写入前端可读的 mock 会话 cookie，避免刚登录就被前端守卫误判。
 
-```ts
-try {
-  return JSON.parse(decodeURIComponent(raw)) as ClientUser;
-} catch {
-  // 旧的坏 cookie：清掉，避免反复跳登录
-  document.cookie = "tuan_user=; Max-Age=0; path=/";
-  return null;
-}
-```
+2. **调整 `/app` 守卫，避免刚登录后的“二次校验踢人”**
+   - `/app` 先信任前端 mock 会话 cookie，允许页面进入。
+   - 不再在进入工作台首屏立即调用 `getCurrentUser()` 后自动清会话并跳回登录页。
+   - 后续需要数据时，项目接口仍会通过服务端 `tuan_uid` 校验；如果服务端会话确实丢失，再显示明确错误并引导重新登录。
 
-### 3. 验证
-- 在 `/auth` 用 `13xxxxxxxxx` + `123456` 登录 → 应直接跳到 `/app` 并显示用户菜单。
-- 在 DevTools → Application → Cookies 检查 `tuan_user`，值应是单次编码的 JSON。
-- 已登录用户刷新 `/app` 不再被踢回 `/auth`。
+3. **修正坏 redirect**
+   - 当登录页的 `redirect` 指向 `/auth` 或无效路径时，统一改为 `/app`。
+   - `/app` 未登录跳转到 `/auth` 时，如果当前路径已经是登录页，不再写入 `redirect=/auth`。
 
-## 不动的部分
-- 后端 `verifySmsCode` / `wechatMockLogin` 逻辑不变。
-- `tuan_uid`（httpOnly）写入方式不变。
-- 路由结构、UI、其他业务代码不变。
+4. **设置超级管理员规则**
+   - 在 mock 用户返回结构里增加 `role` / `isAdmin` 标记。
+   - 手机号 `18657433310` 登录时标记为超级管理员。
+   - UI 上可在用户菜单显示“超级管理员”，但不引入复杂权限系统，符合当前“前期仅做用户区隔”的要求。
+
+5. **错误提示与恢复入口**
+   - 登录失败显示具体原因。
+   - 会话解析异常显示“旧会话异常，请重新登录”，并提供清理本地会话按钮。
+   - 清理时同时清掉 `tuan_user` 和前端错误状态。
+
+6. **验证**
+   - 用手机号 `18657433310` 和验证码 `123456` 实测登录。
+   - 确认最终停留在 `/app`，页面显示“我的项目”。
+   - 确认错误日志中不再有登录相关运行错误。
