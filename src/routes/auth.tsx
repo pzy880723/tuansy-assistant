@@ -9,11 +9,15 @@ import {
   verifySmsCode,
   wechatMockLogin,
 } from "@/lib/auth.functions";
-import { notifyAuthChange } from "@/lib/use-current-user";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { clearAuthCookies, notifyAuthChange, readAuthCookieError, writePublicUserCookie } from "@/lib/use-current-user";
+import {
+  clearAuthCookies,
+  notifyAuthChange,
+  readAuthCookieError,
+  writePublicUserCookie,
+} from "@/lib/use-current-user";
 
 const SearchSchema = z.object({ redirect: z.string().optional() });
 
