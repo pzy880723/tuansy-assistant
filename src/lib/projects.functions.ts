@@ -99,6 +99,7 @@ ${planHint}
     const { data: row, error } = await supabaseAdmin
       .from("projects")
       .insert({
+        owner_id: userId,
         name: output.projectName,
         cover_image_url: data.imageUrls?.[0] ?? null,
         product: {
@@ -119,6 +120,7 @@ ${planHint}
       await supabaseAdmin.from("project_images").insert(
         data.imageUrls.map((url, i) => ({
           project_id: row.id,
+          owner_id: userId,
           url,
           sort_order: i,
           role: "product",
