@@ -130,22 +130,31 @@ SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
           tools: {
             update_intro: tool({
               description:
-                "更新介绍 Tab 的内容。只传需要修改的字段，未传字段保持不变。blocks 整体替换。",
+                "更新介绍 Tab 内容。只传需要修改的字段；blocks 若传则整体替换。注意：blocks 默认由用户在右侧手动点按钮添加，AI 只在用户明确要求时才传。",
               inputSchema: z.object({
-                title: z.string().describe("介绍主标题，可选").optional(),
-                description: z.string().describe("介绍正文/卖点描述，可选").optional(),
-                blocks: z
-                  .array(
-                    z.object({
-                      type: z.enum(["text", "image"]).describe("text 或 image"),
-                      content: z.string().describe("文本内容或图片 URL"),
-                    }),
+                title: z
+                  .string()
+                  .describe("团购活动主标题，简短有力，10-20 字，可选")
+                  .optional(),
+                description: z
+                  .string()
+                  .describe(
+                    "团购活动正文卖点描述。必须写成完整段落，120-300 字，分 2-4 个自然段，结合品类要点突出卖点（产地/口感/适用人群/保障等）。禁止只写一句话。可选。",
                   )
-                  .describe("图文 block 列表，整体替换，可选")
+                  .optional(),
+                blocks: z
+                  .array(IntroBlockSchema)
+                  .describe(
+                    "图文模块数组，整体替换。仅当用户明确要求添加大图/小图九宫格/视频/文字段落/标签时才传；默认留空不动。",
+                  )
                   .optional(),
               }),
               execute: async (input) => {
-                const next = { ...intro, ...input };
+                const patch: Record<string, unknown> = { ...input };
+                if (Array.isArray(input.blocks)) {
+                  patch.blocks = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                }
+                const next = { ...intro, ...patch };
                 const { error } = await supabaseAdmin
                   .from("projects")
                   .update({ intro: next })
