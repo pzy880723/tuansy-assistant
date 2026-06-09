@@ -17,16 +17,12 @@ import {
 const LOVABLE_AIG_RUN_ID_HEADER = "X-Lovable-AIG-Run-ID";
 
 const SkuSchema = z.object({
-  name: z.string(),
-  price: z.string(),
-  stock: z.string(),
-});
-
-const ProductPatchSchema = z.object({
-  title: z.string().optional(),
-  subtitle: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  skus: z.array(SkuSchema).optional(),
+  name: z.string().describe("规格名，例如 1 斤装"),
+  price: z.string().describe("价格字符串，元，保留 1 位小数，例如 19.9"),
+  stock: z.string().describe("库存字符串，整数，例如 100"),
+  original_price: z.string().optional().describe("划线价，可选"),
+  image: z.string().optional().describe("规格图 URL，可选"),
+  desc: z.string().optional().describe("规格说明，可选"),
 });
 
 export const Route = createFileRoute("/api/chat")({
@@ -48,12 +44,19 @@ export const Route = createFileRoute("/api/chat")({
         const projectId = body.projectId;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Load fresh product from DB so the model sees current state
+        // Load fresh project state so the model sees the SAME data the preview renders.
         const { data: project } = await supabaseAdmin
           .from("projects")
-          .select("name, product")
+          .select("name, intro, skus, settings, product")
           .eq("id", projectId)
           .maybeSingle();
+
+        const product = (project?.product ?? {}) as Record<string, unknown>;
+        const intro = (project?.intro ?? {}) as Record<string, unknown>;
+        const skus = (project?.skus ?? []) as unknown[];
+        const settings = (project?.settings ?? {}) as Record<string, unknown>;
+        const category =
+          ((product.category as string[] | undefined)?.[0]) ?? "未分类";
 
         const initialRunId = getLovableAiGatewayRunId(request);
         const gateway = createLovableAiGatewayProvider(key, initialRunId);
@@ -65,8 +68,13 @@ export const Route = createFileRoute("/api/chat")({
           system: `你是「团宝」，一只圆滚滚的橙色礼盒小精灵，是快团团团长的开团搭子。说话像真人助理一样自然、利落、有温度，不端架子、不寒暄。
 
 当前项目: 「${project?.name ?? "未命名"}」
-当前商品品类: ${((project?.product as { category?: string[] } | null)?.category?.[0]) ?? "未分类"}
-当前商品数据: ${JSON.stringify(project?.product ?? {}, null, 2)}
+当前商品品类: ${category}
+
+【右侧预览正在显示的真实数据，必须基于这个来改】
+介绍 intro: ${JSON.stringify(intro, null, 2)}
+SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
+设置 settings: ${JSON.stringify(settings, null, 2)}
+商品元信息 product: ${JSON.stringify(product, null, 2)}
 
 按品类撰写重点（根据上面的品类挑对应那一行）：
 水果生鲜：产地、采摘时间、净重斤数、保鲜/冷链方式、坏果包赔
@@ -84,10 +92,13 @@ export const Route = createFileRoute("/api/chat")({
 - 不寒暄、不重复用户的话、不要"好的，我来帮你..."这种开场
 - 自称"团宝"，不要说"AI"或"助手"
 
-工作原则：
+工作原则（极其重要 — 工具必须对应右侧预览的字段）：
+- 改介绍 Tab 的标题、正文描述、图文 blocks → 调用 update_intro
+- 改 SKU（增、删、改价格/库存/规格名）→ 调用 update_skus，必须传完整的 SKU 数组
+- 改配送、起团、保障、自提、截团时间等设置项 → 调用 update_settings
+- 改商品标题、副标题、服务标签、封面 → 调用 update_product_meta
+- 不要把所有改动都塞进 update_product_meta；不同 Tab 的数据走不同工具
 - 用户描述意图时，主动调用工具修改预览，不要只是回复文字
-- 修改商品基础信息（标题、副标题、标签）调用 update_product
-- 修改、新增或删除 SKU 调用 update_skus（传完整的 SKU 数组）
 - 修改后用一句中文简短确认所做改动
 - 价格保留 1 位小数，库存为整数字符串
 - 不确定时主动询问用户
@@ -102,20 +113,27 @@ export const Route = createFileRoute("/api/chat")({
 
           messages: await convertToModelMessages(body.messages),
           tools: {
-            update_product: tool({
+            update_intro: tool({
               description:
-                "更新商品的标题、副标题或标签。只传需要修改的字段；不要传 skus（用 update_skus）。",
+                "更新介绍 Tab 的内容。只传需要修改的字段，未传字段保持不变。blocks 整体替换。",
               inputSchema: z.object({
-                title: z.string().describe("新的商品标题，可选").optional(),
-                subtitle: z.string().describe("新的副标题/卖点行，可选").optional(),
-                tags: z.array(z.string()).describe("服务标签数组，可选，会整体替换").optional(),
+                title: z.string().describe("介绍主标题，可选").optional(),
+                description: z.string().describe("介绍正文/卖点描述，可选").optional(),
+                blocks: z
+                  .array(
+                    z.object({
+                      type: z.enum(["text", "image"]).describe("text 或 image"),
+                      content: z.string().describe("文本内容或图片 URL"),
+                    }),
+                  )
+                  .describe("图文 block 列表，整体替换，可选")
+                  .optional(),
               }),
               execute: async (input) => {
-                const current = (project?.product ?? {}) as Record<string, unknown>;
-                const next = { ...current, ...input };
+                const next = { ...intro, ...input };
                 const { error } = await supabaseAdmin
                   .from("projects")
-                  .update({ product: next })
+                  .update({ intro: next })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, updated: Object.keys(input) };
@@ -123,19 +141,57 @@ export const Route = createFileRoute("/api/chat")({
             }),
             update_skus: tool({
               description:
-                "整体替换 SKU 列表。传完整的 SKU 数组，每项包含 name、price（字符串，元）、stock（字符串，件数）。",
+                "整体替换 SKU 列表（顶层 skus 列，预览的商品 Tab 直接读这里）。传完整的 SKU 数组，每项至少包含 name、price、stock。",
               inputSchema: z.object({
                 skus: z.array(SkuSchema).min(1).describe("完整的 SKU 数组"),
               }),
-              execute: async ({ skus }) => {
-                const current = (project?.product ?? {}) as Record<string, unknown>;
-                const next = { ...current, skus };
+              execute: async ({ skus: nextSkus }) => {
+                const { error } = await supabaseAdmin
+                  .from("projects")
+                  .update({ skus: nextSkus })
+                  .eq("id", projectId);
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, count: nextSkus.length };
+              },
+            }),
+            update_settings: tool({
+              description:
+                "更新设置 Tab 的字段（配送方式、起团件数、截团时间、保障、自提点、发货时效等）。只传要改的 key，做浅合并。",
+              inputSchema: z.object({
+                patch: z
+                  .record(z.string(), z.unknown())
+                  .describe("要合并进 settings 的 key-value，例如 { min_order: '10', delivery: '包邮' }"),
+              }),
+              execute: async ({ patch }) => {
+                const next = { ...settings, ...patch } as Record<string, unknown>;
+                const { error } = await supabaseAdmin
+                  .from("projects")
+                  .update({ settings: next as never })
+                  .eq("id", projectId);
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, updated: Object.keys(patch) };
+              },
+            }),
+            update_product_meta: tool({
+              description:
+                "更新商品元信息（标题、副标题、服务标签、封面图等），写入 product 列，做浅合并。不要在这里改 SKU。",
+              inputSchema: z.object({
+                title: z.string().describe("新的商品标题，可选").optional(),
+                subtitle: z.string().describe("新的副标题/卖点行，可选").optional(),
+                tags: z
+                  .array(z.string())
+                  .describe("服务标签数组，可选，会整体替换")
+                  .optional(),
+                cover: z.string().describe("封面图 URL，可选").optional(),
+              }),
+              execute: async (input) => {
+                const next = { ...product, ...input };
                 const { error } = await supabaseAdmin
                   .from("projects")
                   .update({ product: next })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
-                return { ok: true, count: skus.length };
+                return { ok: true, updated: Object.keys(input) };
               },
             }),
             ask_questions: tool({
@@ -183,6 +239,3 @@ export const Route = createFileRoute("/api/chat")({
     },
   },
 });
-
-// Silence unused-schema lint while keeping the export for future expansion.
-void ProductPatchSchema;
