@@ -56,6 +56,9 @@ function TopBar() {
         ) : (
           <GlobalNav pathname={pathname} />
         )}
+        <div className="ml-auto">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
