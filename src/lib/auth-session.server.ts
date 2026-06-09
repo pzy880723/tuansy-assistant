@@ -46,6 +46,20 @@ export function writeSession(user: {
 export function clearSession() {
   deleteCookie(SESSION_COOKIE, { path: "/" });
   deleteCookie(PUBLIC_COOKIE, { path: "/" });
+  setCookie(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    path: "/",
+    maxAge: 0,
+  });
+  setCookie(PUBLIC_COOKIE, "", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: true,
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 export async function requireUserId(): Promise<string> {

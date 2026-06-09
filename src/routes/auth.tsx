@@ -6,13 +6,19 @@ import { z } from "zod";
 import { Smartphone, QrCode, Loader2 } from "lucide-react";
 import {
   sendSmsCode,
+  signOut,
   verifySmsCode,
   wechatMockLogin,
 } from "@/lib/auth.functions";
-import { notifyAuthChange } from "@/lib/use-current-user";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  clearAuthCookies,
+  notifyAuthChange,
+  readAuthCookieError,
+  writePublicUserCookie,
+} from "@/lib/use-current-user";
 
 const SearchSchema = z.object({ redirect: z.string().optional() });
 
@@ -24,9 +30,24 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const [tab, setTab] = useState<"phone" | "wechat">("phone");
+  const [sessionError, setSessionError] = useState(() => readAuthCookieError());
   const navigate = useNavigate();
+  const logout = useServerFn(signOut);
   const { redirect } = useSearch({ from: "/auth" });
-  const goNext = () => navigate({ to: redirect || "/app", replace: true });
+  const safeRedirect = redirect && redirect !== "/auth" && !redirect.startsWith("/auth?") ? redirect : "/app";
+  const goNext = () => navigate({ to: safeRedirect, replace: true });
+
+  const resetSession = async () => {
+    try {
+      await logout();
+    } catch {
+      // Client-side cleanup below is enough to let the next login overwrite the mock session.
+    }
+    clearAuthCookies();
+    setSessionError(null);
+    notifyAuthChange();
+    toast.success("已清理旧会话，请重新登录一次");
+  };
 
   return (
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-[oklch(0.97_0.02_55)] to-background px-4">
@@ -40,6 +61,15 @@ function AuthPage() {
             <div className="text-xs text-muted-foreground">登录后开始创建你的团购</div>
           </div>
         </div>
+
+        {sessionError ? (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+            <div>{sessionError}</div>
+            <button type="button" onClick={resetSession} className="mt-1 font-medium underline underline-offset-2">
+              重新登录
+            </button>
+          </div>
+        ) : null}
 
         <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm">
           {(
@@ -81,10 +111,13 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSend = async () => {
+    setError(null);
     if (!/^1[3-9]\d{9}$/.test(phone)) {
       toast.error("请输入正确的手机号");
+      setError("手机号格式不正确，请检查后重新输入。");
       return;
     }
     try {
@@ -101,24 +134,36 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
         });
       }, 1000);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "发送失败");
+      const message = e instanceof Error ? e.message : "发送失败";
+      setError(`验证码发送失败：${message}`);
+      toast.error(message);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (code.length !== 6) {
       toast.error("请输入 6 位验证码");
+      setError("验证码需要填写 6 位数字，开发期固定为 123456。");
       return;
     }
     setSubmitting(true);
     try {
-      await verify({ data: { phone, code } });
+      const res = await verify({ data: { phone, code } });
+      writePublicUserCookie({
+        id: res.user.id,
+        nickname: res.user.nickname,
+        phone: res.user.phone ?? null,
+        wechat: !!res.user.wechat_openid,
+      });
       notifyAuthChange();
       toast.success("登录成功");
       onSuccess();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "登录失败");
+      const message = err instanceof Error ? err.message : "登录失败";
+      setError(`登录失败：${message}。请确认验证码为 123456；如果仍失败，请点击上方“重新登录”清理旧会话后再试。`);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -126,6 +171,11 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+          {error}
+        </div>
+      ) : null}
       <div>
         <label className="mb-1 block text-xs font-medium text-foreground">手机号</label>
         <Input
@@ -169,21 +219,36 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
 function WechatForm({ onSuccess }: { onSuccess: () => void }) {
   const login = useServerFn(wechatMockLogin);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const handleClick = async () => {
+    setError(null);
     setLoading(true);
     try {
-      await login();
+      const res = await login();
+      writePublicUserCookie({
+        id: res.user.id,
+        nickname: res.user.nickname,
+        phone: res.user.phone ?? null,
+        wechat: !!res.user.wechat_openid,
+      });
       notifyAuthChange();
       toast.success("微信登录成功");
       onSuccess();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "登录失败");
+      const message = err instanceof Error ? err.message : "登录失败";
+      setError(`微信模拟登录失败：${message}。请点击“重新登录”清理旧会话后再试。`);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
   return (
     <div className="space-y-3">
+      {error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+          {error}
+        </div>
+      ) : null}
       <div className="grid h-44 place-items-center rounded-xl border-2 border-dashed border-border bg-muted/40">
         <div className="text-center">
           <QrCode className="mx-auto h-16 w-16 text-muted-foreground/60" />
