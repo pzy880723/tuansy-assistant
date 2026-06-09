@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { UserMenu } from "@/components/UserMenu";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "工作台 — 团宝助手" }] }),
@@ -14,6 +16,20 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
+  const user = useCurrentUser();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (user === null) {
+      navigate({ to: "/auth", replace: true, search: { redirect: pathname } });
+    }
+  }, [user, navigate, pathname]);
+
+  if (!user) {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">正在跳转登录…</div>;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
