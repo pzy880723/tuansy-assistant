@@ -14,11 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_users: {
+        Row: {
+          created_at: string
+          id: string
+          nickname: string
+          phone: string | null
+          wechat_openid: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nickname?: string
+          phone?: string | null
+          wechat_openid?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nickname?: string
+          phone?: string | null
+          wechat_openid?: string | null
+        }
+        Relationships: []
+      }
       copy_versions: {
         Row: {
           created_at: string
           id: string
           label: string | null
+          owner_id: string | null
           project_id: string
           snapshot: Json
         }
@@ -26,6 +51,7 @@ export type Database = {
           created_at?: string
           id?: string
           label?: string | null
+          owner_id?: string | null
           project_id: string
           snapshot: Json
         }
@@ -33,10 +59,18 @@ export type Database = {
           created_at?: string
           id?: string
           label?: string | null
+          owner_id?: string | null
           project_id?: string
           snapshot?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "copy_versions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "copy_versions_project_id_fkey"
             columns: ["project_id"]
@@ -51,6 +85,7 @@ export type Database = {
           analysis: Json | null
           created_at: string
           id: string
+          owner_id: string | null
           project_id: string
           role: string
           sort_order: number
@@ -60,6 +95,7 @@ export type Database = {
           analysis?: Json | null
           created_at?: string
           id?: string
+          owner_id?: string | null
           project_id: string
           role?: string
           sort_order?: number
@@ -69,12 +105,20 @@ export type Database = {
           analysis?: Json | null
           created_at?: string
           id?: string
+          owner_id?: string | null
           project_id?: string
           role?: string
           sort_order?: number
           url?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "project_images_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_images_project_id_fkey"
             columns: ["project_id"]
@@ -93,6 +137,7 @@ export type Database = {
           intro: Json
           name: string
           notes: string | null
+          owner_id: string | null
           product: Json
           schedule: Json
           settings: Json
@@ -108,6 +153,7 @@ export type Database = {
           intro?: Json
           name?: string
           notes?: string | null
+          owner_id?: string | null
           product?: Json
           schedule?: Json
           settings?: Json
@@ -123,6 +169,7 @@ export type Database = {
           intro?: Json
           name?: string
           notes?: string | null
+          owner_id?: string | null
           product?: Json
           schedule?: Json
           settings?: Json
@@ -130,7 +177,15 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shipping_templates: {
         Row: {

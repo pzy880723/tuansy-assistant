@@ -2,6 +2,20 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import { requireUserId } from "@/lib/auth-session.server";
+
+async function assertProjectOwner(projectId: string, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("projects")
+    .select("owner_id")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("项目不存在");
+  if (data.owner_id && data.owner_id !== userId) throw new Error("无权访问该项目");
+}
+
 
 
 const CATEGORIES = [
@@ -23,9 +37,11 @@ const StartProjectInput = z.object({
 export const startProject = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => StartProjectInput.parse(d))
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
 
     const gateway = createLovableAiGatewayProvider(key);
     const model = gateway("google/gemini-3-flash-preview");
@@ -83,6 +99,7 @@ ${planHint}
     const { data: row, error } = await supabaseAdmin
       .from("projects")
       .insert({
+        owner_id: userId,
         name: output.projectName,
         cover_image_url: data.imageUrls?.[0] ?? null,
         product: {
@@ -103,6 +120,7 @@ ${planHint}
       await supabaseAdmin.from("project_images").insert(
         data.imageUrls.map((url, i) => ({
           project_id: row.id,
+          owner_id: userId,
           url,
           sort_order: i,
           role: "product",
@@ -146,6 +164,8 @@ const UploadImageInput = z.object({
 export const uploadProductImage = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => UploadImageInput.parse(d))
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    if (data.projectId) await assertProjectOwner(data.projectId, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const bytes = Buffer.from(data.dataBase64, "base64");
     if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("图片超过 8MB");
@@ -155,7 +175,8 @@ export const uploadProductImage = createServerFn({ method: "POST" })
       ? data.filename.split(".").pop()!.toLowerCase()
       : "";
     const ext = (extFromName || extFromMime).slice(0, 5);
-    const path = `${data.projectId ?? "starter"}/${crypto.randomUUID()}.${ext}`;
+    // Path scoped by user so storage policies can be tightened later.
+    const path = `${userId}/${data.projectId ?? "starter"}/${crypto.randomUUID()}.${ext}`;
 
     const { error: upErr } = await supabaseAdmin.storage
       .from("product-images")
@@ -173,12 +194,13 @@ export const uploadProductImage = createServerFn({ method: "POST" })
 
 
 
-
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {
+  const userId = await requireUserId();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: projects, error } = await supabaseAdmin
     .from("projects")
     .select("id, name, status, cover_image_url, product, updated_at, created_at")
+    .eq("owner_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -218,10 +240,12 @@ const metaSchema = z.object({
 export const createProject = createServerFn({ method: "POST" })
   .inputValidator((d: { name?: string; product_name?: string }) => metaSchema.parse(d))
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("projects")
       .insert({
+        owner_id: userId,
         name: data.name ?? "未命名项目",
         product: {
           name: data.product_name ?? "",
@@ -242,6 +266,8 @@ export const createProject = createServerFn({ method: "POST" })
 export const deleteProject = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.id, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("projects").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -251,6 +277,7 @@ export const deleteProject = createServerFn({ method: "POST" })
 export const getProject = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: project, error } = await supabaseAdmin
       .from("projects")
@@ -259,6 +286,7 @@ export const getProject = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!project) throw new Error("项目不存在");
+    if (project.owner_id && project.owner_id !== userId) throw new Error("无权访问该项目");
     const { data: images } = await supabaseAdmin
       .from("project_images")
       .select("*")
@@ -272,6 +300,8 @@ export const updateProject = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: z.record(z.string(), z.unknown()) }).parse(d),
   )
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.id, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("projects").update(data.patch as never).eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -287,6 +317,8 @@ export const updateProjectMeta = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.id, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: cur, error: ge } = await supabaseAdmin
       .from("projects")
@@ -309,3 +341,4 @@ export const updateProjectMeta = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+

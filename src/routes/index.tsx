@@ -119,6 +119,12 @@ function HeroStarter() {
       toast.error("再多说两句吧，或者拖一张商品图过来");
       return;
     }
+    // Require sign-in before kicking off a project.
+    if (typeof document !== "undefined" && !document.cookie.includes("tuan_user=")) {
+      toast.info("请先登录");
+      navigate({ to: "/auth", search: { redirect: "/" } });
+      return;
+    }
     setLoading(true);
     try {
       const res = await start({

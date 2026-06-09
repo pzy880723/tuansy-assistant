@@ -1,57 +1,59 @@
-# 修复编辑页文案生成 & 模块系统
+# 增加身份验证（开发期模拟版）
 
-## 问题诊断
+目标：用最小代价做"用户区隔"，登录方式为**短信验证码**和**微信扫码**，开发期全部走模拟流程，预留接口后期对接真实服务。
 
-通过查看 `src/routes/api/chat.ts` 和 `src/components/tuan/IntroTab.tsx`，发现三个问题：
+## 一、用户体验
 
-### 1. AI 只生成一句话，不是段落
-当前 `update_intro` 工具的 `description` 字段说明太模糊（"介绍正文/卖点描述"），加上 system prompt 限制"控制在 3 到 6 行内"——这个限制针对的是聊天回复，但 AI 把它误用到了写入预览的文案上。
+1. 新路由 `/auth`（公开）：
+   - Tab 1「手机验证码」：输入手机号 → 点"获取验证码" → 输入 6 位码 → 登录。开发期任意手机号都可发，验证码固定为 `123456`（也会在 toast 里提示），输入正确即登录。
+   - Tab 2「微信扫码」：显示一张占位二维码 + "模拟扫码成功"按钮，点一下即登录为"微信用户"。
+2. 进入 `/app/*` 任意页面时若未登录，自动跳到 `/auth`，登录后回到原页面。
+3. 顶栏右上角显示当前用户（手机号尾号 / 微信昵称）+「退出登录」。
 
-### 2. AI 写入的 blocks 类型对不上 UI
-- AI schema: `type: "text" | "image"`，字段 `content`
-- UI 实际类型: `text | image_lg | image_sm | video | tag`，字段 `text / url / urls / tags`
-- 结果：AI 调用 `update_intro` 添加图文块时，写进数据库的数据 UI 渲染不出来，看起来"没反应"。
+## 二、数据隔离
 
-### 3. 团购标题字号太小，没区分层级
-当前 `intro.title` 输入框是 `text-[14px] font-medium`，和正文一样大。
+每个用户只能看到自己创建的团购项目。
 
-模块按需添加这块——`IntroTab` 已经实现了：默认 `blocks: []` 不显示任何模块，点击底部"大图/小图/视频/文字/标签"按钮才 `addBlock`，每个块带"上移/下移/置顶/添加/删除"按钮。这部分实际已经工作，但因为问题 2，AI 主动加的块渲染不出来导致看起来像没生效。
+- `projects`、`project_images`、`copy_versions` 增加 `owner_id uuid` 字段，关联 `auth.users(id)`。
+- `shipping_templates` 暂时保持全局共享（属于通用配置）。
+- RLS 重写为「仅本人可读写自己的数据」，去掉现有的 `USING (true)` 公共策略。
+- Storage `product-images` 桶：写入路径强制为 `{user_id}/...`，策略仅允许本人对自己目录增删改；读取保持公开（图片要在小程序预览展示）。
+- 现有 3 条历史数据：迁移时设为 NULL owner，登录后在「我的项目」页提供「认领到当前账号」按钮（或直接由你手动指认），避免数据丢失。
 
-## 修改方案
+## 三、技术实现（开发期模拟）
 
-### A. `src/routes/api/chat.ts` — 重写 `update_intro` 工具
+- 不接入 Supabase 真实的 Phone Auth / 微信 OAuth，避免短信费用与微信开放平台审核。
+- 使用 Supabase Admin API（在 server function 里用 service role key）"模拟"创建/登录用户：
+  - 手机登录：以 `{phone}@mock.local` 作为邮箱、固定密码登录；不存在则自动创建。
+  - 微信登录：以 `wx_{随机id}@mock.local` 创建，二维码页面点击"模拟扫码成功"后调用 server function 创建并登录。
+- 登录后由前端用返回的 access/refresh token 调用 `supabase.auth.setSession()`，之后所有数据请求都带上 bearer，RLS 正常生效。
+- 全部模拟逻辑集中在 `src/lib/auth.functions.ts`，并加 `// TODO: 接入真实短信/微信` 注释，方便后期替换。
 
-让 AI 的 block schema 完全对齐 UI 类型，并明确文案长度要求：
+## 四、改动清单
 
-```ts
-const IntroBlockSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("text"), text: z.string() }),
-  z.object({ type: z.literal("image_lg"), url: z.string().nullable().optional() }),
-  z.object({ type: z.literal("image_sm"), urls: z.array(z.string()) }),
-  z.object({ type: z.literal("video"), url: z.string().nullable().optional() }),
-  z.object({ type: z.literal("tag"), tags: z.array(z.string()) }),
-]);
+```text
+新增  src/routes/auth.tsx                    登录页（手机 Tab + 微信 Tab）
+新增  src/routes/_authenticated/route.tsx    受保护布局（未登录跳 /auth）
+新增  src/lib/auth.functions.ts              模拟短信/扫码 server functions
+新增  src/components/UserMenu.tsx            顶栏用户信息 + 退出
+迁移  数据库                                 给 3 张表加 owner_id；重写 RLS；
+                                            重写 storage 策略；GRANT 收紧到 authenticated
+移动  src/routes/app.*.tsx                   迁入 _authenticated/ 子树
+改动  src/routes/__root.tsx                  注册 onAuthStateChange
+改动  src/lib/projects.functions.ts          写入时自动带 owner_id；查询按本人过滤
+改动  src/routes/api/chat.ts                 校验当前用户对项目的所有权
 ```
 
-- `title` 描述改为"团购活动主标题，简短有力，10-20 字"
-- `description` 描述改为"团购活动正文，必须写成完整段落，120-300 字，分 2-4 个自然段，突出品类对应的卖点；禁止只写一句话"
-- `blocks` 描述改为"图文模块数组，整体替换。默认不要主动添加；只有当用户明确要求 '加大图/加小图/加视频/加标签' 等指令时才传"
-- execute 里给 block 自动补 `id`（用 `crypto.randomUUID()` 或随机字符串）才能在 UI 里被 move/remove。
+## 五、后期接入真实功能的钩子
 
-### B. `src/routes/api/chat.ts` — 调整 system prompt
+`src/lib/auth.functions.ts` 里两个函数 `sendSmsCode` / `verifySmsCode` / `wechatScanLogin` 都用 `if (import.meta.env.DEV || !process.env.SMS_PROVIDER_KEY) { /* mock */ }` 包住，将来只需：
 
-- 把"控制在 3 到 6 行内"改成"聊天回复控制在 3 到 6 行内；但写入预览的 description 必须是完整段落（120-300 字）"
-- 明确："默认不要主动添加 blocks，blocks 由用户在右侧点击按钮添加；只有用户明确说'加张大图/加小图九宫格/加段文字'等才用 update_intro 写 blocks"
-- 强调"团购标题写到 title 字段，正文卖点写到 description 字段，不要把整段塞到 title"
+- 短信：接阿里云/腾讯云短信，填 `SMS_PROVIDER_KEY` 等 secret。
+- 微信：申请微信开放平台「网站应用」，前端生成真实二维码、后端处理 callback。
 
-### C. `src/components/tuan/IntroTab.tsx` — 团购标题样式
+不需要重写路由或前端 UI。
 
-把标题输入框样式从 `text-[14px] font-medium text-[#1a1a1a]` 改为 `text-[18px] font-bold text-[#1a1a1a]`，并把 placeholder 改为"请输入团购活动标题"（已经是）。其它不动——按钮区、blocks 渲染、上下移动逻辑已正确。
+## 六、需要你确认的两点
 
-## 影响范围
-
-只动两个文件：
-- `src/routes/api/chat.ts`（工具 schema + 系统提示）
-- `src/components/tuan/IntroTab.tsx`（标题字号一行）
-
-不动数据库、不动其它 Tab、不动 PhoneShell。
+1. **模拟阶段验证码**：固定 `123456` 可以吗？还是希望随机生成并在 toast 里弹出？
+2. **历史数据**：现有 3 个项目要不要绑定到你的第一个登录账号（推荐），还是清空重来？
