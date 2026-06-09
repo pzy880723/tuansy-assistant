@@ -35,7 +35,8 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          {user.nickname}
+          <div className="text-foreground">{user.nickname}</div>
+          {user.isAdmin ? <div className="mt-0.5 text-[11px] text-primary">超级管理员</div> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-xs">
