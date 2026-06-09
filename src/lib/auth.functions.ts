@@ -18,8 +18,23 @@ import {
 } from "@/lib/auth-session.server";
 
 export const MOCK_SMS_CODE = "123456";
+export const SUPER_ADMIN_PHONE = "18657433310";
 
 const PhoneSchema = z.string().regex(/^1[3-9]\d{9}$/, "请输入正确的手机号");
+
+function toClientUser(user: {
+  id: string;
+  nickname: string;
+  phone?: string | null;
+  wechat_openid?: string | null;
+}): typeof user & { role: "super_admin" | "user"; isAdmin: boolean } {
+  const isAdmin = user.phone === SUPER_ADMIN_PHONE;
+  return {
+    ...user,
+    role: isAdmin ? "super_admin" : "user",
+    isAdmin,
+  };
+}
 
 export const sendSmsCode = createServerFn({ method: "POST" })
   .inputValidator((d: { phone: string }) =>
@@ -80,7 +95,7 @@ export const verifySmsCode = createServerFn({ method: "POST" })
     }
 
     writeSession(user);
-    return { user };
+    return { user: toClientUser(user) };
   });
 
 export const wechatMockLogin = createServerFn({ method: "POST" }).handler(
@@ -97,7 +112,7 @@ export const wechatMockLogin = createServerFn({ method: "POST" }).handler(
     if (error) throw new Error(error.message);
     await claimLegacyOrphans(created.id);
     writeSession(created);
-    return { user: created };
+    return { user: toClientUser(created) };
   },
 );
 
@@ -114,7 +129,7 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
     clearSession();
     return { user: null };
   }
-  return { user: data };
+  return { user: toClientUser(data) };
 });
 
 export const signOut = createServerFn({ method: "POST" }).handler(async () => {

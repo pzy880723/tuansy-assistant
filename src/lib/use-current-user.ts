@@ -5,6 +5,8 @@ export type ClientUser = {
   nickname: string;
   phone: string | null;
   wechat: boolean;
+  role?: "super_admin" | "user";
+  isAdmin?: boolean;
 };
 
 const PUBLIC_COOKIE = "tuan_user";
@@ -25,6 +27,7 @@ export function clearAuthCookies() {
 export function writePublicUserCookie(user: ClientUser) {
   if (typeof document === "undefined") return;
   const maxAge = 60 * 60 * 24 * 30;
+  window.sessionStorage.removeItem(AUTH_ERROR_KEY);
   document.cookie = `${PUBLIC_COOKIE}=${encodeURIComponent(JSON.stringify(user))}; Max-Age=${maxAge}; path=/; SameSite=Lax; Secure`;
 }
 

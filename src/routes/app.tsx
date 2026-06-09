@@ -4,17 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, Chrome, ExternalLink, Package, Settings as SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/auth.functions";
 import { getProject, updateProject } from "@/lib/projects.functions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
-import {
-  clearAuthCookies,
-  notifyAuthChange,
-  setAuthSessionError,
-  useCurrentUser,
-} from "@/lib/use-current-user";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "工作台 — 团宝助手" }] }),
@@ -23,27 +17,8 @@ export const Route = createFileRoute("/app")({
 
 function AppLayout() {
   const user = useCurrentUser();
-  const currentUser = useServerFn(getCurrentUser);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  useQuery({
-    queryKey: ["current-user-session", user?.id],
-    enabled: !!user,
-    retry: false,
-    queryFn: async () => {
-      const res = await currentUser();
-      if (!res.user) {
-        const message = "登录会话已失效，请重新登录一次";
-        clearAuthCookies();
-        setAuthSessionError(message);
-        notifyAuthChange();
-        toast.error(message);
-        navigate({ to: "/auth", replace: true, search: { redirect: pathname } });
-      }
-      return res;
-    },
-  });
 
   useEffect(() => {
     if (user === null) {

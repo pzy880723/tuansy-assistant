@@ -37,6 +37,7 @@ import {
   listProjects,
   updateProjectMeta,
 } from "@/lib/projects.functions";
+import { clearAuthCookies, notifyAuthChange, setAuthSessionError } from "@/lib/use-current-user";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "我的项目 — 团宝助手" }] }),
@@ -66,10 +67,19 @@ function AppIndex() {
     { mode: "create" } | { mode: "edit"; project: ProjectRow } | null
   >(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, error, isError, isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: () => list(),
+    retry: false,
   });
+
+  const resetAndLogin = () => {
+    const message = "登录会话已失效，请重新登录一次。";
+    clearAuthCookies();
+    setAuthSessionError(message);
+    notifyAuthChange();
+    router.navigate({ to: "/auth", replace: true, search: { redirect: "/app" } });
+  };
 
   const createMut = useMutation({
     mutationFn: async (input: { name: string; product_name: string }) =>
@@ -123,6 +133,8 @@ function AppIndex() {
 
       {isLoading ? (
         <SkeletonGrid />
+      ) : isError ? (
+        <SessionIssue message={error instanceof Error ? error.message : "项目列表加载失败"} onReset={resetAndLogin} />
       ) : projects.length === 0 ? (
         <EmptyState onCreate={() => setDialog({ mode: "create" })} />
       ) : (
@@ -154,6 +166,18 @@ function AppIndex() {
         }}
       />
     </main>
+  );
+}
+
+function SessionIssue({ message, onReset }: { message: string; onReset: () => void }) {
+  return (
+    <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-sm text-destructive">
+      <h2 className="font-semibold">当前登录状态异常</h2>
+      <p className="mt-2 leading-relaxed">{message || "请清理旧会话后重新登录一次。"}</p>
+      <Button className="mt-4" variant="outline" onClick={onReset}>
+        重新登录
+      </Button>
+    </div>
   );
 }
 

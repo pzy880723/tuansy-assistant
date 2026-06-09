@@ -2,7 +2,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
 import { signOut } from "@/lib/auth.functions";
-import { notifyAuthChange, useCurrentUser } from "@/lib/use-current-user";
+import { clearAuthCookies, notifyAuthChange, useCurrentUser } from "@/lib/use-current-user";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ export function UserMenu() {
 
   const handleSignOut = async () => {
     await logout();
+    clearAuthCookies();
     notifyAuthChange();
     navigate({ to: "/auth", replace: true });
   };
@@ -35,7 +36,8 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          {user.nickname}
+          <div className="text-foreground">{user.nickname}</div>
+          {user.isAdmin ? <div className="mt-0.5 text-[11px] text-primary">超级管理员</div> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-xs">
