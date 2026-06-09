@@ -2,7 +2,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
 import { signOut } from "@/lib/auth.functions";
-import { notifyAuthChange, useCurrentUser } from "@/lib/use-current-user";
+import { clearAuthCookies, notifyAuthChange, useCurrentUser } from "@/lib/use-current-user";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ export function UserMenu() {
 
   const handleSignOut = async () => {
     await logout();
+    clearAuthCookies();
     notifyAuthChange();
     navigate({ to: "/auth", replace: true });
   };
