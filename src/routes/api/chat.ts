@@ -25,6 +25,18 @@ const SkuSchema = z.object({
   desc: z.string().optional().describe("规格说明，可选"),
 });
 
+const IntroBlockSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), text: z.string() }),
+  z.object({ type: z.literal("image_lg"), url: z.string().nullable().optional() }),
+  z.object({ type: z.literal("image_sm"), urls: z.array(z.string()) }),
+  z.object({ type: z.literal("video"), url: z.string().nullable().optional() }),
+  z.object({ type: z.literal("tag"), tags: z.array(z.string()) }),
+]);
+
+function genBlockId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -87,21 +99,24 @@ SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
 
 回复风格（务必遵守）：
 - 全程纯文本中文，禁止使用任何 Markdown 符号（不要出现 *、**、#、- 列表、反引号、表格语法）
-- 多条信息用"一、二、三"或直接换行分段，不要用项目符号
-- 控制在 3 到 6 行内，简洁、像真人助理一样说话
+- 聊天回复控制在 3 到 6 行内，简洁、像真人助理一样说话
+- 但写入预览的正文 description 必须是完整段落（120-300 字、2-4 个自然段），禁止只写一句话
 - 不寒暄、不重复用户的话、不要"好的，我来帮你..."这种开场
 - 自称"团宝"，不要说"AI"或"助手"
 
 工作原则（极其重要 — 工具必须对应右侧预览的字段）：
-- 改介绍 Tab 的标题、正文描述、图文 blocks → 调用 update_intro
-- 改 SKU（增、删、改价格/库存/规格名）→ 调用 update_skus，必须传完整的 SKU 数组
-- 改配送、起团、保障、自提、截团时间等设置项 → 调用 update_settings
-- 改商品标题、副标题、服务标签、封面 → 调用 update_product_meta
+- 团购活动标题（短，10-20 字）→ update_intro 的 title
+- 团购正文/卖点描述（长段落 120-300 字）→ update_intro 的 description；不要把整段塞到 title
+- 图文模块 blocks（大图/小图九宫格/视频/文字/标签）默认不要主动添加；由用户在右侧点击对应按钮添加。只有用户明确说"加张大图/加段文字/加九宫格/加标签"等指令时，才用 update_intro 传 blocks
+- 改 SKU（增、删、改价格/库存/规格名）→ update_skus，必须传完整的 SKU 数组
+- 改配送、起团、保障、自提、截团时间等设置项 → update_settings
+- 改商品标题、副标题、服务标签、封面 → update_product_meta
 - 不要把所有改动都塞进 update_product_meta；不同 Tab 的数据走不同工具
 - 用户描述意图时，主动调用工具修改预览，不要只是回复文字
 - 修改后用一句中文简短确认所做改动
 - 价格保留 1 位小数，库存为整数字符串
 - 不确定时主动询问用户
+
 
 询问用户信息时（极其重要）：
 - 一次需要确认 2 个及以上信息时，必须调用 ask_questions 工具发出问卷，禁止把多个问题塞进一段文字里
@@ -115,25 +130,34 @@ SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
           tools: {
             update_intro: tool({
               description:
-                "更新介绍 Tab 的内容。只传需要修改的字段，未传字段保持不变。blocks 整体替换。",
+                "更新介绍 Tab 内容。只传需要修改的字段；blocks 若传则整体替换。注意：blocks 默认由用户在右侧手动点按钮添加，AI 只在用户明确要求时才传。",
               inputSchema: z.object({
-                title: z.string().describe("介绍主标题，可选").optional(),
-                description: z.string().describe("介绍正文/卖点描述，可选").optional(),
-                blocks: z
-                  .array(
-                    z.object({
-                      type: z.enum(["text", "image"]).describe("text 或 image"),
-                      content: z.string().describe("文本内容或图片 URL"),
-                    }),
+                title: z
+                  .string()
+                  .describe("团购活动主标题，简短有力，10-20 字，可选")
+                  .optional(),
+                description: z
+                  .string()
+                  .describe(
+                    "团购活动正文卖点描述。必须写成完整段落，120-300 字，分 2-4 个自然段，结合品类要点突出卖点（产地/口感/适用人群/保障等）。禁止只写一句话。可选。",
                   )
-                  .describe("图文 block 列表，整体替换，可选")
+                  .optional(),
+                blocks: z
+                  .array(IntroBlockSchema)
+                  .describe(
+                    "图文模块数组，整体替换。仅当用户明确要求添加大图/小图九宫格/视频/文字段落/标签时才传；默认留空不动。",
+                  )
                   .optional(),
               }),
               execute: async (input) => {
-                const next = { ...intro, ...input };
+                const patch: Record<string, unknown> = { ...input };
+                if (Array.isArray(input.blocks)) {
+                  patch.blocks = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                }
+                const next = { ...intro, ...patch };
                 const { error } = await supabaseAdmin
                   .from("projects")
-                  .update({ intro: next })
+                  .update({ intro: next as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, updated: Object.keys(input) };
