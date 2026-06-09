@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Smartphone, QrCode, Loader2 } from "lucide-react";
 import {
   sendSmsCode,
+  signOut,
   verifySmsCode,
   wechatMockLogin,
 } from "@/lib/auth.functions";
@@ -30,12 +31,18 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const [tab, setTab] = useState<"phone" | "wechat">("phone");
   const navigate = useNavigate();
+  const logout = useServerFn(signOut);
   const { redirect } = useSearch({ from: "/auth" });
   const sessionError = readAuthCookieError();
   const safeRedirect = redirect && redirect !== "/auth" && !redirect.startsWith("/auth?") ? redirect : "/app";
   const goNext = () => navigate({ to: safeRedirect, replace: true });
 
-  const resetSession = () => {
+  const resetSession = async () => {
+    try {
+      await logout();
+    } catch {
+      // Client-side cleanup below is enough to let the next login overwrite the mock session.
+    }
     clearAuthCookies();
     notifyAuthChange();
     toast.success("已清理旧会话，请重新登录一次");
