@@ -2,6 +2,20 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import { requireUserId } from "@/lib/auth-session.server";
+
+async function assertProjectOwner(projectId: string, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("projects")
+    .select("owner_id")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("项目不存在");
+  if (data.owner_id && data.owner_id !== userId) throw new Error("无权访问该项目");
+}
+
 
 
 const CATEGORIES = [
