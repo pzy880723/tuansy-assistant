@@ -55,6 +55,18 @@ export const Route = createFileRoute("/api/chat")({
 
         const projectId = body.projectId;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { readSessionUserId } = await import("@/lib/auth-session.server");
+        const userId = readSessionUserId();
+        if (!userId) return new Response("Unauthorized", { status: 401 });
+        const { data: ownerRow } = await supabaseAdmin
+          .from("projects")
+          .select("owner_id")
+          .eq("id", projectId)
+          .maybeSingle();
+        if (!ownerRow) return new Response("Project not found", { status: 404 });
+        if (ownerRow.owner_id && ownerRow.owner_id !== userId) {
+          return new Response("Forbidden", { status: 403 });
+        }
 
         // Load fresh project state so the model sees the SAME data the preview renders.
         const { data: project } = await supabaseAdmin
