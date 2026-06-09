@@ -27,7 +27,7 @@ function toClientUser(user: {
   nickname: string;
   phone?: string | null;
   wechat_openid?: string | null;
-}) {
+}): typeof user & { role: "super_admin" | "user"; isAdmin: boolean } {
   const isAdmin = user.phone === SUPER_ADMIN_PHONE;
   return {
     ...user,
