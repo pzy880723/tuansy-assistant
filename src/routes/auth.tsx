@@ -13,6 +13,7 @@ import { notifyAuthChange } from "@/lib/use-current-user";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { clearAuthCookies, notifyAuthChange, readAuthCookieError, writePublicUserCookie } from "@/lib/use-current-user";
 
 const SearchSchema = z.object({ redirect: z.string().optional() });
 
@@ -26,7 +27,15 @@ function AuthPage() {
   const [tab, setTab] = useState<"phone" | "wechat">("phone");
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: "/auth" });
-  const goNext = () => navigate({ to: redirect || "/app", replace: true });
+  const sessionError = readAuthCookieError();
+  const safeRedirect = redirect && redirect !== "/auth" && !redirect.startsWith("/auth?") ? redirect : "/app";
+  const goNext = () => navigate({ to: safeRedirect, replace: true });
+
+  const resetSession = () => {
+    clearAuthCookies();
+    notifyAuthChange();
+    toast.success("已清理旧会话，请重新登录一次");
+  };
 
   return (
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-[oklch(0.97_0.02_55)] to-background px-4">
@@ -40,6 +49,15 @@ function AuthPage() {
             <div className="text-xs text-muted-foreground">登录后开始创建你的团购</div>
           </div>
         </div>
+
+        {sessionError ? (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+            <div>{sessionError}</div>
+            <button type="button" onClick={resetSession} className="mt-1 font-medium underline underline-offset-2">
+              重新登录
+            </button>
+          </div>
+        ) : null}
 
         <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm">
           {(
@@ -113,7 +131,13 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
     }
     setSubmitting(true);
     try {
-      await verify({ data: { phone, code } });
+      const res = await verify({ data: { phone, code } });
+      writePublicUserCookie({
+        id: res.user.id,
+        nickname: res.user.nickname,
+        phone: res.user.phone ?? null,
+        wechat: !!res.user.wechat_openid,
+      });
       notifyAuthChange();
       toast.success("登录成功");
       onSuccess();
@@ -172,7 +196,13 @@ function WechatForm({ onSuccess }: { onSuccess: () => void }) {
   const handleClick = async () => {
     setLoading(true);
     try {
-      await login();
+      const res = await login();
+      writePublicUserCookie({
+        id: res.user.id,
+        nickname: res.user.nickname,
+        phone: res.user.phone ?? null,
+        wechat: !!res.user.wechat_openid,
+      });
       notifyAuthChange();
       toast.success("微信登录成功");
       onSuccess();
