@@ -34,7 +34,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const logout = useServerFn(signOut);
   const { redirect } = useSearch({ from: "/auth" });
-  const safeRedirect = redirect && redirect !== "/auth" && !redirect.startsWith("/auth?") ? redirect : "/app";
+  const safeRedirect = getSafeRedirect(redirect);
   const goNext = () => navigate({ to: safeRedirect, replace: true });
 
   const resetSession = async () => {
@@ -104,6 +104,12 @@ function AuthPage() {
   );
 }
 
+function getSafeRedirect(redirect?: string) {
+  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) return "/app";
+  if (redirect === "/auth" || redirect.startsWith("/auth?")) return "/app";
+  return redirect;
+}
+
 function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
   const send = useServerFn(sendSmsCode);
   const verify = useServerFn(verifySmsCode);
@@ -156,6 +162,8 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
         nickname: res.user.nickname,
         phone: res.user.phone ?? null,
         wechat: !!res.user.wechat_openid,
+        role: res.user.role,
+        isAdmin: res.user.isAdmin,
       });
       notifyAuthChange();
       toast.success("登录成功");
@@ -230,6 +238,8 @@ function WechatForm({ onSuccess }: { onSuccess: () => void }) {
         nickname: res.user.nickname,
         phone: res.user.phone ?? null,
         wechat: !!res.user.wechat_openid,
+        role: res.user.role,
+        isAdmin: res.user.isAdmin,
       });
       notifyAuthChange();
       toast.success("微信登录成功");
