@@ -8,11 +8,18 @@ export type ClientUser = {
 };
 
 const PUBLIC_COOKIE = "tuan_user";
+const AUTH_ERROR_KEY = "tuan_auth_error";
+
+export function setAuthSessionError(message: string) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(AUTH_ERROR_KEY, message);
+}
 
 export function clearAuthCookies() {
   if (typeof document === "undefined") return;
   document.cookie = "tuan_user=; Max-Age=0; path=/";
   document.cookie = "tuan_uid=; Max-Age=0; path=/";
+  window.sessionStorage.removeItem(AUTH_ERROR_KEY);
 }
 
 export function writePublicUserCookie(user: ClientUser) {
@@ -33,8 +40,11 @@ function parsePublicCookie(): { user: ClientUser | null; error: string | null } 
   } catch {
     // Stale / double-encoded cookie from an older build — clear it so the user
     // isn't stuck in an auth-redirect loop, then force a fresh login.
+    const message = "本地登录信息解析失败，已清理旧会话，请重新登录一次。";
+    setAuthSessionError(message);
     clearAuthCookies();
-    return { user: null, error: "本地登录信息解析失败，已清理旧会话，请重新登录一次。" };
+    setAuthSessionError(message);
+    return { user: null, error: message };
   }
 }
 
@@ -43,6 +53,10 @@ function readPublicCookie(): ClientUser | null {
 }
 
 export function readAuthCookieError(): string | null {
+  if (typeof window !== "undefined") {
+    const stored = window.sessionStorage.getItem(AUTH_ERROR_KEY);
+    if (stored) return stored;
+  }
   return parsePublicCookie()?.error ?? null;
 }
 
