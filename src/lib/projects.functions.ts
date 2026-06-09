@@ -37,9 +37,11 @@ const StartProjectInput = z.object({
 export const startProject = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => StartProjectInput.parse(d))
   .handler(async ({ data }) => {
+    const userId = await requireUserId();
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
 
     const gateway = createLovableAiGatewayProvider(key);
     const model = gateway("google/gemini-3-flash-preview");
