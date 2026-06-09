@@ -22,7 +22,7 @@ export function writePublicUserCookie(user: ClientUser) {
 }
 
 function parsePublicCookie(): { user: ClientUser | null; error: string | null } {
-  if (typeof document === "undefined") return null;
+  if (typeof document === "undefined") return { user: null, error: null };
   const match = document.cookie
     .split("; ")
     .find((c) => c.startsWith(`${PUBLIC_COOKIE}=`));
