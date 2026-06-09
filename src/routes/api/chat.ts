@@ -163,10 +163,10 @@ SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
                   .describe("要合并进 settings 的 key-value，例如 { min_order: '10', delivery: '包邮' }"),
               }),
               execute: async ({ patch }) => {
-                const next = { ...settings, ...patch };
+                const next = { ...settings, ...patch } as Record<string, unknown>;
                 const { error } = await supabaseAdmin
                   .from("projects")
-                  .update({ settings: next })
+                  .update({ settings: next as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, updated: Object.keys(patch) };
