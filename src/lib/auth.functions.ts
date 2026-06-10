@@ -74,9 +74,10 @@ async function claimLegacyOrphans(userId: string) {
 
 export const verifySmsCode = createServerFn({ method: "POST" })
   .inputValidator((d: { phone: string; code: string }) =>
-    z
-      .object({ phone: PhoneSchema, code: z.string().length(6) })
-      .parse(d),
+    parseOrThrow(
+      z.object({ phone: PhoneSchema, code: z.string().length(6, "验证码需 6 位") }),
+      d,
+    ),
   )
   .handler(async ({ data }) => {
     if (data.code !== MOCK_SMS_CODE) {
