@@ -20,7 +20,16 @@ import {
 export const MOCK_SMS_CODE = "123456";
 export const SUPER_ADMIN_PHONE = "18657433310";
 
-const PhoneSchema = z.string().regex(/^1[3-9]\d{9}$/, "请输入正确的手机号");
+const PhoneSchema = z
+  .string()
+  .transform((v) => v.replace(/[\s\-()]/g, "").replace(/^(\+?86|0086)/, ""))
+  .pipe(z.string().regex(/^1[3-9]\d{9}$/, "请输入正确的手机号（11 位中国大陆手机号）"));
+
+function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown): T {
+  const r = schema.safeParse(data);
+  if (r.success) return r.data;
+  throw new Error(r.error.issues[0]?.message ?? "请求参数不正确");
+}
 
 function toClientUser(user: {
   id: string;
