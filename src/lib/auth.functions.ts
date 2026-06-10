@@ -47,7 +47,7 @@ function toClientUser(user: {
 
 export const sendSmsCode = createServerFn({ method: "POST" })
   .inputValidator((d: { phone: string }) =>
-    z.object({ phone: PhoneSchema }).parse(d),
+    parseOrThrow(z.object({ phone: PhoneSchema }), d),
   )
   .handler(async () => {
     // TODO(prod): call real SMS provider. For now, the code is always 123456.
