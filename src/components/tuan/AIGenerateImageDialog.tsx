@@ -96,8 +96,10 @@ export function AIGenerateImageDialog({
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "生图失败");
+        const short = text.slice(0, 120);
         if (res.status === 402) toast.error("AI 额度不足，请联系管理员充值");
         else if (res.status === 429) toast.error("请求太频繁，请稍后再试");
+        else toast.error(`生图失败 (${res.status}): ${short}`);
         setSlots((cur) =>
           cur.map((s) =>
             s.id === slotId ? { ...s, status: "error", error: text || "生图失败" } : s,
