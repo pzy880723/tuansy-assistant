@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { readAuthToken } from "@/lib/use-current-user";
 import {
   Dialog,
   DialogContent,
@@ -83,9 +84,13 @@ export function AIGenerateImageDialog({
     variant: string | undefined,
   ): Promise<void> => {
     try {
+      const token = readAuthToken();
       const res = await fetch("/api/generate-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "x-tuan-session": token } : {}),
+        },
         body: JSON.stringify({
           prompt: p,
           count: 1,
@@ -97,7 +102,8 @@ export function AIGenerateImageDialog({
       if (!res.ok) {
         const text = await res.text().catch(() => "生图失败");
         const short = text.slice(0, 120);
-        if (res.status === 402) toast.error("AI 额度不足，请联系管理员充值");
+        if (res.status === 401) toast.error("登录状态失效，请刷新页面重新登录");
+        else if (res.status === 402) toast.error("AI 额度不足，请联系管理员充值");
         else if (res.status === 429) toast.error("请求太频繁，请稍后再试");
         else toast.error(`生图失败 (${res.status}): ${short}`);
         setSlots((cur) =>
