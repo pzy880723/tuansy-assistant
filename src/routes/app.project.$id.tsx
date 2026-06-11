@@ -145,6 +145,27 @@ function ChatPane({
     projectRef.current = project;
   }, [project]);
 
+  const logicStorageKey = `tuanbao.copyLogic.${projectId}`;
+  const [selectedLogicId, setSelectedLogicId] = useState<string>(() => {
+    if (typeof window === "undefined") return "auto";
+    return window.localStorage.getItem(logicStorageKey) || "auto";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(logicStorageKey, selectedLogicId);
+  }, [selectedLogicId, logicStorageKey]);
+  const logicIdRef = useRef(selectedLogicId);
+  useEffect(() => {
+    logicIdRef.current = selectedLogicId;
+  }, [selectedLogicId]);
+  const listLogicsFn = useServerFn(listCopyLogics);
+  const { data: logicsData } = useQuery({
+    queryKey: ["copy-logics"],
+    queryFn: () => listLogicsFn(),
+    staleTime: 60_000,
+  });
+  const logics = logicsData?.logics ?? [];
+
   const initial: UIMessage[] = (() => {
     if (typeof window === "undefined") return [];
     try {
@@ -174,7 +195,12 @@ function ChatPane({
       api: "/api/chat",
       prepareSendMessagesRequest: ({ messages, body }) => ({
         headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
-        body: { ...body, messages, projectId },
+        body: {
+          ...body,
+          messages,
+          projectId,
+          copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
+        },
       }),
     }),
   ).current;
