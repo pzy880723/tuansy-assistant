@@ -32,7 +32,7 @@ export function AIGenerateImageDialog({
   const [count, setCount] = useState<number>(3);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const { attachments, addFiles, removeAttachment, clear } = useImageAttachments({
+  const { attachments, addFiles, remove, clear } = useImageAttachments({
     projectId,
   });
 
