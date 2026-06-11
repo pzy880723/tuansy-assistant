@@ -313,7 +313,7 @@ export function IntroTab({
             value={intro.title ?? ""}
             onChange={(v) => onChange({ ...intro, title: v })}
             placeholder="请输入团购活动标题"
-            className="text-[18px] font-bold text-[#1a1a1a] placeholder:font-normal placeholder:text-[#c8c9cc]"
+            className="text-[15px] font-semibold text-[#1a1a1a] placeholder:font-normal placeholder:text-[#c8c9cc]"
           />
         </div>
         <div className="py-2">
@@ -472,7 +472,7 @@ function BlockCard({
             onChange={onChangeText}
             onBlur={(v) => onFinishEditText(v)}
             placeholder="请输入文字内容（支持换行）"
-            className="min-h-[60px] rounded-md border border-[#07c160]/40 bg-white px-2 py-1.5 text-[13px] text-[#323233]"
+            className="rounded-md border border-[#07c160]/40 bg-white px-2 py-1.5 text-[13px] text-[#323233]"
           />
         ) : (
           <button
