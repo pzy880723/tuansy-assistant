@@ -55,8 +55,8 @@ export const Route = createFileRoute("/api/chat")({
 
         const projectId = body.projectId;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { readSessionUserId } = await import("@/lib/auth-session.server");
-        const userId = readSessionUserId();
+        const { readSessionUserIdFromRequest } = await import("@/lib/auth-session.server");
+        const userId = await readSessionUserIdFromRequest(request);
         if (!userId) return new Response("Unauthorized", { status: 401 });
         const { data: ownerRow } = await supabaseAdmin
           .from("projects")

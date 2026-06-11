@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
 import { cn } from "@/lib/utils";
+import { readAuthToken } from "@/lib/use-current-user";
 import { PhoneShell as TuanPhoneShell } from "@/components/tuan/PhoneShell";
 import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
 import { ProductTab } from "@/components/tuan/ProductTab";
@@ -163,6 +164,7 @@ function ChatPane({
     new DefaultChatTransport({
       api: "/api/chat",
       prepareSendMessagesRequest: ({ messages, body }) => ({
+        headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
         body: { ...body, messages, projectId },
       }),
     }),

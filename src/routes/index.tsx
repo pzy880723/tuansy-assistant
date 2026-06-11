@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { startProject } from "@/lib/projects.functions";
 import { useImageAttachments } from "@/lib/use-image-attachments";
+import { hasAuthSession } from "@/lib/use-current-user";
 import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare, Loader2, ClipboardList, X } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -120,7 +121,7 @@ function HeroStarter() {
       return;
     }
     // Require sign-in before kicking off a project.
-    if (typeof document !== "undefined" && !document.cookie.includes("tuan_user=")) {
+    if (!hasAuthSession()) {
       toast.info("请先登录");
       navigate({ to: "/auth", search: { redirect: "/" } });
       return;
