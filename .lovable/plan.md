@@ -1,28 +1,30 @@
-## 双向同步：右侧编辑 → 左侧聊天 & 历史
+## 团宝文案写作框架升级
 
-**核心机制**: 用一个轻量事件总线（`window.dispatchEvent` + `CustomEvent`）从右侧 `PreviewPane` 向左侧 `ChatPane` 广播手动编辑事件，避免大改父组件结构。
+把用户提的「5 步转化框架 + 图文配对逻辑」固化到 `src/routes/api/chat.ts` 的 system prompt，让团宝在所有写作场景下自动遵守。
 
-### 1. 新建 edit-log 总线（`src/lib/edit-log-bus.ts`）
-导出 `emitManualEdit(projectId, field, label, snapshotPatch)` 与 `onManualEdit(projectId, cb)`。事件名 `tuanbao:manual-edit:<projectId>`。
+### 1. 新增「文案五步法」section
+在现有「按品类撰写重点」之后插入一段固定框架，让模型把 `description` / `blocks` 的内容都按这五步组织：
 
-### 2. PreviewPane 在每次保存时按字段防抖
-- 在 `setIntro / setSkus / setSettings` 中除了原有 `persist`，再调用一个新的 `logEdit(field, humanLabel, fullSnapshot)`。
-- `logEdit` 内部按 `field`（intro / skus / settings / 进一步细化到 title / description / blocks / sku 名称 / 设置 key）维护一个 debounce map，停顿 1.5s 后 `emitManualEdit`。
-- 字段→中文 label 映射：`intro.title` → "修改了标题"、`intro.description` → "修改了介绍正文"、`intro.blocks` → "调整了介绍内容块"、`skus` → "修改了商品规格"、`settings.<key>` → "修改了设置：<中文名>"。
+1. 强力吸睛标题 → `intro.title`，要求 emoji + 痛点词 + 核心卖点 + 利益点 + 人群标签
+2. 痛点共鸣开篇 → `description` 第 1 段，从「我懂你」切入
+3. 品牌故事/背书 → `description` 第 2 段，给低价或品质一个理由
+4. 深度卖点拆解 → 3-4 段卖点，每段一个核心点，多用感官词与场景化描写
+5. 款式/参数详解 → 颜色性格、尺码表、试穿提示
 
-### 3. ChatPane 监听并写入 history + 系统消息
-- `useEffect` 订阅 `onManualEdit(projectId)`，回调里：
-  - **HistoryEntry**: `push` 一条 `{ label: "✏️ "+humanLabel, snapshot, messageIndex: messages.length, source: 'manual' }`，可点击回滚（沿用现有 rollback 逻辑）。
-  - **系统消息**: 用 `setMessages(prev => [...prev, sysMsg])` 追加一条 `role: 'system'` 风格 UIMessage（自定义 id `manual-<ts>`，单个 text part 文案 `✏️ ${humanLabel}`）。
-- `MessageRow` 增加分支：`msg.role === 'system'` 时渲染一条居中、灰色细条 `<div class="mx-auto text-[11px] text-muted-foreground bg-muted/50 rounded-full px-2.5 py-1">✏️ …</div>`，不显示头像/气泡。
-- 系统消息一并写入 `tuanbao.chat.<projectId>` localStorage（沿用现有 effect）。
+### 2. 新增「图文配对流程」section
+明确两阶段工作模式：
 
-### 4. 防止 AI 工具调用回写也被记为"手动编辑"
-- `lastWrittenRef` 已区分本地 vs 远端；`logEdit` 只在用户调用 `setIntro/setSkus/setSettings` 时触发，AI 通过 `invalidateQueries` 路径不会进入这些 setter，天然安全。
+- **阶段 A — 用户只丢文字/描述时**：先用 update_intro 写好 title + description 的完整五步框架，然后罗列出"图文骨架建议"（用纯文本列出每个段落标题 + 该段落建议配图位置），但不要主动 push blocks，等用户补图。
+- **阶段 B — 用户后续丢图片时**：根据图片内容（参考用户描述 / 图片明显特征如商品图、模特图、细节图、参数表）判断它对应骨架里的哪一段，然后用 update_intro 的 blocks 字段把图片插到该段落对应的位置；最终结构为「文字 block → 相关图片 block(s) → 下一段文字 block → 相关图片 block(s)」交替排列。
+- 同一段落多张图：单图用 image_lg、多图（≥3）用 image_sm 九宫格；商品对比/细节图优先小图组。
+- 不要把所有图片堆在最后，必须按语义嵌入对应文字段落之间。
 
-### 5. 不改动
-- 数据库表结构、`/api/chat` 后端、AI tool 流程、回滚逻辑、`IntroTab` 内部 UI。
+### 3. 更新 blocks 规则
+原系统提示中"blocks 默认不要主动添加，只有用户明确要求才传"需要放宽：当用户上传图片时，AI 应自动用 blocks 把图片插入到正确段落（属于阶段 B 的明确触发），无需用户再说"加张大图"。
+
+### 4. 不改动
+- 工具签名 / 数据库 schema / 前端
+- 其他品类、设置、SKU 工具的现有规则
 
 ### 涉及文件
-- 新增：`src/lib/edit-log-bus.ts`
-- 编辑：`src/routes/app.project.$id.tsx`（PreviewPane setter、ChatPane effect、MessageRow 增加 system 分支）
+- 编辑：`src/routes/api/chat.ts`（仅扩展 system prompt 字符串）
