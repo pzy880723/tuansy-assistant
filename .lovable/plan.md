@@ -1,49 +1,110 @@
-## 目标
+## 一、设置页加返回入口
 
-让聊天生成文案时遵守用户在「设置 → 文案编辑逻辑」里定义的模板（模块顺序 + 每模块自然语言指导）。在 ChatPane 顶部新增一个"文案逻辑"下拉选择器：
-- 用户手动选定 → 强制用该逻辑
-- 留空（默认"自动"）→ 后端依据当前项目品类 + 商品标题，让 AI 匹配最合适的一条，匹配不到则回落到 `is_active=true` 的全局默认；再没有就用现有硬编码五步法。
+`/settings` 顶部增加"← 返回项目库"按钮跳 `/app`。
 
-## 后端改动 `src/routes/api/chat.ts`
+## 二、预设文案逻辑（行业模版）— 改为后台管理
 
-1. 请求体新增可选 `copyLogicId?: string`。
-2. 加载逻辑：
-   - 若 `copyLogicId` 传了 → `supabaseAdmin.from("copy_logics").select().eq("id", id).eq("user_id", userId).maybeSingle()`。
-   - 否则查询该用户全部 `copy_logics`（只取 `id,name,description,modules`），若 ≥1 条：
-     - 取 `is_active=true` 那条作为 fallback；
-     - 若总数 ≥2，调用一次轻量 `generateText` (gemini-3-flash) + `Output.object({ id: enum(候选id列表) })`，prompt 喂入候选列表（名称+description 截断 200 字）+ 当前 `product.category` + `product.title`，让模型选最匹配的一条；选不出走 fallback。
-   - 都没有则不注入，沿用现有硬编码段。
-3. 把选中的 logic 渲染成 prompt 片段并替换/拼接到 system 中：
-   - 在【文案五步转化框架…】整段之前插入「【当前启用文案逻辑：${name}】」块，内容含：
-     - `description`（自然语言总纲）
-     - 模块清单：`1. [type] label — guidance` 逐条列出
-     - 一句硬约束："写 intro.title/description/blocks 时必须按上述模块顺序逐段输出；每段内容必须满足对应 guidance；五步法仅作风格参考，与上面冲突时以本逻辑为准。"
-4. 在响应头里回写 `X-Tuanbao-Copy-Logic: <id>`，便于前端显示已生效的逻辑（可选）。
+### 数据模型
 
-## 前端改动
+新建 `preset_copy_logics` 表（与 `copy_logics` 结构基本一致，但**无 user_id**，由 admin 维护）：
+- `id, slug(unique), name, description, modules(jsonb), industry, sort_order, is_published, created_at, updated_at`
+- RLS：`authenticated` 可 `SELECT` `is_published = true` 的行（用户端可浏览）；写入只允许 admin（通过 `has_role`）
 
-### `src/routes/app.project.$id.tsx`（ChatPane）
-1. 新增 `useQuery(["copy-logics"], listCopyLogics)`。
-2. ChatPane 顶部（输入框上方或标题栏右侧）加一个紧凑 `Select`：
-   - 选项：`自动匹配` + 用户所有逻辑（标注哪条是 ⭐ 激活）。
-   - 选中值放 React state `selectedLogicId`，并 `localStorage` 按 projectId 持久化。
-3. `DefaultChatTransport.prepareSendMessagesRequest` 已经 spread body —— 在 body 里追加 `copyLogicId: selectedLogicId ?? undefined`。
+初始迁移内 `INSERT` 7 条种子：服装、食品、珠宝、家电、日化、3C 数码、日用家居（每条预填 description + modules 草案）。
 
-### 不改：`src/lib/copy-logics.functions.ts`、settings 编辑页、其他 tool 行为。
+### 后台管理界面 `/admin/presets`
 
-## 自动匹配细节
+复用 `/settings` 现有的文案逻辑编辑组件（自然语言描述 + 模块列表 + "AI 生成模块"按钮 + 手动增删模块）。差别：
+- 列表显示所有 `preset_copy_logics`（不分用户）
+- 可新建/编辑/删除/上下架（`is_published`）/排序
+- 调用 admin server fn：`adminListPresets`, `adminUpsertPreset`, `adminDeletePreset`, `adminGenerateModulesFromText`（复用现有的 `generateModulesFromText` 逻辑）
 
-- 候选 prompt 控制在 ~1.5k tokens：每条只塞 name + description 截 200 字 + 模块 label 列表。
-- 用 `Output.object({ id: z.enum([...]) })`，没有匹配返回 `is_active` 那条的 id（在 enum 中保留 `"__none__"` 选项让模型可表达"都不匹配"）。
-- 单次额外调用约 1-2s，可接受；后续如需可加缓存（按 projectId + product.title 哈希），本期不做。
+为复用编辑 UI：把 `/settings` 现有的编辑器拆成可复用组件 `<CopyLogicEditor source={"user"|"preset"} value onChange onAIGenerate />`，两边都用它。
 
-## 不在范围
+### 前端用户侧表现
 
-- 不改 copy_logics 表结构。
-- 不改 settings UI。
-- 不改其他 tool 的 schema。
+在 `/settings` 文案逻辑页面新增一个"**标准文案逻辑**"分区，列出所有已上架的预设：
+- 只读展示（描述 + 模块列表 collapsed）
+- 每条带"**复制到我的文案逻辑**"按钮 → 调 server fn `copyPresetToMine({presetId})` 在用户 `copy_logics` 里创建一份可编辑副本，自动跳到编辑态
+- 用户**不能直接修改预设**，只能复制后改
 
-## 涉及文件
+在聊天面板的"文案逻辑"下拉里，预设也会显示在一个独立分组「标准模版（只读）」中，可直接选用；选用时按只读模板生成文案，不允许编辑（要改就先复制）。
 
-- `src/routes/api/chat.ts`（主要改动）
-- `src/routes/app.project.$id.tsx`（加 Select + 透传 copyLogicId）
+为此 `/api/chat` 接收的 `copyLogicId` 需要支持 "preset:<id>" 与原本的 user copy_logic id 两种来源；命中 preset 时从 `preset_copy_logics` 取 modules 注入 system prompt。
+
+## 三、后台管理系统 (admin)
+
+### 1. 权限模型
+
+迁移：
+- `app_role` 枚举 `admin`/`user`
+- `user_roles(user_id, role)` + 唯一约束 + RLS（admin 可读写）
+- `has_role(_user_id, _role)` security definer
+- `app_users.is_banned boolean default false`
+- 触发器：新建 `app_users` 时若手机号 = `18657433310` 自动写入 admin 角色
+- 同迁移末尾 `INSERT` 兜底：若该手机号已存在 `app_users`，直接插入 admin 角色
+
+### 2. 路由结构
+
+```text
+src/routes/
+  admin.tsx              // 布局，SidebarProvider + AdminSidebar
+                         // beforeLoad: 未登录→/auth；非 admin→/app
+  admin.index.tsx        // → /admin/dashboard
+  admin.dashboard.tsx
+  admin.users.tsx
+  admin.presets.tsx      // 预设文案逻辑管理
+  admin.audit.tsx
+```
+
+### 3. 仪表盘
+
+四张卡：总用户、总项目、总文案、近 7 日新增用户；30 天折线：每日 `copy_versions` 生成数。
+server fn：`getAdminStats()`, `getCopyTrend()`。
+
+### 4. 用户管理
+
+表格列：手机号 / 注册时间 / 项目数 / 文案数 / 角色 / 状态 / 操作
+- 操作：封禁/解封、提升/撤销 admin
+- 手机号搜索 + 分页 20/页
+- server fn：`adminListUsers`, `adminSetBan`, `adminSetRole`
+- 封禁用户在登录与 `/api/chat` 拒绝访问
+
+### 5. 预设管理
+
+如上述「二」详细描述。
+
+### 6. 审计日志
+
+两个 Tab：项目列表、文案记录；server fn `adminListProjects`, `adminListCopyVersions`。
+
+### 7. 入口
+
+`/app` 项目库右上角：若 `has_role('admin')` 显示「管理后台」按钮。判定走 `getMyRoles()` server fn。
+
+### 8. 安全约束
+
+所有 admin server fn：`requireSupabaseAuth` → `has_role` 校验 → `supabaseAdmin` 操作；否则抛 403。
+
+## 四、交付清单
+
+- **迁移 1**：`app_role` + `user_roles` + `has_role` + `app_users.is_banned` + 手机号自动 admin 触发器 + 首位 admin 兜底插入
+- **迁移 2**：`preset_copy_logics` 表 + RLS + GRANT + 7 条种子数据
+- **新文件**
+  - `src/components/copy-logic/CopyLogicEditor.tsx`（拆分复用）
+  - `src/components/admin/AdminSidebar.tsx`
+  - `src/lib/admin.functions.ts`（含 preset CRUD、用户管理、统计）
+  - `src/lib/presets.functions.ts`（用户侧：列预设、复制到我的）
+  - `src/routes/admin.tsx` / `admin.index.tsx` / `admin.dashboard.tsx` / `admin.users.tsx` / `admin.presets.tsx` / `admin.audit.tsx`
+- **修改**
+  - `src/routes/settings.tsx`：返回按钮 + 「标准文案逻辑」分区 + 用 CopyLogicEditor
+  - `src/routes/app.index.tsx`：admin 入口
+  - `src/routes/app.project.$id.tsx`：下拉支持 preset 分组，选中传 `preset:<id>`
+  - `src/routes/api/chat.ts`：解析 `copyLogicId` 区分 user / preset 来源
+  - `src/lib/copy-logics.functions.ts`：保持现有 `generateModulesFromText` 可被 admin 复用
+
+## 待你确认（最后一项）
+
+封禁是否立即把用户踢下线？默认：仅拒绝下次登录与所有 server fn 调用（当前 session 页面不强制中断）。要"立即踢下线"建议二期再做。
+
+如无异议，回复"开始"即按此实施。
