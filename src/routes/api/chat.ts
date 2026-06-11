@@ -30,7 +30,7 @@ const IntroBlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("image_lg"), url: z.string().nullable().optional() }),
   z.object({ type: z.literal("image_sm"), urls: z.array(z.string()) }),
   z.object({ type: z.literal("video"), url: z.string().nullable().optional() }),
-  z.object({ type: z.literal("tag"), tags: z.array(z.string()) }),
+  
 ]);
 
 function genBlockId() {
