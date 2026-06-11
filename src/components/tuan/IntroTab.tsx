@@ -235,14 +235,13 @@ export function IntroTab({
     else next.splice(Math.min(next.length, i + 1), 0, item);
     setBlocks(next);
   };
-  const reorder = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
-    const src = blocks.findIndex((b) => b.id === sourceId);
-    const dst = blocks.findIndex((b) => b.id === targetId);
-    if (src < 0 || dst < 0) return;
+  const moveToIndex = (id: string, index: number) => {
+    const src = blocks.findIndex((b) => b.id === id);
+    if (src < 0) return;
     const next = blocks.slice();
     const [item] = next.splice(src, 1);
-    next.splice(dst, 0, item);
+    const dst = src < index ? index - 1 : index;
+    next.splice(Math.max(0, Math.min(next.length, dst)), 0, item);
     setBlocks(next);
   };
   const updateText = (id: string, text: string) => {
@@ -255,7 +254,8 @@ export function IntroTab({
     setEditingId((cur) => (cur === id ? null : cur));
   };
 
-  const [dragId, setDragId] = useState<string | null>(null);
+  // Reorder overlay state
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
 
   const openAIForBlock = (id: string, fallback: string) => {
     aiTargetIdRef.current = id;
