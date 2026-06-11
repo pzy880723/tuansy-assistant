@@ -1,11 +1,13 @@
 // Server-only helpers for AI image generation via Lovable AI Gateway.
-// - No reference images -> OpenAI `openai/gpt-image-2` (documented default, most stable).
-// - With reference images -> Gemini `google/gemini-3.1-flash-image-preview`
-//   (supports multimodal image inputs for editing/style transfer).
+// - No reference images -> OpenAI `openai/gpt-image-2` (image2, photoreal default).
+// - With reference images -> Google `google/gemini-2.5-flash-image` (Nano Banana).
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/images/generations";
 const OPENAI_MODEL = "openai/gpt-image-2";
-const GEMINI_MODEL = "google/gemini-3.1-flash-image-preview";
+const GEMINI_MODEL = "google/gemini-2.5-flash-image";
+
+const REALISM_SUFFIX =
+  "Ultra-realistic professional product photography, natural lighting, true-to-life materials and textures, sharp focus, shallow depth of field, photo-realistic, DSLR shot, no cartoon, no illustration, no 3D render, no plastic look, no oversaturation.";
 
 export type GenerateOneInput = {
   prompt: string;
@@ -30,6 +32,10 @@ function buildError(status: number, text: string): GatewayError {
   return err;
 }
 
+function withRealism(prompt: string): string {
+  return `${prompt}\n\n${REALISM_SUFFIX}`;
+}
+
 async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> {
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
@@ -39,8 +45,8 @@ async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> 
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      prompt,
-      quality: "low",
+      prompt: withRealism(prompt),
+      quality: "high",
       size: "1024x1024",
       n: 1,
     }),
@@ -60,7 +66,9 @@ async function callGeminiImage(
   prompt: string,
   referenceImages: string[],
 ): Promise<string> {
-  const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+  const content: Array<Record<string, unknown>> = [
+    { type: "text", text: withRealism(prompt) },
+  ];
   for (const url of referenceImages) {
     content.push({ type: "image_url", image_url: { url } });
   }
