@@ -349,6 +349,15 @@ export function IntroTab({
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
+            {projectId && (
+              <button
+                onClick={openAIForWhole}
+                className="flex items-center gap-1 rounded-md border border-[#07c160] bg-[#07c160]/10 px-2 py-0.5 text-[11px] text-[#07c160] hover:bg-[#07c160]/15"
+              >
+                <Sparkles className="h-3 w-3" />
+                AI 生图
+              </button>
+            )}
             <button
               onClick={() => toast.info("素材导入：即将上线")}
               className="rounded-md border border-[#07c160] px-2 py-0.5 text-[11px] text-[#07c160]"
