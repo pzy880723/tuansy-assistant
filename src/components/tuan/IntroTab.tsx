@@ -116,12 +116,19 @@ function AutoTextarea({
 export function IntroTab({
   intro,
   onChange,
+  projectId,
 }: {
   intro: IntroData;
   onChange: (next: IntroData) => void;
+  projectId?: string;
 }) {
   const blocks = intro.blocks ?? [];
   const setBlocks = (next: IntroBlock[]) => onChange({ ...intro, blocks: next });
+
+  // AI generate-image dialog state
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const aiTargetIdRef = useRef<string | null>(null);
 
   // hidden file inputs
   const fileLgRef = useRef<HTMLInputElement | null>(null);
