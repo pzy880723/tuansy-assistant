@@ -38,6 +38,7 @@ import {
   type CopyModule,
   type CopyModuleType,
 } from "@/lib/copy-logics.functions";
+import { listPresetCopyLogics, copyPresetToMine } from "@/lib/presets.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings")({
