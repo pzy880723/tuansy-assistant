@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Trash2, MoreHorizontal, Pencil, ImageIcon, Sparkles } from "lucide-react";
+import { Trash2, MoreHorizontal, Pencil, ImageIcon, Sparkles, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,7 @@ import {
   listProjects,
   updateProjectMeta,
 } from "@/lib/projects.functions";
-import { clearAuthCookies, notifyAuthChange, setAuthSessionError } from "@/lib/use-current-user";
+import { clearAuthCookies, notifyAuthChange, setAuthSessionError, useCurrentUser } from "@/lib/use-current-user";
 import { ProjectStarter } from "@/components/project-starter";
 
 export const Route = createFileRoute("/app/")({
@@ -99,8 +99,20 @@ function AppIndex() {
 
   const projects = (data?.projects ?? []) as ProjectRow[];
 
+  const me = useCurrentUser();
+
   return (
     <main className="mx-auto max-w-5xl px-5 py-12">
+      {me?.isAdmin && (
+        <div className="mb-6 flex justify-end">
+          <Link
+            to="/admin"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border bg-card px-3 text-xs font-medium text-primary transition hover:bg-primary/5"
+          >
+            <Shield className="h-3.5 w-3.5" /> 进入管理后台
+          </Link>
+        </div>
+      )}
       {/* Starter — the main entry point, like Lovable dashboard */}
       <section className="text-center">
         <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground">

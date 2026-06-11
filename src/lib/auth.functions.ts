@@ -243,11 +243,22 @@ export const verifySmsCode = createServerFn({ method: "POST" })
 
     const { data: existing } = await supabaseAdmin
       .from("app_users")
-      .select("id, nickname, phone, wechat_openid")
+      .select("id, nickname, phone, wechat_openid, is_banned")
       .eq("phone", data.phone)
       .maybeSingle();
 
-    let user = existing;
+    if (existing?.is_banned) {
+      throw new Error("该账号已被封禁，如有疑问请联系管理员");
+    }
+
+    let user: AppUser | null = existing
+      ? {
+          id: existing.id,
+          nickname: existing.nickname,
+          phone: existing.phone,
+          wechat_openid: existing.wechat_openid,
+        }
+      : null;
     if (!user) {
       const nickname = `手机用户${data.phone.slice(-4)}`;
       const { data: created, error } = await supabaseAdmin
