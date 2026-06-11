@@ -38,6 +38,7 @@ import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
 import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
+import { emitManualEdit, onManualEdit, type ManualEditPayload } from "@/lib/edit-log-bus";
 
 export const Route = createFileRoute("/app/project/$id")({
   head: () => ({ meta: [{ title: "编辑项目 — 团宝助手" }] }),
@@ -199,6 +200,32 @@ function ChatPane({
   useEffect(() => {
     inputRef.current?.focus();
   }, [projectId, status]);
+
+  // Mirror right-side preview edits as system messages + history snapshots.
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  useEffect(() => {
+    const off = onManualEdit(projectId, (p: ManualEditPayload) => {
+      const ts = Date.now();
+      const entry: HistoryEntry = {
+        id: `m-${ts}-${Math.random().toString(36).slice(2, 6)}`,
+        ts,
+        label: `✏️ ${p.label}`,
+        snapshot: p.snapshot,
+        messageIndex: messagesRef.current.length,
+      };
+      setHistory((h) => [entry, ...h].slice(0, 30));
+      const sysMsg: UIMessage = {
+        id: `manual-${ts}`,
+        role: "system",
+        parts: [{ type: "text", text: `✏️ ${p.label}` }],
+      };
+      setMessages([...messagesRef.current, sysMsg]);
+    });
+    return off;
+  }, [projectId, setMessages]);
 
   const sendText = (text: string) => {
     const value = text.trim();
@@ -587,6 +614,16 @@ function MessageRow({
     (p) => p.type.startsWith("tool-") && p.type !== "tool-suggest_next",
   ) as ToolPart[];
 
+  if (msg.role === "system") {
+    return (
+      <div className="flex justify-center">
+        <div className="rounded-full bg-muted/60 px-2.5 py-1 text-[11px] text-muted-foreground">
+          {text}
+        </div>
+      </div>
+    );
+  }
+
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
@@ -923,20 +960,105 @@ function PreviewPane({
     }, 400);
   };
 
+  // Per-field debounced manual-edit log → mirrored as left-side system msgs.
+  const latestRef = useRef({ intro, skus, settings });
+  useEffect(() => {
+    latestRef.current = { intro, skus, settings };
+  }, [intro, skus, settings]);
+  const logTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const queueLog = (field: string, label: string) => {
+    if (logTimers.current[field]) clearTimeout(logTimers.current[field]);
+    logTimers.current[field] = setTimeout(() => {
+      delete logTimers.current[field];
+      emitManualEdit(projectId, {
+        field,
+        label,
+        snapshot: {
+          intro: latestRef.current.intro,
+          skus: latestRef.current.skus,
+          settings: latestRef.current.settings,
+        },
+      });
+    }, 1500);
+  };
+
+  const diffIntroLabels = (prev: IntroData, next: IntroData): Array<[string, string]> => {
+    const out: Array<[string, string]> = [];
+    if ((prev.title ?? "") !== (next.title ?? "")) out.push(["intro.title", "修改了标题"]);
+    if ((prev.description ?? "") !== (next.description ?? ""))
+      out.push(["intro.description", "修改了介绍正文"]);
+    if (JSON.stringify(prev.blocks ?? []) !== JSON.stringify(next.blocks ?? []))
+      out.push(["intro.blocks", "调整了介绍内容块"]);
+    if ((prev.cover_url ?? "") !== (next.cover_url ?? ""))
+      out.push(["intro.cover_url", "更换了封面图"]);
+    if ((prev.leader_name ?? "") !== (next.leader_name ?? ""))
+      out.push(["intro.leader_name", "修改了团长昵称"]);
+    if ((prev.leader_avatar ?? "") !== (next.leader_avatar ?? ""))
+      out.push(["intro.leader_avatar", "更换了团长头像"]);
+    return out;
+  };
+
+  const SETTINGS_LABEL: Record<string, string> = {
+    delivery_method: "配送方式",
+    shipping_time: "发货时间",
+    group_period: "团购周期",
+    notify_targets: "通知对象",
+    first_order_discount: "首单优惠",
+    full_reduce: "满减",
+    multi_discount: "多件优惠",
+    surprise_redpack: "红包",
+    free_share: "免费分享",
+    group_buy: "拼团",
+    lottery: "抽奖",
+    tiered_price: "阶梯价",
+    gifts: "赠品",
+    forward_setting: "转发设置",
+    follower_display: "粉丝展示",
+    admin: "管理员",
+    allow_coupon: "优惠券",
+    min_order: "起订量",
+    show_stock: "库存展示",
+    allow_user_copy: "复制权限",
+    recommend: "推荐位",
+    allow_copy_code: "口令复制",
+    category: "分类",
+    follow_tip: "关注提示",
+  };
+
   const setIntro = (next: IntroData) => {
+    const prev = intro;
     setIntroLocal(next);
     lastWrittenRef.current.intro = JSON.stringify(next);
     persist({ intro: next });
+    latestRef.current = { ...latestRef.current, intro: next };
+    for (const [field, label] of diffIntroLabels(prev, next)) queueLog(field, label);
   };
   const setSkus = (next: SkuItem[]) => {
+    const prev = skus;
     setSkusLocal(next);
     lastWrittenRef.current.skus = JSON.stringify(next);
     persist({ skus: next });
+    latestRef.current = { ...latestRef.current, skus: next };
+    if (JSON.stringify(prev) !== JSON.stringify(next)) {
+      const label =
+        next.length !== prev.length
+          ? `修改了商品规格（${prev.length} → ${next.length}）`
+          : "修改了商品规格";
+      queueLog("skus", label);
+    }
   };
   const setSettings = (next: SettingsData) => {
+    const prev = settings;
     setSettingsLocal(next);
     lastWrittenRef.current.settings = JSON.stringify(next);
     persist({ settings: next });
+    latestRef.current = { ...latestRef.current, settings: next };
+    for (const k of Object.keys({ ...prev, ...next })) {
+      if (prev[k] !== next[k]) {
+        const name = SETTINGS_LABEL[k] ?? k;
+        queueLog(`settings.${k}`, `修改了设置：${name}`);
+      }
+    }
   };
 
   // Bottom sheet state
