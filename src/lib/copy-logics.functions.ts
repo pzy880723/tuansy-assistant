@@ -177,16 +177,13 @@ export const generateModulesFromText = createServerFn({ method: "POST" })
     const gateway = createLovableAiGatewayProvider(key);
 
     const Schema = z.object({
-      modules: z
-        .array(
-          z.object({
-            type: z.enum(MODULE_TYPES),
-            label: z.string().min(1).max(40),
-            guidance: z.string().min(1).max(800),
-          }),
-        )
-        .min(3)
-        .max(15),
+      modules: z.array(
+        z.object({
+          type: z.enum(MODULE_TYPES),
+          label: z.string(),
+          guidance: z.string(),
+        }),
+      ),
     });
 
     const { output } = await generateText({
