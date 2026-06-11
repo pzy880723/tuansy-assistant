@@ -97,7 +97,7 @@ function AuthPage() {
         {tab === "phone" ? <PhoneForm onSuccess={goNext} /> : <WechatForm onSuccess={goNext} />}
 
         <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground">
-          开发期为模拟登录：验证码固定 <span className="font-mono font-semibold text-foreground">123456</span>；微信扫码点一下即可。
+          手机验证码由腾讯云短信发送；未配置短信前仅超级管理员可临时登录。
         </p>
       </div>
     </div>
