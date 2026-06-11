@@ -105,8 +105,8 @@ function AuthPage() {
 }
 
 function getSafeRedirect(redirect?: string) {
-  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) return "/app";
-  if (redirect === "/auth" || redirect.startsWith("/auth?")) return "/app";
+  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) return "/";
+  if (redirect === "/auth" || redirect.startsWith("/auth?")) return "/";
   return redirect;
 }
 
