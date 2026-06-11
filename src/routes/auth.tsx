@@ -127,8 +127,8 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
       return;
     }
     try {
-      await send({ data: { phone } });
-      toast.success("验证码已发送（开发期固定 123456）");
+      const res = await send({ data: { phone } });
+      toast.success(res.mode === "dev" ? "临时验证码为 123456" : "验证码已发送，请查收短信");
       setCountdown(60);
       const t = setInterval(() => {
         setCountdown((c) => {
@@ -151,26 +151,29 @@ function PhoneForm({ onSuccess }: { onSuccess: () => void }) {
     setError(null);
     if (code.length !== 6) {
       toast.error("请输入 6 位验证码");
-      setError("验证码需要填写 6 位数字，开发期固定为 123456。");
+      setError("验证码需要填写 6 位数字。");
       return;
     }
     setSubmitting(true);
     try {
       const res = await verify({ data: { phone, code } });
-      writePublicUserCookie({
-        id: res.user.id,
-        nickname: res.user.nickname,
-        phone: res.user.phone ?? null,
-        wechat: !!res.user.wechat_openid,
-        role: res.user.role,
-        isAdmin: res.user.isAdmin,
-      });
+      writePublicUserCookie(
+        {
+          id: res.user.id,
+          nickname: res.user.nickname,
+          phone: res.user.phone ?? null,
+          wechat: !!res.user.wechat_openid,
+          role: res.user.role,
+          isAdmin: res.user.isAdmin,
+        },
+        res.sessionToken,
+      );
       notifyAuthChange();
       toast.success("登录成功");
       onSuccess();
     } catch (err) {
       const message = err instanceof Error ? err.message : "登录失败";
-      setError(`登录失败：${message}。请确认验证码为 123456；如果仍失败，请点击上方“重新登录”清理旧会话后再试。`);
+      setError(`登录失败：${message}。如果仍失败，请点击上方“重新登录”清理旧会话后再试。`);
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -233,14 +236,17 @@ function WechatForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     try {
       const res = await login();
-      writePublicUserCookie({
-        id: res.user.id,
-        nickname: res.user.nickname,
-        phone: res.user.phone ?? null,
-        wechat: !!res.user.wechat_openid,
-        role: res.user.role,
-        isAdmin: res.user.isAdmin,
-      });
+      writePublicUserCookie(
+        {
+          id: res.user.id,
+          nickname: res.user.nickname,
+          phone: res.user.phone ?? null,
+          wechat: !!res.user.wechat_openid,
+          role: res.user.role,
+          isAdmin: res.user.isAdmin,
+        },
+        res.sessionToken,
+      );
       notifyAuthChange();
       toast.success("微信登录成功");
       onSuccess();
