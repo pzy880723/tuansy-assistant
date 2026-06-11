@@ -91,7 +91,12 @@ async function sendTencentSms(phone: string, code: string) {
     SmsSdkAppId: sdkAppId,
     SignName: signName,
     TemplateId: templateId,
-    TemplateParamSet: [code, String(SMS_TTL_MINUTES)],
+    // 模板参数顺序需与腾讯云控制台中的 {1}{2}... 完全一致
+    // 默认仅传验证码；如模板含有效期参数（如 {2} 分钟），把环境变量 TENCENT_SMS_TEMPLATE_PARAMS 设为 "code,ttl"
+    TemplateParamSet:
+      process.env.TENCENT_SMS_TEMPLATE_PARAMS === "code,ttl"
+        ? [code, String(SMS_TTL_MINUTES)]
+        : [code],
   });
 
   const canonicalHeaders = `content-type:application/json; charset=utf-8\nhost:${host}\nx-tc-action:${action.toLowerCase()}\n`;
