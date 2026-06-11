@@ -684,3 +684,166 @@ export function ProductEntryCard({ count }: { count: number }) {
     </div>
   );
 }
+
+function ReorderOverlay({
+  blocks,
+  draggingId,
+  onCommit,
+  onCancel,
+}: {
+  blocks: IntroBlock[];
+  draggingId: string;
+  onCommit: (index: number) => void;
+  onCancel: () => void;
+}) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const hoverRef = useRef<number | null>(null);
+  hoverRef.current = hoverIndex;
+
+  useEffect(() => {
+    const onUp = () => {
+      const idx = hoverRef.current;
+      if (idx === null) onCancel();
+      else onCommit(idx);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      const el = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
+      const slot = el?.closest<HTMLElement>("[data-slot-index]");
+      if (slot) {
+        const i = Number(slot.dataset.slotIndex);
+        setHoverIndex(Number.isFinite(i) ? i : null);
+      } else {
+        setHoverIndex(null);
+      }
+    };
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onCommit, onCancel]);
+
+  const currentIndex = blocks.findIndex((b) => b.id === draggingId);
+
+  const slot = (index: number) => {
+    const active = hoverIndex === index;
+    const isCurrent = index === currentIndex || index === currentIndex + 1;
+    return (
+      <div
+        data-slot-index={index}
+        onMouseEnter={() => setHoverIndex(index)}
+        onMouseLeave={() => setHoverIndex((cur) => (cur === index ? null : cur))}
+        className="-my-1 flex h-3 cursor-pointer items-center"
+      >
+        <div
+          className={
+            "h-[2px] w-full rounded-full transition-all " +
+            (active
+              ? "bg-[#07c160] shadow-[0_0_0_2px_rgba(7,193,96,0.18)]"
+              : isCurrent
+              ? "bg-[#07c160]/30"
+              : "bg-[#e8e9eb]")
+          }
+        />
+      </div>
+    );
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div
+        className="flex max-h-[80vh] w-[300px] flex-col rounded-2xl bg-white p-3 shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center justify-between px-1">
+          <div className="text-[13px] font-medium text-[#1a1a1a]">拖到目标位置松开</div>
+          <button
+            onClick={onCancel}
+            className="rounded-md p-1 text-[#969799] hover:bg-[#f4f5f7]"
+            title="取消"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto pr-1">
+          {blocks.length === 0 ? (
+            <div className="py-8 text-center text-[12px] text-[#969799]">暂无模块</div>
+          ) : (
+            <>
+              {slot(0)}
+              {blocks.map((b, i) => (
+                <div key={b.id}>
+                  <ThumbBlock block={b} highlighted={b.id === draggingId} />
+                  {slot(i + 1)}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ThumbBlock({ block, highlighted }: { block: IntroBlock; highlighted: boolean }) {
+  const border = highlighted ? "border-[#07c160] ring-2 ring-[#07c160]/30" : "border-[#f0f1f2]";
+  return (
+    <div className={`relative rounded-md border ${border} bg-white p-1.5`}>
+      {highlighted && (
+        <span className="absolute -top-1.5 left-1.5 rounded bg-[#07c160] px-1 py-px text-[9px] font-medium leading-none text-white">
+          拖动中
+        </span>
+      )}
+      {block.type === "text" && (
+        <div className="truncate text-[11px] text-[#646566]">
+          {block.text?.split("\n")[0] || <span className="text-[#c8c9cc]">（空文字）</span>}
+        </div>
+      )}
+      {block.type === "image_lg" && (
+        block.url ? (
+          <img src={block.url} alt="" className="block aspect-[16/10] w-full rounded object-cover" loading="lazy" />
+        ) : (
+          <div className="grid aspect-[16/10] w-full place-items-center rounded bg-[#fafbfc] text-[10px] text-[#c8c9cc]">大图</div>
+        )
+      )}
+      {block.type === "image_sm" && (
+        <div className="grid grid-cols-3 gap-0.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="aspect-square overflow-hidden rounded bg-[#fafbfc]">
+              {block.urls[i] ? (
+                <img src={block.urls[i]} alt="" className="h-full w-full object-cover" loading="lazy" />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+      {block.type === "video" && (
+        <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
+          {block.url ? (
+            <video src={block.url} className="h-full w-full object-cover" muted />
+          ) : null}
+          <div className="absolute inset-0 grid place-items-center">
+            <Play className="h-5 w-5 text-white/85" fill="currentColor" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
