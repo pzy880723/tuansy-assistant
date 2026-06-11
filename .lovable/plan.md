@@ -1,54 +1,36 @@
-## 目标
+## 团购介绍模块改造
 
-把 `/app`（我的项目页）从「点新建按钮 → 弹窗填表 → 进编辑器」的传统结构，改成像 lovable.dev/dashboard 那样：**页面正上方一个大的"一句话开团"输入框，下方陈列已有项目卡片**。删除"新建项目"按钮和弹窗，新建动作完全由顶部那个 prompt 输入框承担（拖图、粘贴图、计划模式、立即开团），和首页 Hero 里的 `HeroStarter` 一致的体验。
+### 1. 工具栏精简（IntroTab.tsx）
+- 移除 `标签 / 加粉 / 承诺` 三个入口，`BLOCK_TOOLS` 只保留 `大图 / 小图 / 视频 / 文字` 四项；网格从 `grid-cols-5` 改为 `grid-cols-4`。
+- 同步移除 `tag` 相关类型与渲染：`types.ts` 的 `IntroBlock` 删除 `tag` 分支，IntroTab 删除 `TagBlockEditor` 及其引用，`BlockLabel` 的 `map` 删除 `tag`。
 
-## 改动
+### 2. 工具栏永远在最末（不再放在卡片内部）
+- 工具栏当前位于"团购介绍"卡片底部，所有 block 渲染在另一张卡片里，中间有间隙。
+- 改为：工具栏渲染在 blocks 列表的**末尾**（即"最后一个模块下面"）。把 blocks 和工具栏合并到同一张 `团购介绍` 卡片中，去掉两张卡片之间的间隔；当 blocks 为空时，工具栏直接显示在描述输入框下方。
 
-### 1. 抽出共享组件 `src/components/project-starter.tsx`
+### 3. 点击工具行为
+- **大图 / 小图 / 视频**：不再先创建空 block，直接触发隐藏的 `<input type="file">`：
+  - 大图：`accept="image/*"`，选中 1 张 → 创建一个 `image_lg` block，`url` 写入 `URL.createObjectURL(file)`。
+  - 小图：`accept="image/*" multiple`，选中多张 → 创建一个 `image_sm` block，`urls` 数组填充。
+  - 视频：`accept="video/*"`，选中 1 个 → 创建 `video` block。
+  - 已有的 block 内"+ 添加大图 / + / + 添加视频"占位按钮也改为复用同一个 file picker，替换 url。
+- **文字**：弹出底部 Sheet（复用 `SettingSheet` 的 multiline 模式，或新增一个轻量 dialog）输入文字，保存后插入一个 `text` block；已有 `text` block 点击后也用同一 Sheet 编辑。
+- 取消"添加"按钮行为里固定追加 text block 的逻辑，改成弹出文字输入 Sheet。
 
-- 把 `src/routes/index.tsx` 里 `HeroStarter` 和 `PlanModeChip` 抽出为独立组件 `ProjectStarter`。
-- 接受 `variant: "dark" | "light"` 控制配色：`dark` 给首页 Hero（保持现有深色玻璃质感），`light` 给 `/app`（贴合白底工作台）。
-- 内部逻辑（调用 `startProject`、`useImageAttachments`、登录守卫、跳转 `/app/project/$id`、写入 seedMessages / autoUserPrompt 到 localStorage）保持不变。
-- 暴露一个 `placeholder` prop，让 `/app` 用更聚焦的提示语（"想开一场什么团？写一句话，或拖几张商品图过来"）。
+### 4. 标题支持换行（团购活动标题）
+- 当前 `InlineText`（单行 input）→ 改成 `multiline` 模式，`rows={1}`，并保留同样的字号/粗体样式。
+- `InlineText` 已支持 multiline，textarea 默认随内容自然换行；如视觉需要可加 `auto-resize`（监听 input 调整 `style.height`），保证不会出现滚动条。
 
-### 2. `src/routes/index.tsx`
+### 5. 新增"拖拽排序"
+- 在每个 BlockCard 右侧操作行新增一个拖拽手柄 `MiniBtn`（图标：`GripVertical`）。
+- 实现方式：使用 HTML5 原生 drag API（无新依赖）——`draggable` 绑在卡片根节点，`onDragStart` 记录 sourceId，`onDragOver` 阻止默认，`onDrop` 调用 `setBlocks` 重排到目标位置。支持拖动到任意位置（含首尾）。
+- 保留 `上移 / 下移 / 置顶 / 删除`，去掉每个 block 上的"添加"按钮（添加已统一到底部工具栏）。
 
-- 删除内联的 `HeroStarter` 和 `PlanModeChip`。
-- 改为 `<ProjectStarter variant="dark" />`，其它 Hero 文案、产品 mockup、Features 等保持不动。
+### 不改动
+- `ProductTab / SettingsTab / PhoneShell`、数据库 schema、serverFn、路由不变。
+- 文件上传仍为本地 `URL.createObjectURL` 预览（与现状一致，未来再接入存储）。
 
-### 3. `src/routes/app.index.tsx` 重做布局
-
-新结构（从上到下）：
-
-```text
-[页面标题区]
-  我的项目
-  每个项目对应一场快团团团购。
-
-[ProjectStarter variant="light" 输入框 — 占据视觉重心]
-  textarea + 加图片 / 计划模式 / 快速开团
-
-[下方分隔：]
-  最近项目  |   共 N 个
-
-[项目卡片网格] —— 复用现有 ProjectCard / SkeletonGrid / EmptyState
-```
-
-具体改动：
-- 移除右上角"+ 新建项目"按钮；移除 `ProjectMetaDialog`、`createProject` 导入和 `createMut`、`dialog` 状态。
-- 空状态 `EmptyState` 简化：移除内部的"创建第一个项目"按钮，改为一句引导文字（"上面写一句话就能开第一场团"），因为新建入口已经在页面顶部了。
-- 保留 `ProjectCard` 的"编辑信息 / 删除"下拉菜单（这是对已存在项目的操作，不冲突）。
-- 保留 `updateProjectMeta`、`deleteProject`、`listProjects` 调用；只删 `createProject`。
-- 保留登录失效时的 `SessionIssue` 处理。
-
-### 4. 不动的东西
-
-- `startProject` / `createProject` 等 server functions：`createProject` 暂时不删（其它地方可能引用，且无害），只是 UI 不再调用。
-- `app.project.$id.tsx` 编辑器页：完全不动。
-- 数据库 schema、认证、路由树：不动。
-
-## 不在范围内
-
-- 不重做项目卡片样式。
-- 不动首页 Hero 的整体设计，仅把 Starter 组件抽出复用。
-- 不改 `startProject` 的 AI prompt / 输出 schema。
+### 涉及文件
+- `src/components/tuan/types.ts`
+- `src/components/tuan/IntroTab.tsx`
+- `src/components/tuan/primitives.tsx`（如新增文字编辑 Sheet 或 auto-resize 帮助函数）

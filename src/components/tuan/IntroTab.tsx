@@ -1,41 +1,83 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Image as ImageIcon,
   LayoutGrid,
   Video,
   PenSquare,
-  Tag as TagIcon,
-  UserPlus,
-  ShieldCheck,
   ArrowLeftRight,
   Search,
   Plus,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { InlineText, MiniBtn } from "./primitives";
 import type { IntroBlock, IntroData } from "./types";
 
-const BLOCK_TOOLS = [
-  { type: "image_lg" as const, label: "大图", icon: ImageIcon },
-  { type: "image_sm" as const, label: "小图", icon: LayoutGrid },
-  { type: "video" as const, label: "视频", icon: Video },
-  { type: "text" as const, label: "文字", icon: PenSquare },
-  { type: "tag" as const, label: "标签", icon: TagIcon },
-  { type: "fan" as const, label: "加粉", icon: UserPlus },
-  { type: "promise" as const, label: "承诺", icon: ShieldCheck },
+type ToolType = "image_lg" | "image_sm" | "video" | "text";
+
+const BLOCK_TOOLS: { type: ToolType; label: string; icon: typeof ImageIcon }[] = [
+  { type: "image_lg", label: "大图", icon: ImageIcon },
+  { type: "image_sm", label: "小图", icon: LayoutGrid },
+  { type: "video", label: "视频", icon: Video },
+  { type: "text", label: "文字", icon: PenSquare },
 ];
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function defaultBlock(type: IntroBlock["type"]): IntroBlock {
-  const id = genId();
-  if (type === "text") return { id, type, text: "" };
-  if (type === "image_lg") return { id, type, url: null };
-  if (type === "image_sm") return { id, type, urls: [] };
-  if (type === "video") return { id, type, url: null };
-  return { id, type: "tag", tags: [] };
+/** Auto-resizing textarea that grows with content. */
+function AutoTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [local, setLocal] = useState(value);
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => setLocal(value), [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [local]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={local}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const v = e.target.value;
+        setLocal(v);
+        if (t.current) clearTimeout(t.current);
+        t.current = setTimeout(() => onChange(v), 500);
+      }}
+      className={
+        "w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-[#c8c9cc] " +
+        "rounded-md px-1 py-0.5 -mx-1 transition focus:bg-white focus:ring-2 focus:ring-[#07c160]/30 " +
+        (className ?? "")
+      }
+    />
+  );
 }
 
 export function IntroTab({
@@ -46,10 +88,89 @@ export function IntroTab({
   onChange: (next: IntroData) => void;
 }) {
   const blocks = intro.blocks ?? [];
-
   const setBlocks = (next: IntroBlock[]) => onChange({ ...intro, blocks: next });
 
-  const addBlock = (type: IntroBlock["type"]) => setBlocks([...blocks, defaultBlock(type)]);
+  // hidden file inputs
+  const fileLgRef = useRef<HTMLInputElement | null>(null);
+  const fileSmRef = useRef<HTMLInputElement | null>(null);
+  const fileVidRef = useRef<HTMLInputElement | null>(null);
+  // For replacing an existing block via the same picker
+  const replaceTargetRef = useRef<string | null>(null);
+
+  // text sheet state
+  const [textSheet, setTextSheet] = useState<{ open: boolean; id: string | null; value: string }>({
+    open: false,
+    id: null,
+    value: "",
+  });
+
+  const openTextSheet = (id: string | null, initial = "") =>
+    setTextSheet({ open: true, id, value: initial });
+
+  const saveTextSheet = (v: string) => {
+    if (textSheet.id) {
+      setBlocks(
+        blocks.map((b) => (b.id === textSheet.id && b.type === "text" ? { ...b, text: v } : b)),
+      );
+    } else if (v.trim()) {
+      setBlocks([...blocks, { id: genId(), type: "text", text: v }]);
+    }
+    setTextSheet({ open: false, id: null, value: "" });
+  };
+
+  const pickFile = (tool: ToolType, replaceId?: string) => {
+    replaceTargetRef.current = replaceId ?? null;
+    if (tool === "image_lg") fileLgRef.current?.click();
+    else if (tool === "image_sm") fileSmRef.current?.click();
+    else if (tool === "video") fileVidRef.current?.click();
+  };
+
+  const onPickImageLg = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const replaceId = replaceTargetRef.current;
+    if (replaceId) {
+      setBlocks(blocks.map((b) => (b.id === replaceId && b.type === "image_lg" ? { ...b, url } : b)));
+    } else {
+      setBlocks([...blocks, { id: genId(), type: "image_lg", url }]);
+    }
+  };
+  const onPickImageSm = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    const urls = files.map((f) => URL.createObjectURL(f));
+    const replaceId = replaceTargetRef.current;
+    if (replaceId) {
+      setBlocks(
+        blocks.map((b) =>
+          b.id === replaceId && b.type === "image_sm" ? { ...b, urls: [...b.urls, ...urls] } : b,
+        ),
+      );
+    } else {
+      setBlocks([...blocks, { id: genId(), type: "image_sm", urls }]);
+    }
+  };
+  const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const replaceId = replaceTargetRef.current;
+    if (replaceId) {
+      setBlocks(blocks.map((b) => (b.id === replaceId && b.type === "video" ? { ...b, url } : b)));
+    } else {
+      setBlocks([...blocks, { id: genId(), type: "video", url }]);
+    }
+  };
+
+  const onToolClick = (type: ToolType) => {
+    if (type === "text") openTextSheet(null, "");
+    else pickFile(type);
+  };
+
   const removeBlock = (id: string) => setBlocks(blocks.filter((b) => b.id !== id));
   const moveBlock = (id: string, dir: "up" | "down" | "top") => {
     const i = blocks.findIndex((b) => b.id === id);
@@ -61,11 +182,33 @@ export function IntroTab({
     else next.splice(Math.min(next.length, i + 1), 0, item);
     setBlocks(next);
   };
-  const updateBlock = (id: string, patch: Partial<IntroBlock>) =>
-    setBlocks(blocks.map((b) => (b.id === id ? ({ ...b, ...patch } as IntroBlock) : b)));
+  const reorder = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const src = blocks.findIndex((b) => b.id === sourceId);
+    const dst = blocks.findIndex((b) => b.id === targetId);
+    if (src < 0 || dst < 0) return;
+    const next = blocks.slice();
+    const [item] = next.splice(src, 1);
+    next.splice(dst, 0, item);
+    setBlocks(next);
+  };
+
+  const [dragId, setDragId] = useState<string | null>(null);
 
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
+      {/* hidden file inputs */}
+      <input ref={fileLgRef} type="file" accept="image/*" className="hidden" onChange={onPickImageLg} />
+      <input
+        ref={fileSmRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={onPickImageSm}
+      />
+      <input ref={fileVidRef} type="file" accept="video/*" className="hidden" onChange={onPickVideo} />
+
       {/* Leader / cover card */}
       <div className="relative h-[130px] overflow-hidden rounded-xl bg-gradient-to-br from-[#3a3a3a] via-[#2b2b2b] to-[#1a1a1a]">
         <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_30%,#fff_1px,transparent_1px),radial-gradient(circle_at_70%_60%,#fff_1px,transparent_1px)] [background-size:60px_60px]" />
@@ -94,7 +237,7 @@ export function IntroTab({
         </div>
       </div>
 
-      {/* Intro card */}
+      {/* Intro card — title + description + blocks + tools all in one card */}
       <div className="rounded-xl bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
@@ -115,7 +258,7 @@ export function IntroTab({
         </div>
 
         <div className="border-b border-[#f0f1f2] py-2">
-          <InlineText
+          <AutoTextarea
             value={intro.title ?? ""}
             onChange={(v) => onChange({ ...intro, title: v })}
             placeholder="请输入团购活动标题"
@@ -133,20 +276,43 @@ export function IntroTab({
           />
         </div>
 
-        {/* Block tools */}
-        <div className="mt-4 grid grid-cols-5 gap-y-3">
+        {/* Existing blocks */}
+        {blocks.length > 0 && (
+          <div className="space-y-3">
+            {blocks.map((b, i) => (
+              <BlockCard
+                key={b.id}
+                block={b}
+                isFirst={i === 0}
+                isLast={i === blocks.length - 1}
+                isDragging={dragId === b.id}
+                onMove={(dir) => moveBlock(b.id, dir)}
+                onRemove={() => removeBlock(b.id)}
+                onUploadReplace={() => {
+                  if (b.type === "image_lg") pickFile("image_lg", b.id);
+                  else if (b.type === "image_sm") pickFile("image_sm", b.id);
+                  else if (b.type === "video") pickFile("video", b.id);
+                }}
+                onEditText={() => b.type === "text" && openTextSheet(b.id, b.text)}
+                onDragStart={() => setDragId(b.id)}
+                onDragEnd={() => setDragId(null)}
+                onDropOn={() => {
+                  if (dragId) reorder(dragId, b.id);
+                  setDragId(null);
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Block tools — always at the very bottom */}
+        <div className="mt-4 grid grid-cols-4 gap-y-3">
           {BLOCK_TOOLS.map((tool) => {
             const Icon = tool.icon;
             return (
               <button
                 key={tool.label}
-                onClick={() => {
-                  if (tool.type === "fan" || tool.type === "promise") {
-                    toast.info(`${tool.label}：即将上线`);
-                    return;
-                  }
-                  addBlock(tool.type);
-                }}
+                onClick={() => onToolClick(tool.type)}
                 className="flex flex-col items-center gap-1 text-[11px] text-[#646566]"
               >
                 <Icon className="h-5 w-5" strokeWidth={1.5} />
@@ -157,29 +323,40 @@ export function IntroTab({
         </div>
       </div>
 
-      {/* Existing blocks */}
-      {blocks.length > 0 && (
-        <div className="space-y-2 rounded-xl bg-white p-3">
-          {blocks.map((b, i) => (
-            <BlockCard
-              key={b.id}
-              block={b}
-              isFirst={i === 0}
-              isLast={i === blocks.length - 1}
-              onMove={(dir) => moveBlock(b.id, dir)}
-              onRemove={() => removeBlock(b.id)}
-              onAdd={() => addBlock("text")}
-              onUpdate={(patch) => updateBlock(b.id, patch)}
+      {/* Text editing sheet */}
+      <Sheet
+        open={textSheet.open}
+        onOpenChange={(o) => !o && setTextSheet({ open: false, id: null, value: "" })}
+      >
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle>{textSheet.id ? "编辑文字" : "添加文字"}</SheetTitle>
+          </SheetHeader>
+          <div className="py-4">
+            <Textarea
+              autoFocus
+              rows={5}
+              value={textSheet.value}
+              placeholder="请输入文字内容"
+              onChange={(e) => setTextSheet((s) => ({ ...s, value: e.target.value }))}
             />
-          ))}
-        </div>
-      )}
+          </div>
+          <SheetFooter>
+            <Button
+              className="w-full bg-[#07c160] text-white hover:bg-[#06ad56]"
+              onClick={() => saveTextSheet(textSheet.value)}
+            >
+              保存
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
 
 function BlockLabel({ type }: { type: IntroBlock["type"] }) {
-  const map = { text: "文字", image_lg: "大图", image_sm: "小图", video: "视频", tag: "标签" };
+  const map = { text: "文字", image_lg: "大图", image_sm: "小图", video: "视频" } as const;
   return <div className="text-[13px] font-medium text-[#1a1a1a]">{map[type]}</div>;
 }
 
@@ -187,102 +364,115 @@ function BlockCard({
   block,
   isFirst,
   isLast,
+  isDragging,
   onMove,
   onRemove,
-  onAdd,
-  onUpdate,
+  onUploadReplace,
+  onEditText,
+  onDragStart,
+  onDragEnd,
+  onDropOn,
 }: {
   block: IntroBlock;
   isFirst: boolean;
   isLast: boolean;
+  isDragging: boolean;
   onMove: (dir: "up" | "down" | "top") => void;
   onRemove: () => void;
-  onAdd: () => void;
-  onUpdate: (patch: Partial<IntroBlock>) => void;
+  onUploadReplace: () => void;
+  onEditText: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDropOn: () => void;
 }) {
+  const [draggable, setDraggable] = useState(false);
   return (
-    <div className="border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0">
+    <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
+      onDragEnd={() => {
+        setDraggable(false);
+        onDragEnd();
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDropOn();
+      }}
+      className={
+        "border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0 " +
+        (isDragging ? "opacity-50" : "")
+      }
+    >
       <div className="mb-1.5 flex items-center justify-between">
         <BlockLabel type={block.type} />
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onMouseDown={() => setDraggable(true)}
+            onTouchStart={() => setDraggable(true)}
+            title="拖动排序"
+            className="cursor-grab rounded-md border border-[#dcdee0] bg-white px-1.5 py-0.5 text-[#646566] hover:border-[#07c160] hover:text-[#07c160] active:cursor-grabbing"
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
           <MiniBtn onClick={() => onMove("up")} disabled={isFirst}>上移</MiniBtn>
           <MiniBtn onClick={() => onMove("down")} disabled={isLast}>下移</MiniBtn>
           <MiniBtn onClick={() => onMove("top")} disabled={isFirst}>置顶</MiniBtn>
-          <MiniBtn onClick={onAdd}>添加</MiniBtn>
           <MiniBtn onClick={onRemove}>删除</MiniBtn>
         </div>
       </div>
       {block.type === "text" && (
-        <InlineText
-          multiline
-          rows={2}
-          value={block.text}
-          onChange={(v) => onUpdate({ text: v })}
-          placeholder="请输入团购活动内容"
-          className="text-[13px] text-[#323233]"
-        />
+        <button
+          type="button"
+          onClick={onEditText}
+          className="w-full whitespace-pre-wrap rounded-md border border-transparent px-1 py-0.5 text-left text-[13px] text-[#323233] hover:border-[#dcdee0]"
+        >
+          {block.text || <span className="text-[#c8c9cc]">点击编辑文字</span>}
+        </button>
       )}
       {block.type === "image_lg" && (
         <button
-          onClick={() => toast.info("上传图片：即将上线")}
-          className="flex aspect-[16/10] w-full items-center justify-center rounded-md border border-dashed border-[#dcdee0] bg-[#fafbfc] text-[12px] text-[#969799]"
+          onClick={onUploadReplace}
+          className="flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-[#dcdee0] bg-[#fafbfc] text-[12px] text-[#969799]"
         >
-          + 添加大图
+          {block.url ? (
+            <img src={block.url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            "+ 添加大图"
+          )}
         </button>
       )}
       {block.type === "image_sm" && (
         <div className="grid grid-cols-3 gap-2">
-          {[0, 1, 2].map((i) => (
-            <button
-              key={i}
-              onClick={() => toast.info("上传图片：即将上线")}
-              className="flex aspect-square items-center justify-center rounded-md border border-dashed border-[#dcdee0] bg-[#fafbfc] text-[11px] text-[#969799]"
-            >
-              +
-            </button>
+          {block.urls.map((u, i) => (
+            <div key={i} className="aspect-square overflow-hidden rounded-md bg-[#fafbfc]">
+              <img src={u} alt="" className="h-full w-full object-cover" />
+            </div>
           ))}
+          <button
+            onClick={onUploadReplace}
+            className="flex aspect-square items-center justify-center rounded-md border border-dashed border-[#dcdee0] bg-[#fafbfc] text-[16px] text-[#969799]"
+          >
+            +
+          </button>
         </div>
       )}
       {block.type === "video" && (
         <button
-          onClick={() => toast.info("上传视频：即将上线")}
-          className="flex aspect-video w-full items-center justify-center rounded-md border border-dashed border-[#dcdee0] bg-[#fafbfc] text-[12px] text-[#969799]"
+          onClick={onUploadReplace}
+          className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-[#dcdee0] bg-[#fafbfc] text-[12px] text-[#969799]"
         >
-          + 添加视频
+          {block.url ? (
+            <video src={block.url} className="h-full w-full object-cover" controls />
+          ) : (
+            "+ 添加视频"
+          )}
         </button>
       )}
-      {block.type === "tag" && (
-        <TagBlockEditor tags={block.tags} onChange={(tags) => onUpdate({ tags })} />
-      )}
-    </div>
-  );
-}
-
-function TagBlockEditor({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
-  const [draft, setDraft] = useState("");
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {tags.map((t, i) => (
-        <button
-          key={i}
-          onClick={() => onChange(tags.filter((_, j) => j !== i))}
-          className="rounded-full bg-[#07c160]/10 px-2 py-0.5 text-[11px] text-[#07c160]"
-        >
-          # {t} ×
-        </button>
-      ))}
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && draft.trim()) {
-            onChange([...tags, draft.trim()]);
-            setDraft("");
-          }
-        }}
-        placeholder="输入标签 回车"
-        className="min-w-[100px] flex-1 bg-transparent px-1 text-[11px] outline-none placeholder:text-[#c8c9cc]"
-      />
     </div>
   );
 }

@@ -2,8 +2,7 @@ export type IntroBlock =
   | { id: string; type: "text"; text: string }
   | { id: string; type: "image_lg"; url?: string | null }
   | { id: string; type: "image_sm"; urls: string[] }
-  | { id: string; type: "video"; url?: string | null }
-  | { id: string; type: "tag"; tags: string[] };
+  | { id: string; type: "video"; url?: string | null };
 
 export type IntroData = {
   title?: string;
