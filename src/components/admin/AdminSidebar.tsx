@@ -19,7 +19,7 @@ export function AdminSidebar() {
       <nav className="flex-1 space-y-0.5 p-2">
         {items.map((it) => {
           const active =
-            pathname === it.to || (it.to !== "/admin" && pathname.startsWith(it.to));
+            pathname === it.to || pathname.startsWith(`${it.to}/`);
           return (
             <Link
               key={it.to}
