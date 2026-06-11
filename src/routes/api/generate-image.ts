@@ -6,6 +6,7 @@ const BodySchema = z.object({
   count: z.number().int().min(1).max(9),
   referenceImages: z.array(z.string().url()).max(3).optional(),
   projectId: z.string().uuid(),
+  variant: z.string().max(200).optional(),
 });
 
 export const Route = createFileRoute("/api/generate-image")({
