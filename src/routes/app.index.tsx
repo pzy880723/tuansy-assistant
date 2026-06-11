@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Trash2, Package, MoreHorizontal, Pencil, ImageIcon } from "lucide-react";
+import { Trash2, MoreHorizontal, Pencil, ImageIcon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,12 +32,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
-  createProject,
   deleteProject,
   listProjects,
   updateProjectMeta,
 } from "@/lib/projects.functions";
 import { clearAuthCookies, notifyAuthChange, setAuthSessionError } from "@/lib/use-current-user";
+import { ProjectStarter } from "@/components/project-starter";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "我的项目 — 团宝助手" }] }),
@@ -57,15 +57,12 @@ type ProjectRow = {
 
 function AppIndex() {
   const list = useServerFn(listProjects);
-  const create = useServerFn(createProject);
   const update = useServerFn(updateProjectMeta);
   const del = useServerFn(deleteProject);
   const router = useRouter();
   const qc = useQueryClient();
 
-  const [dialog, setDialog] = useState<
-    { mode: "create" } | { mode: "edit"; project: ProjectRow } | null
-  >(null);
+  const [editProject, setEditProject] = useState<ProjectRow | null>(null);
 
   const { data, error, isError, isLoading } = useQuery({
     queryKey: ["projects"],
@@ -81,25 +78,13 @@ function AppIndex() {
     router.navigate({ to: "/auth", replace: true, search: { redirect: "/app" } });
   };
 
-  const createMut = useMutation({
-    mutationFn: async (input: { name: string; product_name: string }) =>
-      create({ data: input }),
-    onSuccess: ({ id }) => {
-      toast.success("已创建项目");
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      setDialog(null);
-      router.navigate({ to: "/app/project/$id", params: { id } });
-    },
-    onError: (e) => toast.error(String(e)),
-  });
-
   const updateMut = useMutation({
     mutationFn: async (input: { id: string; name: string; product_name: string }) =>
       update({ data: input }),
     onSuccess: () => {
       toast.success("已保存");
       qc.invalidateQueries({ queryKey: ["projects"] });
-      setDialog(null);
+      setEditProject(null);
     },
     onError: (e) => toast.error(String(e)),
   });
@@ -115,53 +100,70 @@ function AppIndex() {
   const projects = (data?.projects ?? []) as ProjectRow[];
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-10">
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">我的项目</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            每个项目对应一场快团团团购。
-          </p>
+    <main className="mx-auto max-w-5xl px-5 py-12">
+      {/* Starter — the main entry point, like Lovable dashboard */}
+      <section className="text-center">
+        <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground">
+          <Sparkles className="h-3 w-3 text-[oklch(0.7_0.19_45)]" />
+          团宝在线，准备开团
         </div>
-        <Button
-          onClick={() => setDialog({ mode: "create" })}
-          className="brand-glow h-10 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-5 font-semibold text-white hover:brightness-110"
-        >
-          <Plus className="h-4 w-4" /> 新建项目
-        </Button>
+        <h1 className="mt-5 text-balance text-4xl font-bold tracking-tight md:text-5xl">
+          想开一场什么<span className="text-gradient-brand">团</span>？
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-muted-foreground md:text-base">
+          写一句话或丢几张商品图，团宝会自动识别品类，帮你建好项目并打开工作台。
+        </p>
+      </section>
+
+      <div className="mt-8">
+        <ProjectStarter
+          variant="light"
+          authRedirect="/app"
+          placeholder="例如：云南阳光玫瑰，2 斤 39.9 / 5 斤 88，产地直发顺丰冷链 —— 或者直接拖几张商品图过来"
+        />
       </div>
 
-      {isLoading ? (
-        <SkeletonGrid />
-      ) : isError ? (
-        <SessionIssue message={error instanceof Error ? error.message : "项目列表加载失败"} onReset={resetAndLogin} />
-      ) : projects.length === 0 ? (
-        <EmptyState onCreate={() => setDialog({ mode: "create" })} />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onEdit={() => setDialog({ mode: "edit", project: p })}
-              onDelete={() => delMut.mutate(p.id)}
-            />
-          ))}
+      {/* Existing projects */}
+      <section className="mt-16">
+        <div className="mb-5 flex items-end justify-between">
+          <h2 className="text-lg font-semibold">最近项目</h2>
+          {!isLoading && !isError && projects.length > 0 && (
+            <span className="text-xs text-muted-foreground">共 {projects.length} 个</span>
+          )}
         </div>
-      )}
+
+        {isLoading ? (
+          <SkeletonGrid />
+        ) : isError ? (
+          <SessionIssue
+            message={error instanceof Error ? error.message : "项目列表加载失败"}
+            onReset={resetAndLogin}
+          />
+        ) : projects.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.map((p) => (
+              <ProjectCard
+                key={p.id}
+                project={p}
+                onEdit={() => setEditProject(p)}
+                onDelete={() => delMut.mutate(p.id)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       <ProjectMetaDialog
-        open={dialog !== null}
-        onOpenChange={(o) => !o && setDialog(null)}
-        mode={dialog?.mode ?? "create"}
-        initialName={dialog?.mode === "edit" ? dialog.project.name : ""}
-        initialProductName={dialog?.mode === "edit" ? dialog.project.product_name : ""}
-        pending={createMut.isPending || updateMut.isPending}
+        open={editProject !== null}
+        onOpenChange={(o) => !o && setEditProject(null)}
+        initialName={editProject?.name ?? ""}
+        initialProductName={editProject?.product_name ?? ""}
+        pending={updateMut.isPending}
         onSubmit={(values) => {
-          if (dialog?.mode === "edit") {
-            updateMut.mutate({ id: dialog.project.id, ...values });
-          } else {
-            createMut.mutate(values);
+          if (editProject) {
+            updateMut.mutate({ id: editProject.id, ...values });
           }
         }}
       />
@@ -199,25 +201,10 @@ function SkeletonGrid() {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState() {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-dashed bg-gradient-to-b from-[var(--brand-soft)] to-card p-16 text-center">
-      <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(closest-side,oklch(0.7_0.19_45/0.18),transparent)]" />
-      <div className="relative">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_12px_32px_oklch(0.7_0.19_45/0.4)]">
-          <Package className="h-7 w-7" />
-        </div>
-        <h2 className="mt-6 text-2xl font-bold">开第一场团</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          上传商品图，告诉团宝你想怎么卖，团宝会帮你生成完整的快团团内容。
-        </p>
-        <Button
-          className="brand-glow mt-7 h-11 rounded-full bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] px-6 font-semibold text-white hover:brightness-110"
-          onClick={onCreate}
-        >
-          <Plus className="h-4 w-4" /> 创建第一个项目
-        </Button>
-      </div>
+    <div className="rounded-2xl border border-dashed bg-card/50 p-10 text-center text-sm text-muted-foreground">
+      还没有项目。在上方输入框写一句话，团宝会帮你开第一场团。
     </div>
   );
 }
@@ -329,7 +316,6 @@ function ProjectCard({
 function ProjectMetaDialog({
   open,
   onOpenChange,
-  mode,
   initialName,
   initialProductName,
   pending,
@@ -337,7 +323,6 @@ function ProjectMetaDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: "create" | "edit";
   initialName: string;
   initialProductName: string;
   pending: boolean;
@@ -346,7 +331,6 @@ function ProjectMetaDialog({
   const [name, setName] = useState(initialName);
   const [productName, setProductName] = useState(initialProductName);
 
-  // reset state when dialog opens with new initial values
   const [lastOpen, setLastOpen] = useState(false);
   if (open !== lastOpen) {
     setLastOpen(open);
@@ -360,10 +344,8 @@ function ProjectMetaDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "编辑项目信息" : "新建项目"}</DialogTitle>
-          <DialogDescription>
-            填写团购标题和商品名称，稍后可在编辑器中继续完善。
-          </DialogDescription>
+          <DialogTitle>编辑项目信息</DialogTitle>
+          <DialogDescription>修改团购标题或商品名称。</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
@@ -398,7 +380,7 @@ function ProjectMetaDialog({
             disabled={pending}
             className="bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.65_0.22_35)] text-white hover:brightness-110"
           >
-            {pending ? "保存中…" : mode === "edit" ? "保存" : "创建并进入编辑"}
+            {pending ? "保存中…" : "保存"}
           </Button>
         </DialogFooter>
       </DialogContent>
