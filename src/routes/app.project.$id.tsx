@@ -38,6 +38,7 @@ import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
 import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
+import { emitManualEdit, onManualEdit, type ManualEditPayload } from "@/lib/edit-log-bus";
 
 export const Route = createFileRoute("/app/project/$id")({
   head: () => ({ meta: [{ title: "编辑项目 — 团宝助手" }] }),
