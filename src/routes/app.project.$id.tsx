@@ -853,16 +853,52 @@ function PreviewPane({
     | undefined;
 }) {
   const [tab, setTab] = useState<Tab>("intro");
-  const qc = useQueryClient();
   const update = useServerFn(updateProject);
 
-  const intro: IntroData = project?.intro ?? { title: "", description: "", blocks: [] };
-  // Derive sku list: prefer project.skus (jsonb array), fall back to product.skus, fall back to a seeded one.
-  const rawSkus: SkuItem[] =
+  const incomingIntro: IntroData = project?.intro ?? { title: "", description: "", blocks: [] };
+  const incomingSkus: SkuItem[] =
     (project?.skus && Array.isArray(project.skus) ? (project.skus as SkuItem[]) : null) ??
     (project?.product?.skus as SkuItem[] | undefined) ??
     [];
-  const settings: SettingsData = project?.settings ?? {};
+  const incomingSettings: SettingsData = project?.settings ?? {};
+
+  // Optimistic local mirrors — typing updates these immediately; debounced
+  // server write happens in the background. We only adopt incoming values
+  // when they differ from what we last wrote (i.e. the AI tool changed them).
+  const [intro, setIntroLocal] = useState<IntroData>(incomingIntro);
+  const [skus, setSkusLocal] = useState<SkuItem[]>(incomingSkus);
+  const [settings, setSettingsLocal] = useState<SettingsData>(incomingSettings);
+
+  const lastWrittenRef = useRef<{ intro: string; skus: string; settings: string }>({
+    intro: JSON.stringify(incomingIntro),
+    skus: JSON.stringify(incomingSkus),
+    settings: JSON.stringify(incomingSettings),
+  });
+
+  useEffect(() => {
+    const s = JSON.stringify(incomingIntro);
+    if (s !== lastWrittenRef.current.intro) {
+      lastWrittenRef.current.intro = s;
+      setIntroLocal(incomingIntro);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(incomingIntro)]);
+  useEffect(() => {
+    const s = JSON.stringify(incomingSkus);
+    if (s !== lastWrittenRef.current.skus) {
+      lastWrittenRef.current.skus = s;
+      setSkusLocal(incomingSkus);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(incomingSkus)]);
+  useEffect(() => {
+    const s = JSON.stringify(incomingSettings);
+    if (s !== lastWrittenRef.current.settings) {
+      lastWrittenRef.current.settings = s;
+      setSettingsLocal(incomingSettings);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(incomingSettings)]);
 
   const debouncedPatch = useRef<{ patch: Record<string, unknown>; t: ReturnType<typeof setTimeout> | null }>({
     patch: {},
@@ -877,16 +913,31 @@ function PreviewPane({
       debouncedPatch.current.patch = {};
       try {
         await update({ data: { id: projectId, patch: p } });
-        qc.invalidateQueries({ queryKey: ["project", projectId] });
+        // NOTE: we intentionally do NOT invalidate the project query here.
+        // The user just typed this value; refetching would clobber their
+        // in-progress edits and re-render the entire editor on every keystroke.
+        // AI tool calls invalidate via onFinish / onToolCall in ChatPane.
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "保存失败");
       }
-    }, 500);
+    }, 400);
   };
 
-  const setIntro = (next: IntroData) => persist({ intro: next });
-  const setSkus = (next: SkuItem[]) => persist({ skus: next });
-  const setSettings = (next: SettingsData) => persist({ settings: next });
+  const setIntro = (next: IntroData) => {
+    setIntroLocal(next);
+    lastWrittenRef.current.intro = JSON.stringify(next);
+    persist({ intro: next });
+  };
+  const setSkus = (next: SkuItem[]) => {
+    setSkusLocal(next);
+    lastWrittenRef.current.skus = JSON.stringify(next);
+    persist({ skus: next });
+  };
+  const setSettings = (next: SettingsData) => {
+    setSettingsLocal(next);
+    lastWrittenRef.current.settings = JSON.stringify(next);
+    persist({ settings: next });
+  };
 
   // Bottom sheet state
   const [sheet, setSheet] = useState<{
@@ -913,13 +964,13 @@ function PreviewPane({
             <div className="space-y-2">
               <IntroTab intro={intro} onChange={setIntro} />
               <div className="px-2 pb-3">
-                <ProductEntryCard count={rawSkus.length} />
+                <ProductEntryCard count={skus.length} />
               </div>
             </div>
           )}
           {tab === "product" && (
             <ProductTab
-              skus={rawSkus}
+              skus={skus}
               onChange={setSkus}
               settings={settings}
               onOpenSetting={openSetting}
