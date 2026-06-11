@@ -7,6 +7,9 @@ import {
   GripVertical,
   X,
   Upload,
+  ArrowLeftRight,
+  Search,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
