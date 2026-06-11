@@ -1,9 +1,11 @@
 // Server-only helpers for AI image generation via Lovable AI Gateway.
-// Uses Gemini Nano Banana 2 (`google/gemini-3.1-flash-image-preview`) which supports
-// both text-to-image and image editing with reference images.
+// - No reference images -> OpenAI `openai/gpt-image-2` (documented default, most stable).
+// - With reference images -> Gemini `google/gemini-3.1-flash-image-preview`
+//   (supports multimodal image inputs for editing/style transfer).
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/images/generations";
-const MODEL = "google/gemini-3.1-flash-image-preview";
+const OPENAI_MODEL = "openai/gpt-image-2";
+const GEMINI_MODEL = "google/gemini-3.1-flash-image-preview";
 
 export type GenerateOneInput = {
   prompt: string;
@@ -11,16 +13,24 @@ export type GenerateOneInput = {
   referenceImages?: string[];
 };
 
-/** Calls the Gateway once and returns the base64 PNG payload (no data: prefix). */
-export async function generateOneImage(
-  apiKey: string,
-  { prompt, referenceImages }: GenerateOneInput,
-): Promise<string> {
-  const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
-  for (const url of referenceImages ?? []) {
-    content.push({ type: "image_url", image_url: { url } });
-  }
+type GatewayError = Error & { status?: number; code?: string };
 
+function buildError(status: number, text: string): GatewayError {
+  let code: string | undefined;
+  try {
+    const parsed = JSON.parse(text) as { error?: { code?: string; message?: string } };
+    if (parsed.error?.code) code = parsed.error.code;
+    if (parsed.error?.message) text = parsed.error.message;
+  } catch {
+    /* not JSON */
+  }
+  const err = new Error(`AI 生图失败 (${status}): ${text.slice(0, 400)}`) as GatewayError;
+  err.status = status;
+  err.code = code;
+  return err;
+}
+
+async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> {
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: {
@@ -28,23 +38,63 @@ export async function generateOneImage(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
-      messages: [{ role: "user", content }],
-      modalities: ["image", "text"],
+      model: OPENAI_MODEL,
+      prompt,
+      quality: "low",
+      size: "1024x1024",
+      n: 1,
     }),
   });
-
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    const err = new Error(`AI 生图失败 (${res.status}): ${text.slice(0, 300)}`);
-    (err as Error & { status?: number }).status = res.status;
-    throw err;
+    throw buildError(res.status, text);
   }
-
   const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
   const b64 = json.data?.[0]?.b64_json;
   if (!b64) throw new Error("AI 生图返回空数据");
   return b64;
+}
+
+async function callGeminiImage(
+  apiKey: string,
+  prompt: string,
+  referenceImages: string[],
+): Promise<string> {
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+  for (const url of referenceImages) {
+    content.push({ type: "image_url", image_url: { url } });
+  }
+  const res = await fetch(GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: GEMINI_MODEL,
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw buildError(res.status, text);
+  }
+  const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
+  const b64 = json.data?.[0]?.b64_json;
+  if (!b64) throw new Error("AI 生图返回空数据");
+  return b64;
+}
+
+/** Calls the Gateway once and returns the base64 PNG payload (no data: prefix). */
+export async function generateOneImage(
+  apiKey: string,
+  { prompt, referenceImages }: GenerateOneInput,
+): Promise<string> {
+  if (referenceImages && referenceImages.length > 0) {
+    return callGeminiImage(apiKey, prompt, referenceImages);
+  }
+  return callOpenAIImage(apiKey, prompt);
 }
 
 /** Generates N images in parallel, returns array of base64 payloads. */
@@ -58,10 +108,10 @@ export async function generateImagesBatch(
     Array.from({ length: n }, () => generateOneImage(apiKey, input)),
   );
   const ok: string[] = [];
-  let firstErr: Error | null = null;
+  let firstErr: GatewayError | null = null;
   for (const r of results) {
     if (r.status === "fulfilled") ok.push(r.value);
-    else if (!firstErr) firstErr = r.reason as Error;
+    else if (!firstErr) firstErr = r.reason as GatewayError;
   }
   if (ok.length === 0 && firstErr) throw firstErr;
   return ok;
