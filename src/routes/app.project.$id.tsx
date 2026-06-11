@@ -392,6 +392,26 @@ function ChatPane({
         />
         <div className="text-xs font-semibold">团宝</div>
         <div className="text-[10px] text-muted-foreground">你的开团搭子</div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Select value={selectedLogicId} onValueChange={setSelectedLogicId}>
+            <SelectTrigger
+              className="h-7 w-[140px] gap-1 border bg-background px-2 text-[11px]"
+              title="选择文案撰写逻辑；自动匹配会按品类智能挑选"
+            >
+              <SelectValue placeholder="文案逻辑" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="auto" className="text-xs">
+                自动匹配
+              </SelectItem>
+              {logics.map((l) => (
+                <SelectItem key={l.id} value={l.id} className="text-xs">
+                  {l.is_active ? "⭐ " : ""}
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         <Popover>
           <PopoverTrigger asChild>
             <button
