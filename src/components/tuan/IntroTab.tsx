@@ -474,6 +474,7 @@ function BlockCard({
   onDragStart,
   onDragEnd,
   onDropOn,
+  onAIGenerate,
 }: {
   block: IntroBlock;
   isFirst: boolean;
@@ -490,6 +491,7 @@ function BlockCard({
   onDragStart: () => void;
   onDragEnd: () => void;
   onDropOn: () => void;
+  onAIGenerate?: () => void;
 }) {
   const [draggable, setDraggable] = useState(false);
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
