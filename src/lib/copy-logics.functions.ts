@@ -209,7 +209,7 @@ ${MODULE_TYPE_HINT}
       }))
       .slice(0, 15);
     return {
-      modules: out.modules.map((m) => ({ id: rid(), ...m })) as CopyModule[],
+      modules: trimmed.map((m) => ({ id: rid(), ...m })) as CopyModule[],
     };
   });
 
