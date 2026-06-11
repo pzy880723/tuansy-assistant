@@ -487,7 +487,7 @@ function BlockCard({
   block,
   isFirst,
   isLast,
-  isDragging,
+  isReordering,
   isEditing,
   onMove,
   onRemove,
@@ -496,15 +496,13 @@ function BlockCard({
   onChangeText,
   onFinishEditText,
   onRemoveSmallImage,
-  onDragStart,
-  onDragEnd,
-  onDropOn,
+  onStartReorder,
   onAIGenerate,
 }: {
   block: IntroBlock;
   isFirst: boolean;
   isLast: boolean;
-  isDragging: boolean;
+  isReordering: boolean;
   isEditing: boolean;
   onMove: (dir: "up" | "down" | "top") => void;
   onRemove: () => void;
@@ -513,33 +511,16 @@ function BlockCard({
   onChangeText: (v: string) => void;
   onFinishEditText: (v: string) => void;
   onRemoveSmallImage: (idx: number) => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDropOn: () => void;
+  onStartReorder: () => void;
   onAIGenerate?: () => void;
 }) {
-  const [draggable, setDraggable] = useState(false);
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
 
   return (
     <div
-      draggable={draggable}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        onDragStart();
-      }}
-      onDragEnd={() => {
-        setDraggable(false);
-        onDragEnd();
-      }}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDropOn();
-      }}
       className={
         "border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0 " +
-        (isDragging ? "opacity-50" : "")
+        (isReordering ? "opacity-50" : "")
       }
     >
       <div className="mb-1.5 flex items-center justify-between">
@@ -547,13 +528,13 @@ function BlockCard({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onMouseDown={() => setDraggable(true)}
-            onTouchStart={() => setDraggable(true)}
+            onClick={onStartReorder}
             title="拖动排序"
             className="cursor-grab rounded-md border border-[#dcdee0] bg-white px-1.5 py-0.5 text-[#646566] hover:border-[#07c160] hover:text-[#07c160] active:cursor-grabbing"
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
+
           {onAIGenerate && (
             <button
               type="button"
