@@ -1,110 +1,53 @@
-## 一、设置页加返回入口
+# AI 生图能力（聊天 + 文字模块快捷入口）
 
-`/settings` 顶部增加"← 返回项目库"按钮跳 `/app`。
+## 目标
+1. 聊天里团宝可以自己调"生图"工具（用户说"给我配张图"它就生成）。
+2. 介绍 Tab 的每个**文字模块**右上角加"✨ AI 生图"按钮，弹窗选数量+上传参考图，生成后自动把图片插到该文字模块下方（已有空缺九宫格优先填空，否则新建图片模块）。
 
-## 二、预设文案逻辑（行业模版）— 改为后台管理
+## 模型与基础设施
+- **图像模型**：`google/gemini-3.1-flash-image-preview`（Nano Banana 2，支持文生图+参考图编辑，速度快质量高）
+- **存储**：复用现有私有桶 `product-images`，路径 `ai-gen/{userId}/{uuid}.png`，沿用 `uploadProductImage` 的签名 URL 模式
+- **图片搜索（网图搜索）**：本期不做，专注 AI 生图（先前曾问过，用户回复也只提生图）
 
-### 数据模型
+## 后端
 
-新建 `preset_copy_logics` 表（与 `copy_logics` 结构基本一致，但**无 user_id**，由 admin 维护）：
-- `id, slug(unique), name, description, modules(jsonb), industry, sort_order, is_published, created_at, updated_at`
-- RLS：`authenticated` 可 `SELECT` `is_published = true` 的行（用户端可浏览）；写入只允许 admin（通过 `has_role`）
+### 新文件 `src/routes/api/generate-image.ts`（TanStack 服务路由）
+- `POST`，body: `{ prompt: string; count: 1|2|3|4|6|9; referenceImages?: string[] /* http URLs */; projectId: string }`
+- 鉴权：`readSessionUserIdFromRequest`；校验 projectId 归属
+- 拼装 `messages`：text + 每张参考图作为 `image_url`（参考 ai-multimodal-input）
+- 并发 N 次调用 Gateway `/v1/images/generations`（非流式，`stream:false`，便于上传），拿 base64 → 上传 `product-images` 桶 → 返回签名 URL 数组
+- 模型选择按 `count`：≤2 用单次 `n=count` 调用；>2 拆并发以避免 timeout
+- 错误透传 402/429
 
-初始迁移内 `INSERT` 7 条种子：服装、食品、珠宝、家电、日化、3C 数码、日用家居（每条预填 description + modules 草案）。
+### 修改 `src/routes/api/chat.ts`
+- 新增工具 `generate_product_images`：
+  - inputSchema：`prompt`（中文场景描述）、`count`（1/3/6/9 默认 3）、`insertAfterBlockId?`（可选，插在哪个 block 后）、`style?`
+  - execute：调用上面 `/api/generate-image` 逻辑（抽到 `src/lib/image-gen.server.ts` 复用），把结果作为 `image_sm`/`image_lg` block 插入 `intro.blocks`
+- 系统提示词追加：用户描述图片/场景时主动调 `generate_product_images`；参考图由用户上传的 file part 自动带入
 
-### 后台管理界面 `/admin/presets`
+## 前端
 
-复用 `/settings` 现有的文案逻辑编辑组件（自然语言描述 + 模块列表 + "AI 生成模块"按钮 + 手动增删模块）。差别：
-- 列表显示所有 `preset_copy_logics`（不分用户）
-- 可新建/编辑/删除/上下架（`is_published`）/排序
-- 调用 admin server fn：`adminListPresets`, `adminUpsertPreset`, `adminDeletePreset`, `adminGenerateModulesFromText`（复用现有的 `generateModulesFromText` 逻辑）
+### 新组件 `src/components/tuan/AIGenerateImageDialog.tsx`
+shadcn Dialog，字段：
+- 文字提示（默认填入触发它的文字模块文本，可改）
+- 数量选择：1 / 3 / 6 / 9 单选 chips
+- 参考图上传（最多 3 张，复用 `useImageAttachments` 的上传能力）
+- "开始生成" → 调 `/api/generate-image` → 进度条 → 拿到 URL 数组 → `onComplete(urls)`
 
-为复用编辑 UI：把 `/settings` 现有的编辑器拆成可复用组件 `<CopyLogicEditor source={"user"|"preset"} value onChange onAIGenerate />`，两边都用它。
+### 修改 `src/components/tuan/IntroTab.tsx`
+- `BlockCard` 头部按钮区，`block.type === "text"` 时多一个 `<Sparkles /> AI 生图`
+- 点击 → 打开 Dialog，prompt 默认 = 该 text block 内容
+- 生成完成回调：
+  1. 找到该 text block 后**紧邻**的图片 block
+  2. 若是 `image_sm` 且未满 9 张 → 把新图 push 进去（"补齐空缺"语义）
+  3. 否则 → 在该 text block 后插入新 `image_lg`（count=1）或 `image_sm`（count>1）
+- 同时给整个文字栏标题旁加个全局"AI 生图"按钮，prompt 默认 = 整篇 description
 
-### 前端用户侧表现
+## 文件清单
+- 新增：`src/routes/api/generate-image.ts`、`src/lib/image-gen.server.ts`、`src/components/tuan/AIGenerateImageDialog.tsx`
+- 修改：`src/routes/api/chat.ts`（新工具 + 提示词）、`src/components/tuan/IntroTab.tsx`（按钮 + 回调）
 
-在 `/settings` 文案逻辑页面新增一个"**标准文案逻辑**"分区，列出所有已上架的预设：
-- 只读展示（描述 + 模块列表 collapsed）
-- 每条带"**复制到我的文案逻辑**"按钮 → 调 server fn `copyPresetToMine({presetId})` 在用户 `copy_logics` 里创建一份可编辑副本，自动跳到编辑态
-- 用户**不能直接修改预设**，只能复制后改
-
-在聊天面板的"文案逻辑"下拉里，预设也会显示在一个独立分组「标准模版（只读）」中，可直接选用；选用时按只读模板生成文案，不允许编辑（要改就先复制）。
-
-为此 `/api/chat` 接收的 `copyLogicId` 需要支持 "preset:<id>" 与原本的 user copy_logic id 两种来源；命中 preset 时从 `preset_copy_logics` 取 modules 注入 system prompt。
-
-## 三、后台管理系统 (admin)
-
-### 1. 权限模型
-
-迁移：
-- `app_role` 枚举 `admin`/`user`
-- `user_roles(user_id, role)` + 唯一约束 + RLS（admin 可读写）
-- `has_role(_user_id, _role)` security definer
-- `app_users.is_banned boolean default false`
-- 触发器：新建 `app_users` 时若手机号 = `18657433310` 自动写入 admin 角色
-- 同迁移末尾 `INSERT` 兜底：若该手机号已存在 `app_users`，直接插入 admin 角色
-
-### 2. 路由结构
-
-```text
-src/routes/
-  admin.tsx              // 布局，SidebarProvider + AdminSidebar
-                         // beforeLoad: 未登录→/auth；非 admin→/app
-  admin.index.tsx        // → /admin/dashboard
-  admin.dashboard.tsx
-  admin.users.tsx
-  admin.presets.tsx      // 预设文案逻辑管理
-  admin.audit.tsx
-```
-
-### 3. 仪表盘
-
-四张卡：总用户、总项目、总文案、近 7 日新增用户；30 天折线：每日 `copy_versions` 生成数。
-server fn：`getAdminStats()`, `getCopyTrend()`。
-
-### 4. 用户管理
-
-表格列：手机号 / 注册时间 / 项目数 / 文案数 / 角色 / 状态 / 操作
-- 操作：封禁/解封、提升/撤销 admin
-- 手机号搜索 + 分页 20/页
-- server fn：`adminListUsers`, `adminSetBan`, `adminSetRole`
-- 封禁用户在登录与 `/api/chat` 拒绝访问
-
-### 5. 预设管理
-
-如上述「二」详细描述。
-
-### 6. 审计日志
-
-两个 Tab：项目列表、文案记录；server fn `adminListProjects`, `adminListCopyVersions`。
-
-### 7. 入口
-
-`/app` 项目库右上角：若 `has_role('admin')` 显示「管理后台」按钮。判定走 `getMyRoles()` server fn。
-
-### 8. 安全约束
-
-所有 admin server fn：`requireSupabaseAuth` → `has_role` 校验 → `supabaseAdmin` 操作；否则抛 403。
-
-## 四、交付清单
-
-- **迁移 1**：`app_role` + `user_roles` + `has_role` + `app_users.is_banned` + 手机号自动 admin 触发器 + 首位 admin 兜底插入
-- **迁移 2**：`preset_copy_logics` 表 + RLS + GRANT + 7 条种子数据
-- **新文件**
-  - `src/components/copy-logic/CopyLogicEditor.tsx`（拆分复用）
-  - `src/components/admin/AdminSidebar.tsx`
-  - `src/lib/admin.functions.ts`（含 preset CRUD、用户管理、统计）
-  - `src/lib/presets.functions.ts`（用户侧：列预设、复制到我的）
-  - `src/routes/admin.tsx` / `admin.index.tsx` / `admin.dashboard.tsx` / `admin.users.tsx` / `admin.presets.tsx` / `admin.audit.tsx`
-- **修改**
-  - `src/routes/settings.tsx`：返回按钮 + 「标准文案逻辑」分区 + 用 CopyLogicEditor
-  - `src/routes/app.index.tsx`：admin 入口
-  - `src/routes/app.project.$id.tsx`：下拉支持 preset 分组，选中传 `preset:<id>`
-  - `src/routes/api/chat.ts`：解析 `copyLogicId` 区分 user / preset 来源
-  - `src/lib/copy-logics.functions.ts`：保持现有 `generateModulesFromText` 可被 admin 复用
-
-## 待你确认（最后一项）
-
-封禁是否立即把用户踢下线？默认：仅拒绝下次登录与所有 server fn 调用（当前 session 页面不强制中断）。要"立即踢下线"建议二期再做。
-
-如无异议，回复"开始"即按此实施。
+## 验证
+- 文字模块点"AI 生图"→ 选 3 张 → 不上传参考图 → 生成 3 张并插入 image_sm
+- 上传 1 张参考图 + 选 6 张 → 生成 6 张同风格
+- 聊天里说"给我配 3 张水果园场景图" → 团宝调 `generate_product_images` → 预览直接出现新 block
