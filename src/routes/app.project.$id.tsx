@@ -614,6 +614,16 @@ function MessageRow({
     (p) => p.type.startsWith("tool-") && p.type !== "tool-suggest_next",
   ) as ToolPart[];
 
+  if (msg.role === "system") {
+    return (
+      <div className="flex justify-center">
+        <div className="rounded-full bg-muted/60 px-2.5 py-1 text-[11px] text-muted-foreground">
+          {text}
+        </div>
+      </div>
+    );
+  }
+
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
