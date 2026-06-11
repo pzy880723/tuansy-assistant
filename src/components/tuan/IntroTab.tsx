@@ -419,6 +419,11 @@ export function IntroTab({
                   if (dragId) reorder(dragId, b.id);
                   setDragId(null);
                 }}
+                onAIGenerate={
+                  projectId && b.type === "text"
+                    ? () => openAIForBlock(b.id, b.text)
+                    : undefined
+                }
               />
             ))}
           </div>
