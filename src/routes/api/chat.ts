@@ -48,6 +48,7 @@ export const Route = createFileRoute("/api/chat")({
           messages?: UIMessage[];
           projectId?: string;
           snapshot?: unknown;
+          copyLogicId?: string | null;
         };
         if (!Array.isArray(body.messages) || !body.projectId) {
           return new Response("Bad request", { status: 400 });
@@ -82,6 +83,70 @@ export const Route = createFileRoute("/api/chat")({
         const category =
           ((product.category as string[] | undefined)?.[0]) ?? "未分类";
 
+        // ---------- Resolve active copy logic ----------
+        type LogicRow = {
+          id: string;
+          name: string;
+          description: string | null;
+          modules: Array<{ type: string; label: string; guidance: string }> | null;
+          is_active: boolean;
+        };
+        let activeLogic: LogicRow | null = null;
+        const { data: allLogics } = await supabaseAdmin
+          .from("copy_logics")
+          .select("id, name, description, modules, is_active")
+          .eq("user_id", userId);
+        const logics = (allLogics ?? []) as LogicRow[];
+        if (body.copyLogicId) {
+          activeLogic = logics.find((l) => l.id === body.copyLogicId) ?? null;
+        } else if (logics.length > 0) {
+          const fallback = logics.find((l) => l.is_active) ?? logics[0];
+          if (logics.length === 1) {
+            activeLogic = fallback;
+          } else {
+            try {
+              const ids = logics.map((l) => l.id);
+              const matcherGateway = createLovableAiGatewayProvider(key);
+              const productTitle =
+                (product.title as string | undefined) ??
+                (project?.name as string | undefined) ??
+                "";
+              const candidates = logics
+                .map(
+                  (l, i) =>
+                    `${i + 1}. id=${l.id} | 名称：${l.name} | 简介：${(l.description ?? "").slice(0, 200)} | 模块：${(l.modules ?? []).map((m) => m.label).join("/")}`,
+                )
+                .join("\n");
+              const { Output: MatchOutput, generateText: matchGen } = await import("ai");
+              const matched = await matchGen({
+                model: matcherGateway("google/gemini-3-flash-preview"),
+                output: MatchOutput.object({
+                  schema: z.object({
+                    id: z.enum(["__none__", ...ids] as [string, ...string[]]),
+                  }),
+                }),
+                prompt: `从下列文案逻辑中挑一条最适合当前商品；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选：\n${candidates}`,
+              });
+              const picked = (matched.output as { id?: string } | undefined)?.id;
+              activeLogic =
+                picked && picked !== "__none__"
+                  ? (logics.find((l) => l.id === picked) ?? fallback)
+                  : fallback;
+            } catch {
+              activeLogic = fallback;
+            }
+          }
+        }
+
+        const logicPromptBlock = activeLogic
+          ? `\n【当前启用文案逻辑：${activeLogic.name}】（用户在「设置 → 文案编辑逻辑」里定义）\n总纲：${activeLogic.description ?? ""}\n模块清单（写 intro.title/description/blocks 时必须按此顺序逐段输出；每段必须满足对应 guidance）：\n${(activeLogic.modules ?? [])
+              .map(
+                (m, i) =>
+                  `${i + 1}. [${m.type}] ${m.label} — ${m.guidance || "（无额外要求）"}`,
+              )
+              .join("\n")}\n硬约束：本逻辑优先级高于下方通用五步法；冲突时以本逻辑为准。\n`
+          : "";
+
         const initialRunId = getLovableAiGatewayRunId(request);
         const gateway = createLovableAiGatewayProvider(key, initialRunId);
         const model = gateway("google/gemini-3-flash-preview");
@@ -108,7 +173,7 @@ SKU 列表 skus: ${JSON.stringify(skus, null, 2)}
 家居日用：材质、尺寸、使用场景、保修
 母婴儿童：适用年龄段、安全认证、材质安全性
 其他：突出最强卖点和差异化
-
+${logicPromptBlock}
 【文案五步转化框架 — 写 title/description/blocks 时必须遵守】
 核心理念：不是推销产品，而是激发购买欲望。整条逻辑链：吸引眼球 → 引发共鸣 → 建立信任 → 激发欲望 → 促成下单。
 

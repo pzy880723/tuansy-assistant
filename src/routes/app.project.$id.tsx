@@ -30,6 +30,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
+import { listCopyLogics } from "@/lib/copy-logics.functions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { readAuthToken } from "@/lib/use-current-user";
 import { PhoneShell as TuanPhoneShell } from "@/components/tuan/PhoneShell";
@@ -137,6 +145,27 @@ function ChatPane({
     projectRef.current = project;
   }, [project]);
 
+  const logicStorageKey = `tuanbao.copyLogic.${projectId}`;
+  const [selectedLogicId, setSelectedLogicId] = useState<string>(() => {
+    if (typeof window === "undefined") return "auto";
+    return window.localStorage.getItem(logicStorageKey) || "auto";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(logicStorageKey, selectedLogicId);
+  }, [selectedLogicId, logicStorageKey]);
+  const logicIdRef = useRef(selectedLogicId);
+  useEffect(() => {
+    logicIdRef.current = selectedLogicId;
+  }, [selectedLogicId]);
+  const listLogicsFn = useServerFn(listCopyLogics);
+  const { data: logicsData } = useQuery({
+    queryKey: ["copy-logics"],
+    queryFn: () => listLogicsFn(),
+    staleTime: 60_000,
+  });
+  const logics = logicsData?.logics ?? [];
+
   const initial: UIMessage[] = (() => {
     if (typeof window === "undefined") return [];
     try {
@@ -166,7 +195,12 @@ function ChatPane({
       api: "/api/chat",
       prepareSendMessagesRequest: ({ messages, body }) => ({
         headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
-        body: { ...body, messages, projectId },
+        body: {
+          ...body,
+          messages,
+          projectId,
+          copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
+        },
       }),
     }),
   ).current;
@@ -358,11 +392,31 @@ function ChatPane({
         />
         <div className="text-xs font-semibold">团宝</div>
         <div className="text-[10px] text-muted-foreground">你的开团搭子</div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Select value={selectedLogicId} onValueChange={setSelectedLogicId}>
+            <SelectTrigger
+              className="h-7 w-[140px] gap-1 border bg-background px-2 text-[11px]"
+              title="选择文案撰写逻辑；自动匹配会按品类智能挑选"
+            >
+              <SelectValue placeholder="文案逻辑" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="auto" className="text-xs">
+                自动匹配
+              </SelectItem>
+              {logics.map((l) => (
+                <SelectItem key={l.id} value={l.id} className="text-xs">
+                  {l.is_active ? "⭐ " : ""}
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         <Popover>
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="ml-auto inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
             >
               <History className="h-3 w-3" /> 历史 {history.length > 0 && `(${history.length})`}
             </button>
@@ -399,6 +453,7 @@ function ChatPane({
             </div>
           </PopoverContent>
         </Popover>
+        </div>
       </div>
 
 
