@@ -449,6 +449,16 @@ export function IntroTab({
           })}
         </div>
       </div>
+
+      {projectId && (
+        <AIGenerateImageDialog
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          projectId={projectId}
+          defaultPrompt={aiPrompt}
+          onComplete={handleAIComplete}
+        />
+      )}
     </div>
   );
 }
