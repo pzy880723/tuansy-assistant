@@ -416,7 +416,7 @@ function ChatPane({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="ml-auto inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
             >
               <History className="h-3 w-3" /> 历史 {history.length > 0 && `(${history.length})`}
             </button>
