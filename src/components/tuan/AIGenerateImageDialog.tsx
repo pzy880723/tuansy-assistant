@@ -189,7 +189,7 @@ export function AIGenerateImageDialog({
                     )}
                     <button
                       type="button"
-                      onClick={() => removeAttachment(a.id)}
+                      onClick={() => remove(a.id)}
                       className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/60 text-white hover:bg-black/80"
                     >
                       <X className="h-2.5 w-2.5" />
