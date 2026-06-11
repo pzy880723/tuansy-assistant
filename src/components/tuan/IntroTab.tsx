@@ -255,6 +255,53 @@ export function IntroTab({
 
   const [dragId, setDragId] = useState<string | null>(null);
 
+  const openAIForBlock = (id: string, fallback: string) => {
+    aiTargetIdRef.current = id;
+    const b = blocks.find((x) => x.id === id);
+    const text = b && b.type === "text" ? b.text : "";
+    setAiPrompt((text || fallback || intro.description || intro.title || "").trim());
+    setAiOpen(true);
+  };
+  const openAIForWhole = () => {
+    aiTargetIdRef.current = null;
+    setAiPrompt(
+      [intro.title, intro.description].filter(Boolean).join("\n").trim() || "",
+    );
+    setAiOpen(true);
+  };
+
+  const handleAIComplete = (urls: string[]) => {
+    if (urls.length === 0) return;
+    const targetId = aiTargetIdRef.current;
+    const list = blocks.slice();
+    let insertAfter = targetId ? list.findIndex((b) => b.id === targetId) : list.length - 1;
+    if (insertAfter < 0) insertAfter = list.length - 1;
+
+    // Try to fill an adjacent image_sm block first (limited to 9 each).
+    const next = list[insertAfter + 1];
+    if (next && next.type === "image_sm" && next.urls.length < MAX_SMALL_IMAGES) {
+      const room = MAX_SMALL_IMAGES - next.urls.length;
+      const take = urls.slice(0, room);
+      const rest = urls.slice(room);
+      list[insertAfter + 1] = { ...next, urls: [...next.urls, ...take] };
+      if (rest.length > 0) {
+        const block: IntroBlock =
+          rest.length === 1
+            ? { id: genId(), type: "image_lg", url: rest[0] }
+            : { id: genId(), type: "image_sm", urls: rest.slice(0, MAX_SMALL_IMAGES) };
+        list.splice(insertAfter + 2, 0, block);
+      }
+    } else {
+      const block: IntroBlock =
+        urls.length === 1
+          ? { id: genId(), type: "image_lg", url: urls[0] }
+          : { id: genId(), type: "image_sm", urls: urls.slice(0, MAX_SMALL_IMAGES) };
+      list.splice(insertAfter + 1, 0, block);
+    }
+    setBlocks(list);
+  };
+
+
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
       {/* hidden file inputs */}
