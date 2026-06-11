@@ -1,60 +1,49 @@
-## 设置页：文案逻辑（Copy Logic）模板管理
+## 目标
 
-让团长在 `/settings` 里维护一组「文案撰写逻辑」预设，每个预设可用自然语言描述也可以按模块逐项填写，两侧用 AI 双向匹配。后续团宝写文案时会读取当前激活的预设作为框架。
+让聊天生成文案时遵守用户在「设置 → 文案编辑逻辑」里定义的模板（模块顺序 + 每模块自然语言指导）。在 ChatPane 顶部新增一个"文案逻辑"下拉选择器：
+- 用户手动选定 → 强制用该逻辑
+- 留空（默认"自动"）→ 后端依据当前项目品类 + 商品标题，让 AI 匹配最合适的一条，匹配不到则回落到 `is_active=true` 的全局默认；再没有就用现有硬编码五步法。
 
-### 1. 数据库（新建 `copy_logics` 表）
+## 后端改动 `src/routes/api/chat.ts`
 
-字段：
-- `id`, `user_id`, `name`（如 "服装文案"）
-- `description`（自然语言描述，TEXT）
-- `modules`（JSONB，按顺序的模块数组）
-- `is_active`（同一用户仅一条 true，团宝写文案时用它）
-- `created_at`, `updated_at`
+1. 请求体新增可选 `copyLogicId?: string`。
+2. 加载逻辑：
+   - 若 `copyLogicId` 传了 → `supabaseAdmin.from("copy_logics").select().eq("id", id).eq("user_id", userId).maybeSingle()`。
+   - 否则查询该用户全部 `copy_logics`（只取 `id,name,description,modules`），若 ≥1 条：
+     - 取 `is_active=true` 那条作为 fallback；
+     - 若总数 ≥2，调用一次轻量 `generateText` (gemini-3-flash) + `Output.object({ id: enum(候选id列表) })`，prompt 喂入候选列表（名称+description 截断 200 字）+ 当前 `product.category` + `product.title`，让模型选最匹配的一条；选不出走 fallback。
+   - 都没有则不注入，沿用现有硬编码段。
+3. 把选中的 logic 渲染成 prompt 片段并替换/拼接到 system 中：
+   - 在【文案五步转化框架…】整段之前插入「【当前启用文案逻辑：${name}】」块，内容含：
+     - `description`（自然语言总纲）
+     - 模块清单：`1. [type] label — guidance` 逐条列出
+     - 一句硬约束："写 intro.title/description/blocks 时必须按上述模块顺序逐段输出；每段内容必须满足对应 guidance；五步法仅作风格参考，与上面冲突时以本逻辑为准。"
+4. 在响应头里回写 `X-Tuanbao-Copy-Logic: <id>`，便于前端显示已生效的逻辑（可选）。
 
-模块项结构：
-```
-{ id, type: "title" | "paragraph" | "image_large" | "image_grid" | "video" | "params",
-  label: "强力吸睛标题" | "痛点共鸣段" | …,
-  guidance: "怎么写这一段的自然语言说明" }
-```
+## 前端改动
 
-RLS：用户只能 CRUD 自己的；GRANT 给 authenticated + service_role。
+### `src/routes/app.project.$id.tsx`（ChatPane）
+1. 新增 `useQuery(["copy-logics"], listCopyLogics)`。
+2. ChatPane 顶部（输入框上方或标题栏右侧）加一个紧凑 `Select`：
+   - 选项：`自动匹配` + 用户所有逻辑（标注哪条是 ⭐ 激活）。
+   - 选中值放 React state `selectedLogicId`，并 `localStorage` 按 projectId 持久化。
+3. `DefaultChatTransport.prepareSendMessagesRequest` 已经 spread body —— 在 body 里追加 `copyLogicId: selectedLogicId ?? undefined`。
 
-### 2. 服务端函数（`src/lib/copy-logics.functions.ts`）
-- `listCopyLogics()` – 当前用户全部
-- `upsertCopyLogic({ id?, name, description, modules, is_active })`
-- `deleteCopyLogic({ id })`
-- `setActiveCopyLogic({ id })` – 把其它行 is_active 置 false
-- `generateModulesFromText({ name, description })` – 调 Lovable AI（gemini-3-flash-preview）+ `Output.object` schema，根据 NL 描述生成模块数组（含默认五步法 fallback）
-- `generateTextFromModules({ name, modules })` – 反向：把模块清单总结成一段 NL 描述
+### 不改：`src/lib/copy-logics.functions.ts`、settings 编辑页、其他 tool 行为。
 
-均用 `requireSupabaseAuth`。
+## 自动匹配细节
 
-### 3. 默认种子
-首次进入设置页时，如果用户一条逻辑都没有，前端调用 `upsertCopyLogic` 写入"通用五步法"默认预设（拿 chat.ts 里的五步法直接转化为 modules + description），设为 active。
+- 候选 prompt 控制在 ~1.5k tokens：每条只塞 name + description 截 200 字 + 模块 label 列表。
+- 用 `Output.object({ id: z.enum([...]) })`，没有匹配返回 `is_active` 那条的 id（在 enum 中保留 `"__none__"` 选项让模型可表达"都不匹配"）。
+- 单次额外调用约 1-2s，可接受；后续如需可加缓存（按 projectId + product.title 哈希），本期不做。
 
-### 4. UI（重写 `src/routes/settings.tsx`）
+## 不在范围
 
-布局：
-- 顶部"新增文案逻辑"按钮 → 弹出输入"名称"对话框，建空白预设后进入编辑视图
-- 左侧列表：所有预设，显示名称 + 是否激活 + 删除按钮；点击切换
-- 右侧编辑卡片：
-  - 名称输入
-  - "设为当前激活" Toggle
-  - **自然语言描述** `Textarea`（自适应高度），右上角按钮「→ 生成模块」（调 generateModulesFromText，loading 状态）
-  - **模块清单**：可拖动重排、每条显示 type 标签 + label + guidance（Textarea）
-    - 每条尾部「删除」「上移」「下移」
-    - 末尾按钮"+ 添加模块"（弹出 type / label 选择）
-  - 模块区右上角按钮「← 回写自然语言」（调 generateTextFromModules，把结果写入 description）
-- 所有字段输入都按 800ms 防抖自动 `upsertCopyLogic` 保存，右上角显示"已保存 hh:mm"
-- 保存/AI 调用失败用 toast 显示
+- 不改 copy_logics 表结构。
+- 不改 settings UI。
+- 不改其他 tool 的 schema。
 
-### 5. 不在本次范围（明确告知用户后续做）
-- 把激活逻辑接入 `/api/chat` 的 system prompt（下一步可单独迭代，避免本次范围过大）
-- 项目级覆盖（每个团购单独选用哪个文案逻辑）
+## 涉及文件
 
-### 涉及文件
-- 新增：`supabase/migrations/<ts>_copy_logics.sql`
-- 新增：`src/lib/copy-logics.functions.ts`
-- 新增：`src/components/settings/CopyLogicEditor.tsx`
-- 编辑：`src/routes/settings.tsx`
+- `src/routes/api/chat.ts`（主要改动）
+- `src/routes/app.project.$id.tsx`（加 Select + 透传 copyLogicId）
