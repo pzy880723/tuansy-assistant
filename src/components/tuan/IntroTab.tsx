@@ -278,28 +278,12 @@ export function IntroTab({
     const list = blocks.slice();
     let insertAfter = targetId ? list.findIndex((b) => b.id === targetId) : list.length - 1;
     if (insertAfter < 0) insertAfter = list.length - 1;
-
-    // Try to fill an adjacent image_sm block first (limited to 9 each).
-    const next = list[insertAfter + 1];
-    if (next && next.type === "image_sm" && next.urls.length < MAX_SMALL_IMAGES) {
-      const room = MAX_SMALL_IMAGES - next.urls.length;
-      const take = urls.slice(0, room);
-      const rest = urls.slice(room);
-      list[insertAfter + 1] = { ...next, urls: [...next.urls, ...take] };
-      if (rest.length > 0) {
-        const block: IntroBlock =
-          rest.length === 1
-            ? { id: genId(), type: "image_lg", url: rest[0] }
-            : { id: genId(), type: "image_sm", urls: rest.slice(0, MAX_SMALL_IMAGES) };
-        list.splice(insertAfter + 2, 0, block);
-      }
-    } else {
-      const block: IntroBlock =
-        urls.length === 1
-          ? { id: genId(), type: "image_lg", url: urls[0] }
-          : { id: genId(), type: "image_sm", urls: urls.slice(0, MAX_SMALL_IMAGES) };
-      list.splice(insertAfter + 1, 0, block);
-    }
+    const newBlocks: IntroBlock[] = urls.map((url) => ({
+      id: genId(),
+      type: "image_lg",
+      url,
+    }));
+    list.splice(insertAfter + 1, 0, ...newBlocks);
     setBlocks(list);
   };
 

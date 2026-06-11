@@ -6,6 +6,7 @@ const BodySchema = z.object({
   count: z.number().int().min(1).max(9),
   referenceImages: z.array(z.string().url()).max(3).optional(),
   projectId: z.string().uuid(),
+  variant: z.string().max(200).optional(),
 });
 
 export const Route = createFileRoute("/api/generate-image")({
@@ -42,9 +43,12 @@ export const Route = createFileRoute("/api/generate-image")({
         );
 
         try {
+          const finalPrompt = body.variant
+            ? `${body.prompt}\n\n[variation hint: ${body.variant}]`
+            : body.prompt;
           const b64s = await generateImagesBatch(
             key,
-            { prompt: body.prompt, referenceImages: body.referenceImages },
+            { prompt: finalPrompt, referenceImages: body.referenceImages },
             body.count,
           );
           const urls = await Promise.all(
