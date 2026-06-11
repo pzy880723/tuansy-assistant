@@ -10,10 +10,12 @@ import {
   ArrowLeftRight,
   Search,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
 import type { IntroBlock, IntroData } from "./types";
+import { AIGenerateImageDialog } from "./AIGenerateImageDialog";
 
 type ToolType = "image_lg" | "image_sm" | "video" | "text";
 
