@@ -79,7 +79,7 @@ function Hero() {
         </div>
 
         <div className="mx-auto mt-10 max-w-2xl">
-          <HeroStarter />
+          <ProjectStarter variant="dark" authRedirect="/" />
           <p className="mt-3 text-center text-xs text-white/40">
             团宝会自动识别品类，生成项目并跳转到工作台 · <Link to="/app" className="underline-offset-4 hover:text-white/70 hover:underline">不急，先逛逛工作台</Link>
           </p>
