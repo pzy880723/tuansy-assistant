@@ -382,14 +382,24 @@ export function AIGenerateImageDialog({
                       </>
                     )}
                     {slot.status === "error" && (
-                      <button
-                        type="button"
-                        onClick={() => regenerateSlot(slot.id)}
-                        className="flex h-full w-full flex-col items-center justify-center gap-1 bg-[#fff5f5] text-[11px] text-[#ee0a24] hover:bg-[#ffeded]"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        生成失败 · 点击重试
-                      </button>
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[#fff5f5] px-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => regenerateSlot(slot.id)}
+                          className="flex items-center gap-1 text-[12px] font-medium text-[#ee0a24] hover:underline"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          生成失败 · 点击重试
+                        </button>
+                        {slot.error && (
+                          <div
+                            title={slot.error}
+                            className="line-clamp-2 max-w-full px-1 text-[10px] leading-tight text-[#ee0a24]/70"
+                          >
+                            {slot.error}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
