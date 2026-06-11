@@ -30,6 +30,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
+import { listCopyLogics } from "@/lib/copy-logics.functions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { readAuthToken } from "@/lib/use-current-user";
 import { PhoneShell as TuanPhoneShell } from "@/components/tuan/PhoneShell";
