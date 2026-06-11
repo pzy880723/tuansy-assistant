@@ -120,15 +120,14 @@ export const Route = createFileRoute("/api/chat")({
               const { Output: MatchOutput, generateText: matchGen } = await import("ai");
               const matched = await matchGen({
                 model: matcherGateway("google/gemini-3-flash-preview"),
-                experimental_output: MatchOutput.object({
+                output: MatchOutput.object({
                   schema: z.object({
                     id: z.enum(["__none__", ...ids] as [string, ...string[]]),
                   }),
                 }),
                 prompt: `从下列文案逻辑中挑一条最适合当前商品；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选：\n${candidates}`,
               });
-              const picked = (matched as { experimental_output?: { id?: string } })
-                .experimental_output?.id;
+              const picked = (matched.output as { id?: string } | undefined)?.id;
               activeLogic =
                 picked && picked !== "__none__"
                   ? (logics.find((l) => l.id === picked) ?? fallback)
