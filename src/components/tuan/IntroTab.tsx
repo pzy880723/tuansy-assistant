@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Image as ImageIcon,
   LayoutGrid,
@@ -11,6 +12,7 @@ import {
   Search,
   Plus,
   Sparkles,
+  Play,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
