@@ -122,7 +122,7 @@ export const Route = createFileRoute("/api/chat")({
                 model: matcherGateway("google/gemini-3-flash-preview"),
                 experimental_output: MatchOutput.object({
                   schema: z.object({
-                    id: z.enum([...ids, "__none__"] as [string, ...string[]]),
+                    id: z.enum(["__none__", ...ids] as [string, ...string[]]),
                   }),
                 }),
                 prompt: `从下列文案逻辑中挑一条最适合当前商品；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选：\n${candidates}`,
