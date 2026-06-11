@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { readAuthToken } from "@/lib/use-current-user";
 import {
   Dialog,
   DialogContent,
