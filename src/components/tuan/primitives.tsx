@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-/** Debounced inline text input that looks like plain text until focused. */
+/** Debounced inline text input that looks like plain text until focused.
+ *  Never overwrites local state while focused — prevents cursor jump / lost
+ *  characters when the parent re-renders mid-typing.
+ */
 export function InlineText({
   value,
   onChange,
@@ -24,12 +27,30 @@ export function InlineText({
 }) {
   const [local, setLocal] = useState(value);
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setLocal(value), [value]);
+  const focused = useRef(false);
+  const pending = useRef<string | null>(null);
 
-  const flush = (v: string) => {
+  useEffect(() => {
+    if (!focused.current) setLocal(value);
+  }, [value]);
+
+  const schedule = (v: string) => {
     setLocal(v);
+    pending.current = v;
     if (t.current) clearTimeout(t.current);
-    t.current = setTimeout(() => onChange(v), 500);
+    t.current = setTimeout(() => {
+      pending.current = null;
+      onChange(v);
+    }, 250);
+  };
+
+  const flushNow = () => {
+    if (t.current) clearTimeout(t.current);
+    if (pending.current !== null) {
+      const v = pending.current;
+      pending.current = null;
+      onChange(v);
+    }
   };
 
   const cls = cn(
@@ -45,7 +66,12 @@ export function InlineText({
         value={local}
         rows={rows}
         placeholder={placeholder}
-        onChange={(e) => flush(e.target.value)}
+        onFocus={() => (focused.current = true)}
+        onBlur={() => {
+          focused.current = false;
+          flushNow();
+        }}
+        onChange={(e) => schedule(e.target.value)}
         className={cls}
       />
     );
@@ -54,7 +80,12 @@ export function InlineText({
     <input
       value={local}
       placeholder={placeholder}
-      onChange={(e) => flush(e.target.value)}
+      onFocus={() => (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        flushNow();
+      }}
+      onChange={(e) => schedule(e.target.value)}
       className={cls}
     />
   );

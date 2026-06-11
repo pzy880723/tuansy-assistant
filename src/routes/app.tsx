@@ -20,20 +20,28 @@ function AppLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Avoid SSR/CSR hydration mismatch: cookie-derived user is only readable on
+  // the client, so render the same shell on both passes and only act on the
+  // user value after hydration.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
   useEffect(() => {
-    if (user === null) {
+    if (hydrated && user === null) {
       navigate({ to: "/auth", replace: true, search: { redirect: pathname } });
     }
-  }, [user, navigate, pathname]);
-
-  if (!user) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">正在跳转登录…</div>;
-  }
+  }, [hydrated, user, navigate, pathname]);
 
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
-      <Outlet />
+      {hydrated && user ? (
+        <Outlet />
+      ) : (
+        <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">
+          {hydrated ? "正在跳转登录…" : null}
+        </div>
+      )}
     </div>
   );
 }

@@ -35,7 +35,8 @@ function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-/** Auto-resizing textarea that grows with content. */
+/** Auto-resizing textarea that grows with content. Never overwrites local
+ *  state while focused (prevents cursor jump / lost chars). */
 function AutoTextarea({
   value,
   onChange,
@@ -50,8 +51,12 @@ function AutoTextarea({
   const [local, setLocal] = useState(value);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focused = useRef(false);
+  const pending = useRef<string | null>(null);
 
-  useEffect(() => setLocal(value), [value]);
+  useEffect(() => {
+    if (!focused.current) setLocal(value);
+  }, [value]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -59,17 +64,35 @@ function AutoTextarea({
     el.style.height = `${el.scrollHeight}px`;
   }, [local]);
 
+  const flushNow = () => {
+    if (t.current) clearTimeout(t.current);
+    if (pending.current !== null) {
+      const v = pending.current;
+      pending.current = null;
+      onChange(v);
+    }
+  };
+
   return (
     <textarea
       ref={ref}
       rows={1}
       value={local}
       placeholder={placeholder}
+      onFocus={() => (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        flushNow();
+      }}
       onChange={(e) => {
         const v = e.target.value;
         setLocal(v);
+        pending.current = v;
         if (t.current) clearTimeout(t.current);
-        t.current = setTimeout(() => onChange(v), 500);
+        t.current = setTimeout(() => {
+          pending.current = null;
+          onChange(v);
+        }, 250);
       }}
       className={
         "w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-[#c8c9cc] " +
