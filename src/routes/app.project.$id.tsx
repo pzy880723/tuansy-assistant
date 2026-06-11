@@ -201,6 +201,32 @@ function ChatPane({
     inputRef.current?.focus();
   }, [projectId, status]);
 
+  // Mirror right-side preview edits as system messages + history snapshots.
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  useEffect(() => {
+    const off = onManualEdit(projectId, (p: ManualEditPayload) => {
+      const ts = Date.now();
+      const entry: HistoryEntry = {
+        id: `m-${ts}-${Math.random().toString(36).slice(2, 6)}`,
+        ts,
+        label: `✏️ ${p.label}`,
+        snapshot: p.snapshot,
+        messageIndex: messagesRef.current.length,
+      };
+      setHistory((h) => [entry, ...h].slice(0, 30));
+      const sysMsg: UIMessage = {
+        id: `manual-${ts}`,
+        role: "system",
+        parts: [{ type: "text", text: `✏️ ${p.label}` }],
+      };
+      setMessages([...messagesRef.current, sysMsg]);
+    });
+    return off;
+  }, [projectId, setMessages]);
+
   const sendText = (text: string) => {
     const value = text.trim();
     const files = img.getReadyFiles();
