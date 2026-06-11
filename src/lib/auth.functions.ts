@@ -204,10 +204,37 @@ export const verifySmsCode = createServerFn({ method: "POST" })
     ),
   )
   .handler(async ({ data }) => {
-    if (data.code !== MOCK_SMS_CODE) {
-      throw new Error("验证码不正确（开发期固定为 123456）");
-    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (!hasTencentSmsConfig()) {
+      if (data.phone !== SUPER_ADMIN_PHONE || data.code !== MOCK_SMS_CODE) {
+        throw new Error("腾讯云短信未配置；当前仅超级管理员可用 123456 临时登录");
+      }
+    } else {
+      const { data: sms, error: smsError } = await supabaseAdmin
+        .from("sms_verification_codes")
+        .select("id, code_hash, expires_at, attempts")
+        .eq("phone", data.phone)
+        .is("consumed_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (smsError) throw new Error(smsError.message);
+      if (!sms) throw new Error("请先获取短信验证码");
+      if (new Date(sms.expires_at).getTime() <= Date.now()) throw new Error("验证码已过期，请重新获取");
+      if ((sms.attempts ?? 0) >= MAX_VERIFY_ATTEMPTS) throw new Error("验证码错误次数过多，请重新获取");
+      if (!safeCompare(sms.code_hash, hashValue(data.code))) {
+        await supabaseAdmin
+          .from("sms_verification_codes")
+          .update({ attempts: (sms.attempts ?? 0) + 1 })
+          .eq("id", sms.id);
+        throw new Error("验证码不正确，请重新输入");
+      }
+      await supabaseAdmin
+        .from("sms_verification_codes")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("id", sms.id);
+    }
 
     const { data: existing } = await supabaseAdmin
       .from("app_users")
@@ -228,8 +255,7 @@ export const verifySmsCode = createServerFn({ method: "POST" })
       await claimLegacyOrphans(user.id);
     }
 
-    writeSession(user);
-    return { user: toClientUser(user) };
+    return finishLogin(user);
   });
 
 export const wechatMockLogin = createServerFn({ method: "POST" }).handler(
@@ -245,13 +271,12 @@ export const wechatMockLogin = createServerFn({ method: "POST" }).handler(
       .single();
     if (error) throw new Error(error.message);
     await claimLegacyOrphans(created.id);
-    writeSession(created);
-    return { user: toClientUser(created) };
+    return finishLogin(created);
   },
 );
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
-  const uid = readSessionUserId();
+  const uid = await readSessionUserIdAsync();
   if (!uid) return { user: null };
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
@@ -260,13 +285,13 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
     .eq("id", uid)
     .maybeSingle();
   if (!data) {
-    clearSession();
+    await clearCurrentSession();
     return { user: null };
   }
   return { user: toClientUser(data) };
 });
 
 export const signOut = createServerFn({ method: "POST" }).handler(async () => {
-  clearSession();
+  await clearCurrentSession();
   return { ok: true as const };
 });
