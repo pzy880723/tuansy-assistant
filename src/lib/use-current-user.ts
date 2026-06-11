@@ -11,6 +11,8 @@ export type ClientUser = {
 
 const PUBLIC_COOKIE = "tuan_user";
 const AUTH_ERROR_KEY = "tuan_auth_error";
+const AUTH_TOKEN_KEY = "tuan_session_token";
+const AUTH_USER_KEY = "tuan_session_user";
 
 export function setAuthSessionError(message: string) {
   if (typeof window === "undefined") return;
@@ -18,13 +20,23 @@ export function setAuthSessionError(message: string) {
 }
 
 export function clearAuthCookies() {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.localStorage.removeItem(AUTH_USER_KEY);
+    window.sessionStorage.removeItem(AUTH_ERROR_KEY);
+  }
   if (typeof document === "undefined") return;
   document.cookie = "tuan_user=; Max-Age=0; path=/";
   document.cookie = "tuan_uid=; Max-Age=0; path=/";
   window.sessionStorage.removeItem(AUTH_ERROR_KEY);
 }
 
-export function writePublicUserCookie(user: ClientUser) {
+export function writePublicUserCookie(user: ClientUser, sessionToken?: string) {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(AUTH_ERROR_KEY);
+    window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    if (sessionToken) window.localStorage.setItem(AUTH_TOKEN_KEY, sessionToken);
+  }
   if (typeof document === "undefined") return;
   const maxAge = 60 * 60 * 24 * 30;
   window.sessionStorage.removeItem(AUTH_ERROR_KEY);
@@ -52,7 +64,16 @@ function parsePublicCookie(): { user: ClientUser | null; error: string | null } 
 }
 
 function readPublicCookie(): ClientUser | null {
-  return parsePublicCookie()?.user ?? null;
+  const cookieUser = parsePublicCookie()?.user ?? null;
+  if (cookieUser) return cookieUser;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_USER_KEY);
+    return raw ? (JSON.parse(raw) as ClientUser) : null;
+  } catch {
+    window.localStorage.removeItem(AUTH_USER_KEY);
+    return null;
+  }
 }
 
 export function readAuthCookieError(): string | null {
@@ -83,4 +104,13 @@ export function notifyAuthChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("tuan-auth-change"));
   }
+}
+
+export function readAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function hasAuthSession(): boolean {
+  return Boolean(readPublicCookie() && readAuthToken());
 }
