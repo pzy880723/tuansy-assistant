@@ -10,10 +10,12 @@ import {
   ArrowLeftRight,
   Search,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
 import type { IntroBlock, IntroData } from "./types";
+import { AIGenerateImageDialog } from "./AIGenerateImageDialog";
 
 type ToolType = "image_lg" | "image_sm" | "video" | "text";
 
@@ -114,12 +116,19 @@ function AutoTextarea({
 export function IntroTab({
   intro,
   onChange,
+  projectId,
 }: {
   intro: IntroData;
   onChange: (next: IntroData) => void;
+  projectId?: string;
 }) {
   const blocks = intro.blocks ?? [];
   const setBlocks = (next: IntroBlock[]) => onChange({ ...intro, blocks: next });
+
+  // AI generate-image dialog state
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const aiTargetIdRef = useRef<string | null>(null);
 
   // hidden file inputs
   const fileLgRef = useRef<HTMLInputElement | null>(null);
@@ -246,6 +255,53 @@ export function IntroTab({
 
   const [dragId, setDragId] = useState<string | null>(null);
 
+  const openAIForBlock = (id: string, fallback: string) => {
+    aiTargetIdRef.current = id;
+    const b = blocks.find((x) => x.id === id);
+    const text = b && b.type === "text" ? b.text : "";
+    setAiPrompt((text || fallback || intro.description || intro.title || "").trim());
+    setAiOpen(true);
+  };
+  const openAIForWhole = () => {
+    aiTargetIdRef.current = null;
+    setAiPrompt(
+      [intro.title, intro.description].filter(Boolean).join("\n").trim() || "",
+    );
+    setAiOpen(true);
+  };
+
+  const handleAIComplete = (urls: string[]) => {
+    if (urls.length === 0) return;
+    const targetId = aiTargetIdRef.current;
+    const list = blocks.slice();
+    let insertAfter = targetId ? list.findIndex((b) => b.id === targetId) : list.length - 1;
+    if (insertAfter < 0) insertAfter = list.length - 1;
+
+    // Try to fill an adjacent image_sm block first (limited to 9 each).
+    const next = list[insertAfter + 1];
+    if (next && next.type === "image_sm" && next.urls.length < MAX_SMALL_IMAGES) {
+      const room = MAX_SMALL_IMAGES - next.urls.length;
+      const take = urls.slice(0, room);
+      const rest = urls.slice(room);
+      list[insertAfter + 1] = { ...next, urls: [...next.urls, ...take] };
+      if (rest.length > 0) {
+        const block: IntroBlock =
+          rest.length === 1
+            ? { id: genId(), type: "image_lg", url: rest[0] }
+            : { id: genId(), type: "image_sm", urls: rest.slice(0, MAX_SMALL_IMAGES) };
+        list.splice(insertAfter + 2, 0, block);
+      }
+    } else {
+      const block: IntroBlock =
+        urls.length === 1
+          ? { id: genId(), type: "image_lg", url: urls[0] }
+          : { id: genId(), type: "image_sm", urls: urls.slice(0, MAX_SMALL_IMAGES) };
+      list.splice(insertAfter + 1, 0, block);
+    }
+    setBlocks(list);
+  };
+
+
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
       {/* hidden file inputs */}
@@ -293,6 +349,15 @@ export function IntroTab({
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
+            {projectId && (
+              <button
+                onClick={openAIForWhole}
+                className="flex items-center gap-1 rounded-md border border-[#07c160] bg-[#07c160]/10 px-2 py-0.5 text-[11px] text-[#07c160] hover:bg-[#07c160]/15"
+              >
+                <Sparkles className="h-3 w-3" />
+                AI 生图
+              </button>
+            )}
             <button
               onClick={() => toast.info("素材导入：即将上线")}
               className="rounded-md border border-[#07c160] px-2 py-0.5 text-[11px] text-[#07c160]"
@@ -354,6 +419,11 @@ export function IntroTab({
                   if (dragId) reorder(dragId, b.id);
                   setDragId(null);
                 }}
+                onAIGenerate={
+                  projectId && b.type === "text"
+                    ? () => openAIForBlock(b.id, b.text)
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -379,6 +449,16 @@ export function IntroTab({
           })}
         </div>
       </div>
+
+      {projectId && (
+        <AIGenerateImageDialog
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          projectId={projectId}
+          defaultPrompt={aiPrompt}
+          onComplete={handleAIComplete}
+        />
+      )}
     </div>
   );
 }
@@ -404,6 +484,7 @@ function BlockCard({
   onDragStart,
   onDragEnd,
   onDropOn,
+  onAIGenerate,
 }: {
   block: IntroBlock;
   isFirst: boolean;
@@ -420,6 +501,7 @@ function BlockCard({
   onDragStart: () => void;
   onDragEnd: () => void;
   onDropOn: () => void;
+  onAIGenerate?: () => void;
 }) {
   const [draggable, setDraggable] = useState(false);
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
@@ -457,6 +539,17 @@ function BlockCard({
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
+          {onAIGenerate && (
+            <button
+              type="button"
+              onClick={onAIGenerate}
+              title="根据文字 AI 生图"
+              className="flex items-center gap-0.5 rounded-md border border-[#07c160] bg-[#07c160]/10 px-1.5 py-0.5 text-[11px] text-[#07c160] hover:bg-[#07c160]/20"
+            >
+              <Sparkles className="h-3 w-3" />
+              生图
+            </button>
+          )}
           <MiniBtn onClick={() => onMove("up")} disabled={isFirst}>上移</MiniBtn>
           <MiniBtn onClick={() => onMove("down")} disabled={isLast}>下移</MiniBtn>
           <MiniBtn onClick={() => onMove("top")} disabled={isFirst}>置顶</MiniBtn>

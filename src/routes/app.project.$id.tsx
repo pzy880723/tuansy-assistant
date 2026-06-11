@@ -1139,7 +1139,7 @@ function PreviewPane({
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
           {tab === "intro" && (
             <div className="space-y-2">
-              <IntroTab intro={intro} onChange={setIntro} />
+              <IntroTab intro={intro} onChange={setIntro} projectId={projectId} />
               <div className="px-2 pb-3">
                 <ProductEntryCard count={skus.length} />
               </div>

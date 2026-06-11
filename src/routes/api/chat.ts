@@ -375,6 +375,62 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
               }),
               execute: async (input) => ({ ok: true, ...input }),
             }),
+            generate_product_images: tool({
+              description:
+                "根据中文场景描述用 AI 生成商品配图（1-9 张），自动插入到介绍 blocks 中。用户说『给我配图/生成图片/做几张场景图』时调用。referenceImages 传聊天中用户已上传的图 URL，可让 AI 保持商品一致性。",
+              inputSchema: z.object({
+                prompt: z
+                  .string()
+                  .min(2)
+                  .max(800)
+                  .describe("中文场景描述，越具体越好，例如『清晨阳光下的草莓园特写，水珠晶莹』"),
+                count: z
+                  .number()
+                  .int()
+                  .min(1)
+                  .max(9)
+                  .describe("生成张数，建议 1/3/6/9，单图用 image_lg，多图用 image_sm 九宫格"),
+                referenceImages: z
+                  .array(z.string().url())
+                  .max(3)
+                  .optional()
+                  .describe("参考图 URL 数组，可让 AI 保持商品外观一致；通常传用户在聊天中上传的图"),
+              }),
+              execute: async ({ prompt, count, referenceImages }) => {
+                try {
+                  const { generateImagesBatch, uploadGeneratedImage } = await import(
+                    "@/lib/image-gen.server"
+                  );
+                  const b64s = await generateImagesBatch(
+                    key,
+                    { prompt, referenceImages },
+                    count,
+                  );
+                  const urls = await Promise.all(
+                    b64s.map((b) => uploadGeneratedImage(b, userId, projectId)),
+                  );
+                  if (urls.length === 0) return { ok: false, error: "没有生成任何图片" };
+
+                  // Append a new block to intro.blocks
+                  const currentBlocks = Array.isArray((intro as { blocks?: unknown }).blocks)
+                    ? ((intro as { blocks?: unknown[] }).blocks as Array<Record<string, unknown>>)
+                    : [];
+                  const newBlock =
+                    urls.length === 1
+                      ? { id: genBlockId(), type: "image_lg" as const, url: urls[0] }
+                      : { id: genBlockId(), type: "image_sm" as const, urls: urls.slice(0, 9) };
+                  const nextIntro = { ...intro, blocks: [...currentBlocks, newBlock] };
+                  const { error } = await supabaseAdmin
+                    .from("projects")
+                    .update({ intro: nextIntro as never })
+                    .eq("id", projectId);
+                  if (error) return { ok: false, error: error.message };
+                  return { ok: true, urls, count: urls.length };
+                } catch (e) {
+                  return { ok: false, error: (e as Error).message };
+                }
+              },
+            }),
             suggest_next: tool({
               description:
                 "在回复末尾给出 2 到 4 条用户下一步可能想做的快速操作建议，每条不超过 18 个汉字。每次回复都要调用一次。",
