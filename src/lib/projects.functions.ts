@@ -53,12 +53,12 @@ export const startProject = createServerFn({ method: "POST" })
 
     const OutputSchema = z.object({
       category: z.enum(CATEGORIES),
-      projectName: z.string().min(2).max(18),
-      productName: z.string().min(2).max(30),
-      tags: z.array(z.string().min(1).max(10)).min(2).max(4),
-      seedAssistantText: z.string().min(10).max(260),
-      autoUserPrompt: z.string().max(200).nullable(),
-      suggestNext: z.array(z.string().min(2).max(18)).min(2).max(4),
+      projectName: z.string().min(2).max(60).transform((s) => s.slice(0, 18)),
+      productName: z.string().min(2).max(120).transform((s) => s.slice(0, 30)),
+      tags: z.array(z.string().min(1).max(20).transform((s) => s.slice(0, 10))).min(1).max(6),
+      seedAssistantText: z.string().min(10).max(600).transform((s) => s.slice(0, 260)),
+      autoUserPrompt: z.string().max(400).nullable().transform((s) => (s ? s.slice(0, 200) : s)),
+      suggestNext: z.array(z.string().min(2).max(40).transform((s) => s.slice(0, 18))).min(1).max(6),
     });
 
     const imageHint =
