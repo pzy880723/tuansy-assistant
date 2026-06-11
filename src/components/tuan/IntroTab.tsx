@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Image as ImageIcon,
   LayoutGrid,
@@ -11,6 +12,7 @@ import {
   Search,
   Plus,
   Sparkles,
+  Play,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
@@ -233,14 +235,13 @@ export function IntroTab({
     else next.splice(Math.min(next.length, i + 1), 0, item);
     setBlocks(next);
   };
-  const reorder = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
-    const src = blocks.findIndex((b) => b.id === sourceId);
-    const dst = blocks.findIndex((b) => b.id === targetId);
-    if (src < 0 || dst < 0) return;
+  const moveToIndex = (id: string, index: number) => {
+    const src = blocks.findIndex((b) => b.id === id);
+    if (src < 0) return;
     const next = blocks.slice();
     const [item] = next.splice(src, 1);
-    next.splice(dst, 0, item);
+    const dst = src < index ? index - 1 : index;
+    next.splice(Math.max(0, Math.min(next.length, dst)), 0, item);
     setBlocks(next);
   };
   const updateText = (id: string, text: string) => {
@@ -253,7 +254,8 @@ export function IntroTab({
     setEditingId((cur) => (cur === id ? null : cur));
   };
 
-  const [dragId, setDragId] = useState<string | null>(null);
+  // Reorder overlay state
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
 
   const openAIForBlock = (id: string, fallback: string) => {
     aiTargetIdRef.current = id;
@@ -373,22 +375,12 @@ export function IntroTab({
           </div>
         </div>
 
-        <div className="border-b border-[#f0f1f2] py-2">
+        <div className={blocks.length > 0 ? "border-b border-[#f0f1f2] py-2" : "py-2"}>
           <AutoTextarea
             value={intro.title ?? ""}
             onChange={(v) => onChange({ ...intro, title: v })}
             placeholder="请输入团购活动标题"
             className="text-[15px] font-semibold text-[#1a1a1a] placeholder:font-normal placeholder:text-[#c8c9cc]"
-          />
-        </div>
-        <div className="py-2">
-          <InlineText
-            multiline
-            rows={3}
-            value={intro.description ?? ""}
-            onChange={(v) => onChange({ ...intro, description: v })}
-            placeholder="请输入团购活动内容"
-            className="text-[13px] text-[#323233]"
           />
         </div>
 
@@ -400,7 +392,7 @@ export function IntroTab({
                 block={b}
                 isFirst={i === 0}
                 isLast={i === blocks.length - 1}
-                isDragging={dragId === b.id}
+                isReordering={reorderingId === b.id}
                 isEditing={editingId === b.id}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
@@ -413,12 +405,7 @@ export function IntroTab({
                 onChangeText={(v) => updateText(b.id, v)}
                 onFinishEditText={(v) => finishEditing(b.id, v)}
                 onRemoveSmallImage={(idx) => removeSmallImage(b.id, idx)}
-                onDragStart={() => setDragId(b.id)}
-                onDragEnd={() => setDragId(null)}
-                onDropOn={() => {
-                  if (dragId) reorder(dragId, b.id);
-                  setDragId(null);
-                }}
+                onStartReorder={() => setReorderingId(b.id)}
                 onAIGenerate={
                   projectId && b.type === "text"
                     ? () => openAIForBlock(b.id, b.text)
@@ -430,17 +417,32 @@ export function IntroTab({
         )}
 
         {/* Block tools */}
-        <div className="mt-4 grid grid-cols-4 gap-2">
+        <div
+          className={
+            blocks.length === 0
+              ? "mt-2 grid grid-cols-4 gap-2 py-6"
+              : "mt-4 grid grid-cols-4 gap-2"
+          }
+        >
           {BLOCK_TOOLS.map((tool) => {
             const Icon = tool.icon;
+            const big = blocks.length === 0;
             return (
               <button
                 key={tool.label}
                 onClick={() => onToolClick(tool.type)}
-                className="group flex flex-col items-center gap-1 rounded-lg p-2 text-[11px] text-[#646566] transition-all duration-150 hover:bg-[#07c160]/10 hover:text-[#07c160] hover:scale-[1.03] active:scale-[0.97]"
+                className={
+                  "group flex flex-col items-center rounded-lg transition-all duration-150 hover:bg-[#07c160]/10 hover:text-[#07c160] hover:scale-[1.03] active:scale-[0.97] " +
+                  (big
+                    ? "gap-2 p-4 text-[13px] text-[#646566]"
+                    : "gap-1 p-2 text-[11px] text-[#646566]")
+                }
               >
                 <Icon
-                  className="h-5 w-5 transition-colors group-hover:text-[#07c160]"
+                  className={
+                    "transition-colors group-hover:text-[#07c160] " +
+                    (big ? "h-7 w-7" : "h-5 w-5")
+                  }
                   strokeWidth={1.5}
                 />
                 {tool.label}
@@ -449,6 +451,19 @@ export function IntroTab({
           })}
         </div>
       </div>
+
+      {reorderingId && (
+        <ReorderOverlay
+          blocks={blocks}
+          draggingId={reorderingId}
+          onCommit={(index) => {
+            moveToIndex(reorderingId, index);
+            setReorderingId(null);
+          }}
+          onCancel={() => setReorderingId(null)}
+        />
+      )}
+
 
       {projectId && (
         <AIGenerateImageDialog
@@ -472,7 +487,7 @@ function BlockCard({
   block,
   isFirst,
   isLast,
-  isDragging,
+  isReordering,
   isEditing,
   onMove,
   onRemove,
@@ -481,15 +496,13 @@ function BlockCard({
   onChangeText,
   onFinishEditText,
   onRemoveSmallImage,
-  onDragStart,
-  onDragEnd,
-  onDropOn,
+  onStartReorder,
   onAIGenerate,
 }: {
   block: IntroBlock;
   isFirst: boolean;
   isLast: boolean;
-  isDragging: boolean;
+  isReordering: boolean;
   isEditing: boolean;
   onMove: (dir: "up" | "down" | "top") => void;
   onRemove: () => void;
@@ -498,33 +511,16 @@ function BlockCard({
   onChangeText: (v: string) => void;
   onFinishEditText: (v: string) => void;
   onRemoveSmallImage: (idx: number) => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDropOn: () => void;
+  onStartReorder: () => void;
   onAIGenerate?: () => void;
 }) {
-  const [draggable, setDraggable] = useState(false);
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
 
   return (
     <div
-      draggable={draggable}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        onDragStart();
-      }}
-      onDragEnd={() => {
-        setDraggable(false);
-        onDragEnd();
-      }}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDropOn();
-      }}
       className={
         "border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0 " +
-        (isDragging ? "opacity-50" : "")
+        (isReordering ? "opacity-50" : "")
       }
     >
       <div className="mb-1.5 flex items-center justify-between">
@@ -532,13 +528,13 @@ function BlockCard({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onMouseDown={() => setDraggable(true)}
-            onTouchStart={() => setDraggable(true)}
+            onClick={onStartReorder}
             title="拖动排序"
             className="cursor-grab rounded-md border border-[#dcdee0] bg-white px-1.5 py-0.5 text-[#646566] hover:border-[#07c160] hover:text-[#07c160] active:cursor-grabbing"
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
+
           {onAIGenerate && (
             <button
               type="button"
@@ -688,3 +684,166 @@ export function ProductEntryCard({ count }: { count: number }) {
     </div>
   );
 }
+
+function ReorderOverlay({
+  blocks,
+  draggingId,
+  onCommit,
+  onCancel,
+}: {
+  blocks: IntroBlock[];
+  draggingId: string;
+  onCommit: (index: number) => void;
+  onCancel: () => void;
+}) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const hoverRef = useRef<number | null>(null);
+  hoverRef.current = hoverIndex;
+
+  useEffect(() => {
+    const onUp = () => {
+      const idx = hoverRef.current;
+      if (idx === null) onCancel();
+      else onCommit(idx);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      const el = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
+      const slot = el?.closest<HTMLElement>("[data-slot-index]");
+      if (slot) {
+        const i = Number(slot.dataset.slotIndex);
+        setHoverIndex(Number.isFinite(i) ? i : null);
+      } else {
+        setHoverIndex(null);
+      }
+    };
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onCommit, onCancel]);
+
+  const currentIndex = blocks.findIndex((b) => b.id === draggingId);
+
+  const slot = (index: number) => {
+    const active = hoverIndex === index;
+    const isCurrent = index === currentIndex || index === currentIndex + 1;
+    return (
+      <div
+        data-slot-index={index}
+        onMouseEnter={() => setHoverIndex(index)}
+        onMouseLeave={() => setHoverIndex((cur) => (cur === index ? null : cur))}
+        className="-my-1 flex h-3 cursor-pointer items-center"
+      >
+        <div
+          className={
+            "h-[2px] w-full rounded-full transition-all " +
+            (active
+              ? "bg-[#07c160] shadow-[0_0_0_2px_rgba(7,193,96,0.18)]"
+              : isCurrent
+              ? "bg-[#07c160]/30"
+              : "bg-[#e8e9eb]")
+          }
+        />
+      </div>
+    );
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div
+        className="flex max-h-[80vh] w-[300px] flex-col rounded-2xl bg-white p-3 shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center justify-between px-1">
+          <div className="text-[13px] font-medium text-[#1a1a1a]">拖到目标位置松开</div>
+          <button
+            onClick={onCancel}
+            className="rounded-md p-1 text-[#969799] hover:bg-[#f4f5f7]"
+            title="取消"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto pr-1">
+          {blocks.length === 0 ? (
+            <div className="py-8 text-center text-[12px] text-[#969799]">暂无模块</div>
+          ) : (
+            <>
+              {slot(0)}
+              {blocks.map((b, i) => (
+                <div key={b.id}>
+                  <ThumbBlock block={b} highlighted={b.id === draggingId} />
+                  {slot(i + 1)}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ThumbBlock({ block, highlighted }: { block: IntroBlock; highlighted: boolean }) {
+  const border = highlighted ? "border-[#07c160] ring-2 ring-[#07c160]/30" : "border-[#f0f1f2]";
+  return (
+    <div className={`relative rounded-md border ${border} bg-white p-1.5`}>
+      {highlighted && (
+        <span className="absolute -top-1.5 left-1.5 rounded bg-[#07c160] px-1 py-px text-[9px] font-medium leading-none text-white">
+          拖动中
+        </span>
+      )}
+      {block.type === "text" && (
+        <div className="truncate text-[11px] text-[#646566]">
+          {block.text?.split("\n")[0] || <span className="text-[#c8c9cc]">（空文字）</span>}
+        </div>
+      )}
+      {block.type === "image_lg" && (
+        block.url ? (
+          <img src={block.url} alt="" className="block aspect-[16/10] w-full rounded object-cover" loading="lazy" />
+        ) : (
+          <div className="grid aspect-[16/10] w-full place-items-center rounded bg-[#fafbfc] text-[10px] text-[#c8c9cc]">大图</div>
+        )
+      )}
+      {block.type === "image_sm" && (
+        <div className="grid grid-cols-3 gap-0.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="aspect-square overflow-hidden rounded bg-[#fafbfc]">
+              {block.urls[i] ? (
+                <img src={block.urls[i]} alt="" className="h-full w-full object-cover" loading="lazy" />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+      {block.type === "video" && (
+        <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
+          {block.url ? (
+            <video src={block.url} className="h-full w-full object-cover" muted />
+          ) : null}
+          <div className="absolute inset-0 grid place-items-center">
+            <Play className="h-5 w-5 text-white/85" fill="currentColor" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
