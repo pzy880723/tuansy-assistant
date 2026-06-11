@@ -555,3 +555,43 @@ function BlockCard({
     </div>
   );
 }
+
+export function ProductEntryCard({ count }: { count: number }) {
+  return (
+    <div className="rounded-xl bg-white p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <div className="text-[15px] font-semibold text-[#1a1a1a]">团购商品</div>
+          <button
+            onClick={() => toast.info("切换旧版：即将上线")}
+            className="flex items-center gap-0.5 text-[11px] text-[#969799]"
+          >
+            <ArrowLeftRight className="h-3 w-3" />
+            切换旧版
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => toast.info("素材导入：即将上线")}
+            className="rounded-md border border-[#07c160] px-2 py-0.5 text-[11px] text-[#07c160]"
+          >
+            素材导入
+          </button>
+          <button
+            onClick={() => toast.info("从商品库导入：即将上线")}
+            className="rounded-md border border-[#07c160] px-2 py-0.5 text-[11px] text-[#07c160]"
+          >
+            从商品库导入
+          </button>
+        </div>
+      </div>
+      <div className="mb-2 flex h-9 items-center gap-1.5 rounded-md bg-[#f4f5f7] px-3 text-[12px] text-[#c8c9cc]">
+        <Search className="h-3.5 w-3.5" />
+        搜索商品名称、规格
+      </div>
+      <div className="flex h-10 items-center justify-center rounded-md border border-[#07c160] text-[13px] text-[#07c160]">
+        <Plus className="mr-1 h-4 w-4" /> 添加商品 {count > 0 && `（已 ${count}）`}
+      </div>
+    </div>
+  );
+}
