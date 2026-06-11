@@ -453,6 +453,7 @@ function ChatPane({
             </div>
           </PopoverContent>
         </Popover>
+        </div>
       </div>
 
 
