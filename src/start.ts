@@ -2,6 +2,7 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { readAuthToken } from "@/lib/use-current-user";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -18,7 +19,12 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+const attachTuanSession = createMiddleware({ type: "function" }).client(async ({ next }) => {
+  const token = readAuthToken();
+  return next({ headers: token ? { "x-tuan-session": token } : undefined });
+});
+
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [attachSupabaseAuth, attachTuanSession],
   requestMiddleware: [errorMiddleware],
 }));
