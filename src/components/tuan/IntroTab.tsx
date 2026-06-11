@@ -375,22 +375,12 @@ export function IntroTab({
           </div>
         </div>
 
-        <div className="border-b border-[#f0f1f2] py-2">
+        <div className={blocks.length > 0 ? "border-b border-[#f0f1f2] py-2" : "py-2"}>
           <AutoTextarea
             value={intro.title ?? ""}
             onChange={(v) => onChange({ ...intro, title: v })}
             placeholder="请输入团购活动标题"
             className="text-[15px] font-semibold text-[#1a1a1a] placeholder:font-normal placeholder:text-[#c8c9cc]"
-          />
-        </div>
-        <div className="py-2">
-          <InlineText
-            multiline
-            rows={3}
-            value={intro.description ?? ""}
-            onChange={(v) => onChange({ ...intro, description: v })}
-            placeholder="请输入团购活动内容"
-            className="text-[13px] text-[#323233]"
           />
         </div>
 
@@ -402,7 +392,7 @@ export function IntroTab({
                 block={b}
                 isFirst={i === 0}
                 isLast={i === blocks.length - 1}
-                isDragging={dragId === b.id}
+                isReordering={reorderingId === b.id}
                 isEditing={editingId === b.id}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
@@ -415,12 +405,7 @@ export function IntroTab({
                 onChangeText={(v) => updateText(b.id, v)}
                 onFinishEditText={(v) => finishEditing(b.id, v)}
                 onRemoveSmallImage={(idx) => removeSmallImage(b.id, idx)}
-                onDragStart={() => setDragId(b.id)}
-                onDragEnd={() => setDragId(null)}
-                onDropOn={() => {
-                  if (dragId) reorder(dragId, b.id);
-                  setDragId(null);
-                }}
+                onStartReorder={() => setReorderingId(b.id)}
                 onAIGenerate={
                   projectId && b.type === "text"
                     ? () => openAIForBlock(b.id, b.text)
@@ -432,17 +417,32 @@ export function IntroTab({
         )}
 
         {/* Block tools */}
-        <div className="mt-4 grid grid-cols-4 gap-2">
+        <div
+          className={
+            blocks.length === 0
+              ? "mt-2 grid grid-cols-4 gap-2 py-6"
+              : "mt-4 grid grid-cols-4 gap-2"
+          }
+        >
           {BLOCK_TOOLS.map((tool) => {
             const Icon = tool.icon;
+            const big = blocks.length === 0;
             return (
               <button
                 key={tool.label}
                 onClick={() => onToolClick(tool.type)}
-                className="group flex flex-col items-center gap-1 rounded-lg p-2 text-[11px] text-[#646566] transition-all duration-150 hover:bg-[#07c160]/10 hover:text-[#07c160] hover:scale-[1.03] active:scale-[0.97]"
+                className={
+                  "group flex flex-col items-center rounded-lg transition-all duration-150 hover:bg-[#07c160]/10 hover:text-[#07c160] hover:scale-[1.03] active:scale-[0.97] " +
+                  (big
+                    ? "gap-2 p-4 text-[13px] text-[#646566]"
+                    : "gap-1 p-2 text-[11px] text-[#646566]")
+                }
               >
                 <Icon
-                  className="h-5 w-5 transition-colors group-hover:text-[#07c160]"
+                  className={
+                    "transition-colors group-hover:text-[#07c160] " +
+                    (big ? "h-7 w-7" : "h-5 w-5")
+                  }
                   strokeWidth={1.5}
                 />
                 {tool.label}
@@ -451,6 +451,19 @@ export function IntroTab({
           })}
         </div>
       </div>
+
+      {reorderingId && (
+        <ReorderOverlay
+          blocks={blocks}
+          draggingId={reorderingId}
+          onCommit={(index) => {
+            moveToIndex(reorderingId, index);
+            setReorderingId(null);
+          }}
+          onCancel={() => setReorderingId(null)}
+        />
+      )}
+
 
       {projectId && (
         <AIGenerateImageDialog
