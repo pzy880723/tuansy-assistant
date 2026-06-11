@@ -176,32 +176,43 @@ export const generateModulesFromText = createServerFn({ method: "POST" })
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
     const gateway = createLovableAiGatewayProvider(key);
 
-    const Schema = z.object({
-      modules: z.array(
-        z.object({
-          type: z.enum(MODULE_TYPES),
-          label: z.string(),
-          guidance: z.string(),
-        }),
-      ),
+    const ItemSchema = z.object({
+      type: z.enum(MODULE_TYPES),
+      label: z.string(),
+      guidance: z.string(),
     });
 
-    const { output } = await generateText({
+    const { text } = await generateText({
       model: gateway("google/gemini-3-flash-preview"),
-      output: Output.object({ schema: Schema }),
+      maxOutputTokens: 4000,
       prompt: `你在帮一位团长设计「文案撰写逻辑」模板，名称叫「${data.name}」。
 团长用自然语言描述了他写文案想遵守的整套思路：
 """
 ${data.description}
 """
 
-请把这套思路拆成有序的模块清单，按真实展示顺序排列。每个模块包含 type、label（不超过 12 字的模块名）和 guidance（这一段具体写什么、怎么写的指引，60-200 字，纯文本，无 Markdown）。
-请把这套思路拆成有序的模块清单（3-15 个），按真实展示顺序排列。每个模块包含 type、label（不超过 12 字的模块名）和 guidance（这一段具体写什么、怎么写的指引，60-200 字，纯文本，无 Markdown）。
+把这套思路拆成有序的模块清单（3-15 个）。每个模块包含 type、label（不超过 12 字）、guidance（60-200 字，纯文本无 Markdown）。
 ${MODULE_TYPE_HINT}
-默认骨架可以参考五步法：标题 → 痛点共鸣段 → 品牌/背书段 → 卖点拆解段（可拆成多段，配大图或九宫格） → 款式参数段；但要忠实于团长描述里的特殊要求与品类侧重。`,
+默认骨架可参考：标题 → 痛点 → 品牌背书 → 卖点拆解 → 款式参数；忠实于团长描述的特殊要求与品类侧重。
+
+只输出一个 JSON 对象，形如：
+{"modules":[{"type":"title","label":"标题","guidance":"..."}, ...]}
+不要包裹 \`\`\` 代码块，不要任何额外文字。`,
     });
-    const out = output as z.infer<typeof Schema>;
-    const trimmed = out.modules
+
+    // Tolerant JSON extraction
+    let raw = text.trim();
+    raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    const objStart = raw.indexOf("{");
+    const objEnd = raw.lastIndexOf("}");
+    if (objStart === -1 || objEnd <= objStart) {
+      throw new Error("AI 返回内容无法解析为 JSON，请重试或简化描述");
+    }
+    const parsed = JSON.parse(raw.slice(objStart, objEnd + 1)) as {
+      modules?: unknown;
+    };
+    const list = z.array(ItemSchema).parse(parsed.modules ?? []);
+    const trimmed = list
       .map((m) => ({
         type: m.type,
         label: (m.label ?? "").trim().slice(0, 40) || "模块",
