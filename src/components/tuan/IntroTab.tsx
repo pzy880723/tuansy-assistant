@@ -529,6 +529,17 @@ function BlockCard({
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
+          {onAIGenerate && (
+            <button
+              type="button"
+              onClick={onAIGenerate}
+              title="根据文字 AI 生图"
+              className="flex items-center gap-0.5 rounded-md border border-[#07c160] bg-[#07c160]/10 px-1.5 py-0.5 text-[11px] text-[#07c160] hover:bg-[#07c160]/20"
+            >
+              <Sparkles className="h-3 w-3" />
+              生图
+            </button>
+          )}
           <MiniBtn onClick={() => onMove("up")} disabled={isFirst}>上移</MiniBtn>
           <MiniBtn onClick={() => onMove("down")} disabled={isLast}>下移</MiniBtn>
           <MiniBtn onClick={() => onMove("top")} disabled={isFirst}>置顶</MiniBtn>
