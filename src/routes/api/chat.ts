@@ -92,48 +92,70 @@ export const Route = createFileRoute("/api/chat")({
           is_active: boolean;
         };
         let activeLogic: LogicRow | null = null;
-        const { data: allLogics } = await supabaseAdmin
-          .from("copy_logics")
-          .select("id, name, description, modules, is_active")
-          .eq("user_id", userId);
-        const logics = (allLogics ?? []) as LogicRow[];
-        if (body.copyLogicId) {
-          activeLogic = logics.find((l) => l.id === body.copyLogicId) ?? null;
-        } else if (logics.length > 0) {
-          const fallback = logics.find((l) => l.is_active) ?? logics[0];
-          if (logics.length === 1) {
-            activeLogic = fallback;
-          } else {
-            try {
-              const ids = logics.map((l) => l.id);
-              const matcherGateway = createLovableAiGatewayProvider(key);
-              const productTitle =
-                (product.title as string | undefined) ??
-                (project?.name as string | undefined) ??
-                "";
-              const candidates = logics
-                .map(
-                  (l, i) =>
-                    `${i + 1}. id=${l.id} | 名称：${l.name} | 简介：${(l.description ?? "").slice(0, 200)} | 模块：${(l.modules ?? []).map((m) => m.label).join("/")}`,
-                )
-                .join("\n");
-              const { Output: MatchOutput, generateText: matchGen } = await import("ai");
-              const matched = await matchGen({
-                model: matcherGateway("google/gemini-3-flash-preview"),
-                output: MatchOutput.object({
-                  schema: z.object({
-                    id: z.enum(["__none__", ...ids] as [string, ...string[]]),
-                  }),
-                }),
-                prompt: `从下列文案逻辑中挑一条最适合当前商品；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选：\n${candidates}`,
-              });
-              const picked = (matched.output as { id?: string } | undefined)?.id;
-              activeLogic =
-                picked && picked !== "__none__"
-                  ? (logics.find((l) => l.id === picked) ?? fallback)
-                  : fallback;
-            } catch {
+        const presetPrefix = "preset:";
+        if (body.copyLogicId && body.copyLogicId.startsWith(presetPrefix)) {
+          const presetId = body.copyLogicId.slice(presetPrefix.length);
+          const { data: preset } = await supabaseAdmin
+            .from("preset_copy_logics")
+            .select("id, name, description, modules, is_published")
+            .eq("id", presetId)
+            .eq("is_published", true)
+            .maybeSingle();
+          if (preset) {
+            activeLogic = {
+              id: preset.id,
+              name: `${preset.name}（标准）`,
+              description: preset.description,
+              modules: preset.modules as LogicRow["modules"],
+              is_active: true,
+            };
+          }
+        }
+        if (!activeLogic) {
+          const { data: allLogics } = await supabaseAdmin
+            .from("copy_logics")
+            .select("id, name, description, modules, is_active")
+            .eq("user_id", userId);
+          const logics = (allLogics ?? []) as LogicRow[];
+          if (body.copyLogicId) {
+            activeLogic = logics.find((l) => l.id === body.copyLogicId) ?? null;
+          }
+          if (!activeLogic && logics.length > 0) {
+            const fallback = logics.find((l) => l.is_active) ?? logics[0];
+            if (logics.length === 1) {
               activeLogic = fallback;
+            } else {
+              try {
+                const ids = logics.map((l) => l.id);
+                const matcherGateway = createLovableAiGatewayProvider(key);
+                const productTitle =
+                  (product.title as string | undefined) ??
+                  (project?.name as string | undefined) ??
+                  "";
+                const candidates = logics
+                  .map(
+                    (l, i) =>
+                      `${i + 1}. id=${l.id} | 名称：${l.name} | 简介：${(l.description ?? "").slice(0, 200)} | 模块：${(l.modules ?? []).map((m) => m.label).join("/")}`,
+                  )
+                  .join("\n");
+                const { Output: MatchOutput, generateText: matchGen } = await import("ai");
+                const matched = await matchGen({
+                  model: matcherGateway("google/gemini-3-flash-preview"),
+                  output: MatchOutput.object({
+                    schema: z.object({
+                      id: z.enum(["__none__", ...ids] as [string, ...string[]]),
+                    }),
+                  }),
+                  prompt: `从下列文案逻辑中挑一条最适合当前商品；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选：\n${candidates}`,
+                });
+                const picked = (matched.output as { id?: string } | undefined)?.id;
+                activeLogic =
+                  picked && picked !== "__none__"
+                    ? (logics.find((l) => l.id === picked) ?? fallback)
+                    : fallback;
+              } catch {
+                activeLogic = fallback;
+              }
             }
           }
         }
