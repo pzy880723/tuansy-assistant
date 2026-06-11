@@ -458,66 +458,117 @@ export function AIGenerateImageDialog({
   );
 }
 
-/** Tech-style animated loading placeholder. */
+/** Siri / Apple-Intelligence style liquid loader. */
 function TechLoader() {
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-[#0f1c2c] via-[#0a1220] to-[#0f1c2c]">
-      {/* grid pattern */}
-      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(7,193,96,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(7,193,96,0.4)_1px,transparent_1px)] [background-size:18px_18px]" />
-      {/* shimmer */}
-      <div className="tech-shimmer absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-[#07c160]/25 to-transparent" />
-      {/* rings */}
+    <div
+      className="relative h-full w-full overflow-hidden"
+      style={{ background: "oklch(0.99 0.005 270)" }}
+    >
+      {/* Liquid color blobs */}
+      <div className="siri-blob siri-blob-a" />
+      <div className="siri-blob siri-blob-b" />
+      <div className="siri-blob siri-blob-c" />
+
+      {/* Rainbow conic ring (blurred halo) */}
       <div className="absolute inset-0 grid place-items-center">
-        <div className="relative h-14 w-14">
-          <svg
-            viewBox="0 0 56 56"
-            className="absolute inset-0 h-full w-full animate-spin text-[#07c160]"
-            style={{ animationDuration: "2.4s" }}
-          >
-            <circle
-              cx="28"
-              cy="28"
-              r="24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeDasharray="6 10"
-              opacity="0.7"
-            />
-          </svg>
-          <svg
-            viewBox="0 0 56 56"
-            className="absolute inset-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] animate-spin text-[#3ee08a]"
-            style={{ animationDuration: "1.6s", animationDirection: "reverse" }}
-          >
-            <circle
-              cx="28"
-              cy="28"
-              r="20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeDasharray="3 6"
-              opacity="0.8"
-            />
-          </svg>
+        <div className="relative h-16 w-16">
           <div
-            className="absolute inset-0 grid place-items-center text-[#07c160]"
-            style={{ filter: "drop-shadow(0 0 6px rgba(7,193,96,0.85))" }}
-          >
-            <Sparkles className="h-5 w-5" />
+            className="absolute inset-0 rounded-full siri-spin"
+            style={{
+              background:
+                "conic-gradient(from 0deg, #ff6ec7, #b388ff, #6ec1ff, #4cc9f0, #ffd166, #ff6ec7)",
+              filter: "blur(10px) saturate(160%)",
+              opacity: 0.9,
+            }}
+          />
+          {/* Crisp inner ring (counter-spin) */}
+          <div
+            className="absolute inset-1.5 rounded-full siri-spin-rev"
+            style={{
+              background:
+                "conic-gradient(from 180deg, transparent 0deg, #ffffffcc 20deg, transparent 80deg, #ffffff99 200deg, transparent 260deg)",
+              mask: "radial-gradient(circle, transparent 58%, #000 60%)",
+              WebkitMask: "radial-gradient(circle, transparent 58%, #000 60%)",
+            }}
+          />
+          {/* Breathing core */}
+          <div className="absolute inset-0 grid place-items-center">
+            <div
+              className="h-3 w-3 rounded-full bg-white siri-breathe"
+              style={{ boxShadow: "0 0 24px 6px rgba(255,255,255,0.9), 0 0 8px rgba(170,120,255,0.7)" }}
+            />
           </div>
         </div>
       </div>
-      <div className="absolute inset-x-0 bottom-1.5 text-center text-[10px] tracking-widest text-[#07c160]/80">
-        AI 绘制中…
+
+      {/* Soft noise overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+        }}
+      />
+
+      {/* Label */}
+      <div
+        className="absolute inset-x-0 bottom-2 text-center text-[10px] font-light tracking-[0.3em]"
+        style={{ color: "rgba(60, 40, 90, 0.55)" }}
+      >
+        DESIGNING
       </div>
+
       <style>{`
-        @keyframes tech-shimmer-anim {
-          0% { transform: translateX(0) skewX(-12deg); }
-          100% { transform: translateX(400%) skewX(-12deg); }
+        .siri-blob {
+          position: absolute;
+          width: 75%;
+          height: 75%;
+          border-radius: 9999px;
+          filter: blur(34px) saturate(150%);
+          mix-blend-mode: screen;
+          opacity: 0.95;
+          will-change: transform;
         }
-        .tech-shimmer { animation: tech-shimmer-anim 1.8s linear infinite; }
+        .siri-blob-a {
+          left: -15%;
+          top: -10%;
+          background: radial-gradient(circle, #ff6ec7 0%, transparent 60%);
+          animation: siri-blob-a 9s ease-in-out infinite;
+        }
+        .siri-blob-b {
+          right: -20%;
+          top: 5%;
+          background: radial-gradient(circle, #8a5cf6 0%, transparent 60%);
+          animation: siri-blob-b 11s ease-in-out infinite;
+        }
+        .siri-blob-c {
+          left: 10%;
+          bottom: -25%;
+          background: radial-gradient(circle, #4cc9f0 0%, transparent 60%);
+          animation: siri-blob-c 10s ease-in-out infinite;
+        }
+        @keyframes siri-blob-a {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(20%, 15%) scale(1.15); }
+        }
+        @keyframes siri-blob-b {
+          0%, 100% { transform: translate(0, 0) scale(1.05); }
+          50% { transform: translate(-15%, 20%) scale(0.95); }
+        }
+        @keyframes siri-blob-c {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(15%, -20%) scale(1.1); }
+        }
+        @keyframes siri-spin-kf { to { transform: rotate(360deg); } }
+        @keyframes siri-spin-rev-kf { to { transform: rotate(-360deg); } }
+        .siri-spin { animation: siri-spin-kf 6s linear infinite; }
+        .siri-spin-rev { animation: siri-spin-rev-kf 4s linear infinite; }
+        @keyframes siri-breathe-kf {
+          0%, 100% { opacity: 0.7; transform: scale(0.92); }
+          50% { opacity: 1; transform: scale(1.18); }
+        }
+        .siri-breathe { animation: siri-breathe-kf 2.2s ease-in-out infinite; }
       `}</style>
     </div>
   );
