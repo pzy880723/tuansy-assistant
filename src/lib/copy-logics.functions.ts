@@ -177,16 +177,13 @@ export const generateModulesFromText = createServerFn({ method: "POST" })
     const gateway = createLovableAiGatewayProvider(key);
 
     const Schema = z.object({
-      modules: z
-        .array(
-          z.object({
-            type: z.enum(MODULE_TYPES),
-            label: z.string().min(1).max(40),
-            guidance: z.string().min(1).max(800),
-          }),
-        )
-        .min(3)
-        .max(15),
+      modules: z.array(
+        z.object({
+          type: z.enum(MODULE_TYPES),
+          label: z.string(),
+          guidance: z.string(),
+        }),
+      ),
     });
 
     const { output } = await generateText({
@@ -199,12 +196,20 @@ ${data.description}
 """
 
 请把这套思路拆成有序的模块清单，按真实展示顺序排列。每个模块包含 type、label（不超过 12 字的模块名）和 guidance（这一段具体写什么、怎么写的指引，60-200 字，纯文本，无 Markdown）。
+请把这套思路拆成有序的模块清单（3-15 个），按真实展示顺序排列。每个模块包含 type、label（不超过 12 字的模块名）和 guidance（这一段具体写什么、怎么写的指引，60-200 字，纯文本，无 Markdown）。
 ${MODULE_TYPE_HINT}
 默认骨架可以参考五步法：标题 → 痛点共鸣段 → 品牌/背书段 → 卖点拆解段（可拆成多段，配大图或九宫格） → 款式参数段；但要忠实于团长描述里的特殊要求与品类侧重。`,
     });
     const out = output as z.infer<typeof Schema>;
+    const trimmed = out.modules
+      .map((m) => ({
+        type: m.type,
+        label: (m.label ?? "").trim().slice(0, 40) || "模块",
+        guidance: (m.guidance ?? "").trim().slice(0, 800),
+      }))
+      .slice(0, 15);
     return {
-      modules: out.modules.map((m) => ({ id: rid(), ...m })) as CopyModule[],
+      modules: trimmed.map((m) => ({ id: rid(), ...m })) as CopyModule[],
     };
   });
 
