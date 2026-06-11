@@ -68,6 +68,47 @@ export type Database = {
         }
         Relationships: []
       }
+      copy_logics: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          modules: Json
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          modules?: Json
+          name?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          modules?: Json
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copy_logics_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       copy_versions: {
         Row: {
           created_at: string

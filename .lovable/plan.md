@@ -1,30 +1,60 @@
-## 团宝文案写作框架升级
+## 设置页：文案逻辑（Copy Logic）模板管理
 
-把用户提的「5 步转化框架 + 图文配对逻辑」固化到 `src/routes/api/chat.ts` 的 system prompt，让团宝在所有写作场景下自动遵守。
+让团长在 `/settings` 里维护一组「文案撰写逻辑」预设，每个预设可用自然语言描述也可以按模块逐项填写，两侧用 AI 双向匹配。后续团宝写文案时会读取当前激活的预设作为框架。
 
-### 1. 新增「文案五步法」section
-在现有「按品类撰写重点」之后插入一段固定框架，让模型把 `description` / `blocks` 的内容都按这五步组织：
+### 1. 数据库（新建 `copy_logics` 表）
 
-1. 强力吸睛标题 → `intro.title`，要求 emoji + 痛点词 + 核心卖点 + 利益点 + 人群标签
-2. 痛点共鸣开篇 → `description` 第 1 段，从「我懂你」切入
-3. 品牌故事/背书 → `description` 第 2 段，给低价或品质一个理由
-4. 深度卖点拆解 → 3-4 段卖点，每段一个核心点，多用感官词与场景化描写
-5. 款式/参数详解 → 颜色性格、尺码表、试穿提示
+字段：
+- `id`, `user_id`, `name`（如 "服装文案"）
+- `description`（自然语言描述，TEXT）
+- `modules`（JSONB，按顺序的模块数组）
+- `is_active`（同一用户仅一条 true，团宝写文案时用它）
+- `created_at`, `updated_at`
 
-### 2. 新增「图文配对流程」section
-明确两阶段工作模式：
+模块项结构：
+```
+{ id, type: "title" | "paragraph" | "image_large" | "image_grid" | "video" | "params",
+  label: "强力吸睛标题" | "痛点共鸣段" | …,
+  guidance: "怎么写这一段的自然语言说明" }
+```
 
-- **阶段 A — 用户只丢文字/描述时**：先用 update_intro 写好 title + description 的完整五步框架，然后罗列出"图文骨架建议"（用纯文本列出每个段落标题 + 该段落建议配图位置），但不要主动 push blocks，等用户补图。
-- **阶段 B — 用户后续丢图片时**：根据图片内容（参考用户描述 / 图片明显特征如商品图、模特图、细节图、参数表）判断它对应骨架里的哪一段，然后用 update_intro 的 blocks 字段把图片插到该段落对应的位置；最终结构为「文字 block → 相关图片 block(s) → 下一段文字 block → 相关图片 block(s)」交替排列。
-- 同一段落多张图：单图用 image_lg、多图（≥3）用 image_sm 九宫格；商品对比/细节图优先小图组。
-- 不要把所有图片堆在最后，必须按语义嵌入对应文字段落之间。
+RLS：用户只能 CRUD 自己的；GRANT 给 authenticated + service_role。
 
-### 3. 更新 blocks 规则
-原系统提示中"blocks 默认不要主动添加，只有用户明确要求才传"需要放宽：当用户上传图片时，AI 应自动用 blocks 把图片插入到正确段落（属于阶段 B 的明确触发），无需用户再说"加张大图"。
+### 2. 服务端函数（`src/lib/copy-logics.functions.ts`）
+- `listCopyLogics()` – 当前用户全部
+- `upsertCopyLogic({ id?, name, description, modules, is_active })`
+- `deleteCopyLogic({ id })`
+- `setActiveCopyLogic({ id })` – 把其它行 is_active 置 false
+- `generateModulesFromText({ name, description })` – 调 Lovable AI（gemini-3-flash-preview）+ `Output.object` schema，根据 NL 描述生成模块数组（含默认五步法 fallback）
+- `generateTextFromModules({ name, modules })` – 反向：把模块清单总结成一段 NL 描述
 
-### 4. 不改动
-- 工具签名 / 数据库 schema / 前端
-- 其他品类、设置、SKU 工具的现有规则
+均用 `requireSupabaseAuth`。
+
+### 3. 默认种子
+首次进入设置页时，如果用户一条逻辑都没有，前端调用 `upsertCopyLogic` 写入"通用五步法"默认预设（拿 chat.ts 里的五步法直接转化为 modules + description），设为 active。
+
+### 4. UI（重写 `src/routes/settings.tsx`）
+
+布局：
+- 顶部"新增文案逻辑"按钮 → 弹出输入"名称"对话框，建空白预设后进入编辑视图
+- 左侧列表：所有预设，显示名称 + 是否激活 + 删除按钮；点击切换
+- 右侧编辑卡片：
+  - 名称输入
+  - "设为当前激活" Toggle
+  - **自然语言描述** `Textarea`（自适应高度），右上角按钮「→ 生成模块」（调 generateModulesFromText，loading 状态）
+  - **模块清单**：可拖动重排、每条显示 type 标签 + label + guidance（Textarea）
+    - 每条尾部「删除」「上移」「下移」
+    - 末尾按钮"+ 添加模块"（弹出 type / label 选择）
+  - 模块区右上角按钮「← 回写自然语言」（调 generateTextFromModules，把结果写入 description）
+- 所有字段输入都按 800ms 防抖自动 `upsertCopyLogic` 保存，右上角显示"已保存 hh:mm"
+- 保存/AI 调用失败用 toast 显示
+
+### 5. 不在本次范围（明确告知用户后续做）
+- 把激活逻辑接入 `/api/chat` 的 system prompt（下一步可单独迭代，避免本次范围过大）
+- 项目级覆盖（每个团购单独选用哪个文案逻辑）
 
 ### 涉及文件
-- 编辑：`src/routes/api/chat.ts`（仅扩展 system prompt 字符串）
+- 新增：`supabase/migrations/<ts>_copy_logics.sql`
+- 新增：`src/lib/copy-logics.functions.ts`
+- 新增：`src/components/settings/CopyLogicEditor.tsx`
+- 编辑：`src/routes/settings.tsx`
