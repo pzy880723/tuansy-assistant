@@ -23,7 +23,8 @@ export type PresetCopyLogic = {
 };
 
 export const listPresetCopyLogics = createServerFn({ method: "GET" }).handler(async () => {
-  await requireUserId();
+  // 预设是已发布的只读模版，任何访问 /settings 的用户都可以浏览，无需登录。
+  // 复制到自己（copyPresetToMine）才会校验登录态。
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("preset_copy_logics")
@@ -33,6 +34,7 @@ export const listPresetCopyLogics = createServerFn({ method: "GET" }).handler(as
   if (error) throw new Error(error.message);
   return { presets: (data ?? []) as unknown as PresetCopyLogic[] };
 });
+
 
 function rid() {
   return Math.random().toString(36).slice(2, 10);
