@@ -34,9 +34,11 @@ import {
   setActiveCopyLogic,
   generateModulesFromText,
   generateTextFromModules,
+  DEFAULT_FORMATTING,
   type CopyLogic,
   type CopyModule,
   type CopyModuleType,
+  type CopyFormatting,
 } from "@/lib/copy-logics.functions";
 import { listPresetCopyLogics, copyPresetToMine } from "@/lib/presets.functions";
 import { cn } from "@/lib/utils";
