@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { readAuthToken } from "@/lib/use-current-user";
+import { uploadAiGeneratedImage } from "@/lib/image-gen.functions";
 import {
   Dialog,
   DialogContent,
@@ -27,12 +30,83 @@ type Slot = {
   id: string;
   status: "loading" | "done" | "error";
   url?: string;
+  previewUrl?: string;
+  isFinal?: boolean;
   error?: string;
   variantSeed: string;
 };
 
+type ImageStreamPayload = {
+  type?: string;
+  b64_json?: string;
+};
+
 function genSeed() {
   return Math.random().toString(36).slice(2, 8);
+}
+
+function userFacingError(status: number, text: string) {
+  if (status === 401) return "登录状态失效，请刷新页面重新登录";
+  if (status === 402) return "AI 额度已用完，请联系管理员充值";
+  if (status === 429) return "请求太频繁，请稍后再试";
+  return `生图失败 (${status}): ${text.slice(0, 160) || "请稍后重试"}`;
+}
+
+async function readImageStream(
+  res: Response,
+  onFrame: (dataUrl: string, isFinal: boolean) => void,
+): Promise<string> {
+  if (!res.body) throw new Error("生图流为空");
+  let buffer = "";
+  let finalB64 = "";
+  let sawCompleted = false;
+
+  const consumeBlock = (block: string) => {
+    const lines = block.split(/\r?\n/);
+    let eventName = "";
+    const dataLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith("event:")) eventName = line.slice(6).trim();
+      if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    const raw = dataLines.join("\n");
+    if (!raw || raw === "[DONE]") return;
+    let payload: ImageStreamPayload;
+    try {
+      payload = JSON.parse(raw) as ImageStreamPayload;
+    } catch {
+      return;
+    }
+    const type = eventName || payload.type || "";
+    if (
+      type !== "image_generation.partial_image" &&
+      type !== "image_generation.completed"
+    ) return;
+    if (!payload.b64_json) return;
+    const isFinal = type === "image_generation.completed";
+    if (isFinal) {
+      finalB64 = payload.b64_json;
+      sawCompleted = true;
+    }
+    flushSync(() => onFrame(`data:image/png;base64,${payload.b64_json}`, isFinal));
+  };
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() ?? "";
+      blocks.forEach(consumeBlock);
+    }
+    if (buffer.trim()) consumeBlock(buffer);
+  } finally {
+    reader.cancel().catch(() => undefined);
+  }
+  if (!sawCompleted || !finalB64) throw new Error("图片生成中断，请重试");
+  return finalB64;
 }
 
 export function AIGenerateImageDialog({
@@ -56,6 +130,7 @@ export function AIGenerateImageDialog({
   const [dragId, setDragId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { attachments, addFiles, remove, clear } = useImageAttachments({ projectId });
+  const uploadGenerated = useServerFn(uploadAiGeneratedImage);
 
   useEffect(() => {
     if (open) {
@@ -93,7 +168,6 @@ export function AIGenerateImageDialog({
         },
         body: JSON.stringify({
           prompt: p,
-          count: 1,
           referenceImages: referenceUrls.length > 0 ? referenceUrls : undefined,
           projectId,
           variant,
@@ -101,31 +175,31 @@ export function AIGenerateImageDialog({
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "生图失败");
-        const short = text.slice(0, 120);
-        if (res.status === 401) toast.error("登录状态失效，请刷新页面重新登录");
-        else if (res.status === 402) toast.error("AI 额度不足，请联系管理员充值");
-        else if (res.status === 429) toast.error("请求太频繁，请稍后再试");
-        else toast.error(`生图失败 (${res.status}): ${short}`);
+        const msg = userFacingError(res.status, text);
+        toast.error(msg);
         setSlots((cur) =>
           cur.map((s) =>
-            s.id === slotId ? { ...s, status: "error", error: text || "生图失败" } : s,
+            s.id === slotId ? { ...s, status: "error", error: msg } : s,
           ),
         );
         return;
       }
-      const data = (await res.json()) as { urls?: string[] };
-      const url = data.urls?.[0];
-      if (!url) {
+      const finalB64 = await readImageStream(res, (dataUrl, isFinal) => {
         setSlots((cur) =>
-          cur.map((s) => (s.id === slotId ? { ...s, status: "error", error: "空数据" } : s)),
+          cur.map((s) =>
+            s.id === slotId ? { ...s, previewUrl: dataUrl, isFinal } : s,
+          ),
         );
-        return;
-      }
+      });
+      const { url } = await uploadGenerated({ data: { b64: finalB64, projectId } });
       setSlots((cur) =>
-        cur.map((s) => (s.id === slotId ? { ...s, status: "done", url } : s)),
+        cur.map((s) =>
+          s.id === slotId ? { ...s, status: "done", url, previewUrl: undefined, isFinal: true } : s,
+        ),
       );
     } catch (e) {
       const msg = (e as Error).message;
+      toast.error(msg || "生图失败，请重试");
       setSlots((cur) =>
         cur.map((s) => (s.id === slotId ? { ...s, status: "error", error: msg } : s)),
       );
@@ -158,7 +232,15 @@ export function AIGenerateImageDialog({
     setSlots((cur) =>
       cur.map((s) =>
         s.id === slotId
-          ? { ...s, status: "loading", error: undefined, url: undefined, variantSeed: newSeed }
+          ? {
+              ...s,
+              status: "loading",
+              error: undefined,
+              url: undefined,
+              previewUrl: undefined,
+              isFinal: false,
+              variantSeed: newSeed,
+            }
           : s,
       ),
     );
@@ -355,7 +437,23 @@ export function AIGenerateImageDialog({
                       draggable && "cursor-grab active:cursor-grabbing",
                     )}
                   >
-                    {slot.status === "loading" && <TechLoader />}
+                    {slot.status === "loading" && (
+                      <>
+                        {slot.previewUrl && (
+                          <img
+                            src={slot.previewUrl}
+                            alt=""
+                            className={cn(
+                              "h-full w-full object-cover transition-[filter,opacity] duration-500",
+                              slot.isFinal ? "blur-0 opacity-100" : "blur-xl opacity-80",
+                            )}
+                          />
+                        )}
+                        <div className="absolute inset-0">
+                          <TechLoader translucent={Boolean(slot.previewUrl)} />
+                        </div>
+                      </>
+                    )}
                     {slot.status === "done" && slot.url && (
                       <>
                         <img
@@ -465,11 +563,11 @@ export function AIGenerateImageDialog({
 }
 
 /** Siri / Apple-Intelligence style liquid loader. */
-function TechLoader() {
+function TechLoader({ translucent = false }: { translucent?: boolean }) {
   return (
     <div
-      className="relative h-full w-full overflow-hidden"
-      style={{ background: "oklch(0.99 0.005 270)" }}
+      className={cn("relative h-full w-full overflow-hidden", translucent && "bg-white/20 backdrop-blur-sm")}
+      style={{ background: translucent ? undefined : "oklch(0.99 0.005 270)" }}
     >
       {/* Liquid color blobs */}
       <div className="siri-blob siri-blob-a" />
@@ -520,7 +618,7 @@ function TechLoader() {
       {/* Label */}
       <div
         className="absolute inset-x-0 bottom-2 text-center text-[10px] font-light tracking-[0.3em]"
-        style={{ color: "rgba(60, 40, 90, 0.55)" }}
+        style={{ color: translucent ? "rgba(255,255,255,0.82)" : "rgba(60, 40, 90, 0.55)" }}
       >
         DESIGNING
       </div>

@@ -3,7 +3,6 @@ import { z } from "zod";
 
 const BodySchema = z.object({
   prompt: z.string().min(1).max(2000),
-  count: z.number().int().min(1).max(9),
   referenceImages: z.array(z.string().url()).max(3).optional(),
   projectId: z.string().uuid(),
   variant: z.string().max(200).optional(),
@@ -38,23 +37,27 @@ export const Route = createFileRoute("/api/generate-image")({
           return new Response("Forbidden", { status: 403 });
         }
 
-        const { generateImagesBatch, uploadGeneratedImage } = await import(
-          "@/lib/image-gen.server"
-        );
+        const { createImageGenerationStream } = await import("@/lib/image-gen.server");
 
         try {
           const finalPrompt = body.variant
             ? `${body.prompt}\n\n[variation hint: ${body.variant}]`
             : body.prompt;
-          const b64s = await generateImagesBatch(
+          const upstream = await createImageGenerationStream(
             key,
             { prompt: finalPrompt, referenceImages: body.referenceImages },
-            body.count,
           );
-          const urls = await Promise.all(
-            b64s.map((b) => uploadGeneratedImage(b, userId, body.projectId)),
-          );
-          return Response.json({ urls });
+          if (!upstream.ok || !upstream.body) {
+            return new Response(await upstream.text().catch(() => "生图失败"), {
+              status: upstream.status,
+            });
+          }
+          return new Response(upstream.body, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+            },
+          });
         } catch (e) {
           const err = e as Error & { status?: number };
           const status = err.status === 429 || err.status === 402 ? err.status : 500;
