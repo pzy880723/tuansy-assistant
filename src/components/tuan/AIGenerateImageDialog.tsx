@@ -232,7 +232,15 @@ export function AIGenerateImageDialog({
     setSlots((cur) =>
       cur.map((s) =>
         s.id === slotId
-          ? { ...s, status: "loading", error: undefined, url: undefined, variantSeed: newSeed }
+          ? {
+              ...s,
+              status: "loading",
+              error: undefined,
+              url: undefined,
+              previewUrl: undefined,
+              isFinal: false,
+              variantSeed: newSeed,
+            }
           : s,
       ),
     );
