@@ -460,17 +460,16 @@ export function IntroTab({
     setAiOpen(true);
   };
 
-  const handleAIComplete = (urls: string[]) => {
+  const handleAIComplete = (urls: string[], mode: "lg" | "sm") => {
     if (urls.length === 0) return;
     const targetId = aiTargetIdRef.current;
     const list = blocks.slice();
     let insertAfter = targetId ? list.findIndex((b) => b.id === targetId) : list.length - 1;
     if (insertAfter < 0) insertAfter = list.length - 1;
-    const newBlocks: IntroBlock[] = urls.map((url) => ({
-      id: genId(),
-      type: "image_lg",
-      url,
-    }));
+    const newBlocks: IntroBlock[] =
+      mode === "sm"
+        ? [{ id: genId(), type: "image_sm", urls }]
+        : urls.map((url) => ({ id: genId(), type: "image_lg", url }));
     list.splice(insertAfter + 1, 0, ...newBlocks);
     setBlocks(list);
   };
