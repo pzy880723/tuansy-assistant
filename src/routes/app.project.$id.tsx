@@ -200,12 +200,13 @@ function ChatPane({
           messages,
           projectId,
           copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
+          startupMode: messages[0]?.id.startsWith("seed-plan-") ? "plan" : "draft",
         },
       }),
     }),
   ).current;
 
-  const { messages, sendMessage, setMessages, status, error } = useChat({
+  const { messages, sendMessage, setMessages, regenerate, status, error } = useChat({
     id: projectId,
     messages: initial,
     transport,
@@ -319,19 +320,16 @@ function ChatPane({
     });
   };
 
-  // Auto-trigger the first AI write when arriving from the home "开团" dialog
+  // A seeded home-page prompt is already the first visible user message. Resume from it once.
   const bootedRef = useRef(false);
   useEffect(() => {
     if (bootedRef.current) return;
-    if (typeof window === "undefined") return;
-    if (isLoading) return;
-    const key = `tuanbao.boot.${projectId}`;
-    const boot = window.sessionStorage.getItem(key);
-    if (!boot) return;
+    if (status !== "ready") return;
+    const last = messages.at(-1);
+    if (!last || last.role !== "user" || !last.id.startsWith("seed-")) return;
     bootedRef.current = true;
-    window.sessionStorage.removeItem(key);
-    void sendMessage({ text: boot });
-  }, [projectId, isLoading, sendMessage]);
+    void regenerate({ messageId: last.id });
+  }, [messages, regenerate, status]);
 
 
   const suggestions: string[] = (() => {
@@ -873,8 +871,24 @@ function Questionnaire({
 
 function ToolCard({ part }: { part: ToolPart }) {
   const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
+  const introInput = part.input as
+    | { title?: string; blocksAppend?: Array<{ type?: string; text?: string }>; blocksReplaceAt?: unknown[] }
+    | undefined;
+  const introAction = introInput?.blocksAppend?.[0]?.text
+    ? `写入新段落：${introInput.blocksAppend[0].text.slice(0, 14)}${introInput.blocksAppend[0].text.length > 14 ? "…" : ""}`
+    : introInput?.title
+      ? "构思并写入标题"
+      : introInput?.blocksReplaceAt
+        ? "把图片放到对应段落"
+        : "更新介绍文案";
   const label =
-    name === "update_product" ? "更新商品信息" : name === "update_skus" ? "更新 SKU" : name;
+    name === "update_intro"
+      ? `✍️ ${introAction}`
+      : name === "update_product"
+        ? "更新商品信息"
+        : name === "update_skus"
+          ? "更新 SKU"
+          : name;
   const isRunning = part.state === "input-streaming" || part.state === "input-available";
   const hasOutput = part.state === "output-available";
   const failed = part.state === "output-error" || !!part.errorText;
