@@ -669,7 +669,8 @@ export function IntroTab({
                         <div className="mb-2 truncate text-[15px] font-semibold text-[#1a1a1a]">
                           {intro.title || "团购介绍"}
                         </div>
-                        <div className="space-y-3">
+                        <div className="relative space-y-3">
+
                           {blocks.map((b) => {
                             const isMe = b.id === drag.id;
                             if (isMe) {
