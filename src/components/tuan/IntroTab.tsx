@@ -273,16 +273,17 @@ export function IntroTab({
     if (el) ghostBlockRefs.current.set(id, el);
     else ghostBlockRefs.current.delete(id);
   };
+  // Scroll container inside the fixed thumbnail (for auto-scroll near edges).
+  const ghostScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const GHOST_SCALE = 0.5;
 
   type DragState = {
     id: string;
     pointerId: number;
     // Bounding rect of the preview at drag-start (for the blur backdrop and
-    // the thumbnail's initial position/size).
+    // the thumbnail's fixed position/size).
     cRect: { left: number; top: number; width: number; height: number };
-    // Pointer position at grab time, relative to the container's top-left.
-    grabRelX: number;
-    grabRelY: number;
     // Current pointer in viewport coords.
     pointerX: number;
     pointerY: number;
@@ -316,8 +317,6 @@ export function IntroTab({
       id,
       pointerId: e.pointerId,
       cRect: { left: cRect.left, top: cRect.top, width: cRect.width, height: cRect.height },
-      grabRelX: e.clientX - cRect.left,
-      grabRelY: e.clientY - cRect.top,
       pointerX: e.clientX,
       pointerY: e.clientY,
       dropIndex: origIdx < 0 ? 0 : origIdx,
@@ -378,6 +377,29 @@ export function IntroTab({
     const prevTouchAction = document.body.style.touchAction;
     document.body.style.overflow = "hidden";
     document.body.style.touchAction = "none";
+
+    // Auto-scroll inside the fixed thumbnail when pointer is near its edges.
+    const EDGE = 60;
+    const MAX_SPEED = 14;
+    let raf = 0;
+    const tick = () => {
+      const s = ghostScrollRef.current;
+      const cur = dragRef.current;
+      if (s && cur) {
+        const r = s.getBoundingClientRect();
+        const y = cur.pointerY;
+        let dy = 0;
+        if (y < r.top + EDGE) {
+          dy = -MAX_SPEED * (1 - Math.max(0, (y - r.top) / EDGE));
+        } else if (y > r.bottom - EDGE) {
+          dy = MAX_SPEED * (1 - Math.max(0, (r.bottom - y) / EDGE));
+        }
+        if (dy !== 0) s.scrollTop += dy;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
@@ -385,19 +407,22 @@ export function IntroTab({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
       document.body.style.touchAction = prevTouchAction;
+      cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag?.id, drag?.pointerId]);
 
   // Per-block translateY INSIDE the thumbnail — opens a gap where the
-  // dragged block will land.
+  // dragged block will land. Uses scaled block height for visual continuity.
   const ghostTranslateOf = (blockId: string): number => {
     if (!drag || blockId === drag.id) return 0;
     const others = blocks.filter((b) => b.id !== drag.id);
     const ci = others.findIndex((b) => b.id === blockId);
     if (ci < 0) return 0;
-    return ci >= drag.dropIndex ? 24 : 0;
+    const gap = Math.max(24, drag.blockHeight * GHOST_SCALE + 6);
+    return ci >= drag.dropIndex ? gap : 0;
   };
+
 
   const openAIForBlock = (id: string, fallback: string) => {
     aiTargetIdRef.current = id;
