@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { readAuthToken } from "@/lib/use-current-user";
+import { uploadAiGeneratedImage } from "@/lib/image-gen.functions";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +30,15 @@ type Slot = {
   id: string;
   status: "loading" | "done" | "error";
   url?: string;
+  previewUrl?: string;
+  isFinal?: boolean;
   error?: string;
   variantSeed: string;
+};
+
+type ImageStreamPayload = {
+  type?: string;
+  b64_json?: string;
 };
 
 function genSeed() {
