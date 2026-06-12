@@ -122,7 +122,7 @@ export function AIGenerateImageDialog({
   onOpenChange: (v: boolean) => void;
   projectId: string;
   defaultPrompt?: string;
-  onComplete: (urls: string[]) => void;
+  onComplete: (urls: string[], mode: "lg" | "sm") => void;
 }) {
   const [prompt, setPrompt] = useState(defaultPrompt ?? "");
   const [count, setCount] = useState<number>(3);
@@ -130,6 +130,7 @@ export function AIGenerateImageDialog({
   const [phase, setPhase] = useState<"form" | "generating">("form");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [saveMode, setSaveMode] = useState<"lg" | "sm">("lg");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { attachments, addFiles, remove, clear } = useImageAttachments({ projectId });
   const uploadGenerated = useServerFn(uploadAiGeneratedImage);
@@ -142,6 +143,7 @@ export function AIGenerateImageDialog({
       setPhase("form");
       setSlots([]);
       setDragId(null);
+      setSaveMode("lg");
       clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -280,7 +282,7 @@ export function AIGenerateImageDialog({
       return;
     }
     const urls = slots.filter((s) => s.status === "done").map((s) => s.url as string);
-    onComplete(urls);
+    onComplete(urls, saveMode);
     onOpenChange(false);
   };
 
