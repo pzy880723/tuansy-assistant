@@ -47,7 +47,7 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: preset, error: pErr } = await supabaseAdmin
       .from("preset_copy_logics")
-      .select("name, description, modules")
+      .select("name, description, modules, formatting")
       .eq("id", data.presetId)
       .eq("is_published", true)
       .maybeSingle();
@@ -59,6 +59,9 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
       ...m,
       id: rid(),
     }));
+    const formatting =
+      ((preset as { formatting?: unknown }).formatting as CopyFormatting | undefined) ??
+      DEFAULT_FORMATTING;
 
     const { count } = await supabaseAdmin
       .from("copy_logics")
@@ -72,6 +75,7 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
         name: `${preset.name}（我的副本）`,
         description: preset.description,
         modules,
+        formatting,
         is_active: (count ?? 0) === 0,
       })
       .select("*")
