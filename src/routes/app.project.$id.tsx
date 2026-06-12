@@ -668,10 +668,6 @@ function MessageRow({
     .replace(/\*\*/g, "")
     .replace(/(^|\s)\*(?!\s)/g, "$1");
 
-  const toolParts = msg.parts.filter(
-    (p) => p.type.startsWith("tool-") && p.type !== "tool-suggest_next",
-  ) as ToolPart[];
-
   if (msg.role === "system") {
     return (
       <div className="flex justify-center">
@@ -703,7 +699,21 @@ function MessageRow({
         className="h-7 w-7 shrink-0 rounded-full bg-[var(--brand-soft)] object-contain"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {toolParts.map((part, i) => {
+        {msg.parts.map((rawPart, i) => {
+          if (rawPart.type === "text") {
+            const partText = rawPart.text
+              .replace(/\*\*/g, "")
+              .replace(/(^|\s)\*(?!\s)/g, "$1");
+            return partText ? (
+              <div key={i} className="max-w-[95%] px-1 text-sm leading-relaxed whitespace-pre-wrap">
+                {partText}
+              </div>
+            ) : null;
+          }
+          if (!rawPart.type.startsWith("tool-") || rawPart.type === "tool-suggest_next") {
+            return null;
+          }
+          const part = rawPart as ToolPart;
           if (part.type === "tool-ask_questions") {
             return (
               <Questionnaire
@@ -716,11 +726,6 @@ function MessageRow({
           }
           return <ToolCard key={i} part={part} />;
         })}
-        {text && (
-          <div className="max-w-[95%] rounded-2xl rounded-tl-md bg-muted px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-            {text}
-          </div>
-        )}
       </div>
     </div>
   );
