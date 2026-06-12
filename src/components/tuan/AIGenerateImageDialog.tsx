@@ -122,7 +122,7 @@ export function AIGenerateImageDialog({
   onOpenChange: (v: boolean) => void;
   projectId: string;
   defaultPrompt?: string;
-  onComplete: (urls: string[]) => void;
+  onComplete: (urls: string[], mode: "lg" | "sm") => void;
 }) {
   const [prompt, setPrompt] = useState(defaultPrompt ?? "");
   const [count, setCount] = useState<number>(3);
@@ -130,6 +130,7 @@ export function AIGenerateImageDialog({
   const [phase, setPhase] = useState<"form" | "generating">("form");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [saveMode, setSaveMode] = useState<"lg" | "sm">("lg");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { attachments, addFiles, remove, clear } = useImageAttachments({ projectId });
   const uploadGenerated = useServerFn(uploadAiGeneratedImage);
@@ -142,6 +143,7 @@ export function AIGenerateImageDialog({
       setPhase("form");
       setSlots([]);
       setDragId(null);
+      setSaveMode("lg");
       clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -280,7 +282,7 @@ export function AIGenerateImageDialog({
       return;
     }
     const urls = slots.filter((s) => s.status === "done").map((s) => s.url as string);
-    onComplete(urls);
+    onComplete(urls, saveMode);
     onOpenChange(false);
   };
 
@@ -519,6 +521,43 @@ export function AIGenerateImageDialog({
                 有 {slots.length - doneCount} 张生成失败，可点击重试或删除
               </div>
             )}
+            {!anyLoading && doneCount > 0 && (
+              <div className="space-y-1.5 rounded-md border border-[#ebedf0] bg-[#fafbfc] p-2.5">
+                <div className="text-[11px] font-medium text-[#646566]">插入方式</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSaveMode("lg")}
+                    className={cn(
+                      "rounded-md border px-2.5 py-2 text-left text-[12px] transition",
+                      saveMode === "lg"
+                        ? "border-[#07c160] bg-[#07c160]/5 text-[#07c160]"
+                        : "border-[#dcdee0] bg-white text-[#323233] hover:border-[#c8c9cc]",
+                    )}
+                  >
+                    <div className="font-medium">大图模式</div>
+                    <div className="mt-0.5 text-[10px] text-[#969799]">
+                      每张图作为一个大图模块（共 {doneCount} 个模块）
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSaveMode("sm")}
+                    className={cn(
+                      "rounded-md border px-2.5 py-2 text-left text-[12px] transition",
+                      saveMode === "sm"
+                        ? "border-[#07c160] bg-[#07c160]/5 text-[#07c160]"
+                        : "border-[#dcdee0] bg-white text-[#323233] hover:border-[#c8c9cc]",
+                    )}
+                  >
+                    <div className="font-medium">小图九宫格</div>
+                    <div className="mt-0.5 text-[10px] text-[#969799]">
+                      {doneCount} 张合并为一个九宫格小图模块
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -555,7 +594,9 @@ export function AIGenerateImageDialog({
                 ) : (
                   <>
                     <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    确认插入 {doneCount} 张
+                    {saveMode === "sm"
+                      ? `插入九宫格（${doneCount} 张）`
+                      : `插入大图 ${doneCount} 个模块`}
                   </>
                 )}
               </Button>
