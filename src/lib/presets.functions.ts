@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireUserId } from "@/lib/auth-session.server";
-import type { CopyLogic, CopyModule } from "@/lib/copy-logics.functions";
+import {
+  DEFAULT_FORMATTING,
+  type CopyFormatting,
+  type CopyLogic,
+  type CopyModule,
+} from "@/lib/copy-logics.functions";
 
 export type PresetCopyLogic = {
   id: string;
@@ -10,6 +15,7 @@ export type PresetCopyLogic = {
   industry: string;
   description: string;
   modules: CopyModule[];
+  formatting: CopyFormatting;
   sort_order: number;
   is_published: boolean;
   created_at: string;
