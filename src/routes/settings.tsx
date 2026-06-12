@@ -224,8 +224,9 @@ function CopyLogicSection() {
         <div>
           <div className="text-sm font-semibold">文案编辑逻辑</div>
           <div className="text-[11px] text-muted-foreground">
-            团宝写文案时会遵循当前激活的逻辑
+            可同时启用多条，团宝会按商品品类自动挑一条来写
           </div>
+
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild>
