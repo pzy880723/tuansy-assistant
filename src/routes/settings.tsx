@@ -320,14 +320,16 @@ function CopyLogicSection() {
                 }
               }}
               onActivate={async () => {
+                const nextActive = !selected.is_active;
                 try {
-                  await setActive({ data: { id: selected.id } });
+                  await setActive({ data: { id: selected.id, active: nextActive } });
                   await refresh();
-                  toast.success("已设为当前激活");
+                  toast.success(nextActive ? "已启用" : "已停用");
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : "切换失败");
                 }
               }}
+
               onDelete={async () => {
                 if (!window.confirm(`确认删除「${selected.name}」？`)) return;
                 try {
