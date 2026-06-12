@@ -726,6 +726,7 @@ export function IntroTab({
                                     left: 12,
                                     right: 12,
                                     top: 0,
+                                    zIndex: 50,
                                     opacity: 1,
                                     outline: "2px dashed #07c160",
                                     background: "#ffffff",
@@ -749,6 +750,8 @@ export function IntroTab({
                                   transform: `translateY(${ghostTranslateOf(b.id)}px)`,
                                   transition:
                                     "transform 220ms cubic-bezier(.2,.8,.2,1)",
+                                  position: "relative",
+                                  zIndex: 1,
                                   background: "#ffffff",
                                   borderRadius: 10,
                                   padding: 10,
