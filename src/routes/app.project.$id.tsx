@@ -233,6 +233,11 @@ function ChatPane({
   }, [messages, storageKey]);
 
   useEffect(() => {
+    if (status !== "streaming") return;
+    void qc.invalidateQueries({ queryKey: ["project", projectId] });
+  }, [messages, projectId, qc, status]);
+
+  useEffect(() => {
     inputRef.current?.focus();
   }, [projectId, status]);
 
