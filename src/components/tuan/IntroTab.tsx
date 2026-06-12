@@ -562,6 +562,12 @@ export function IntroTab({
             placeholder="请输入团购活动标题"
             className="text-[15px] font-semibold text-[#1a1a1a] placeholder:font-normal placeholder:text-[#c8c9cc]"
           />
+          <AutoTextarea
+            value={intro.description ?? ""}
+            onChange={(v) => onChange({ ...intro, description: v })}
+            placeholder="请输入团购摘要"
+            className="mt-2 text-[13px] leading-6 text-[#646566] placeholder:text-[#c8c9cc]"
+          />
         </div>
 
         {blocks.length > 0 && (

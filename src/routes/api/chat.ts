@@ -376,10 +376,19 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
                   .update({ intro: next as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
+                const change = blocksAppend?.[0]
+                  ? { kind: "append", block: (next.blocks as unknown[] | undefined)?.at(-1) }
+                  : blocksReplaceAt?.length
+                    ? { kind: "replace", indexes: blocksReplaceAt.map((item) => item.index) }
+                    : input.title || input.description
+                      ? { kind: "header", title: input.title, description: input.description }
+                      : { kind: "reorder" };
                 return {
                   ok: true,
                   updated: Object.keys(input),
                   blockCount: Array.isArray(next.blocks) ? next.blocks.length : currentBlocks.length,
+                  intro: next,
+                  change,
                 };
               },
             }),
