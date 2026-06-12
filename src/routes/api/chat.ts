@@ -98,7 +98,7 @@ export const Route = createFileRoute("/api/chat")({
           const presetId = body.copyLogicId.slice(presetPrefix.length);
           const { data: preset } = await supabaseAdmin
             .from("preset_copy_logics")
-            .select("id, name, description, modules, is_published")
+            .select("id, name, description, modules, formatting, is_published")
             .eq("id", presetId)
             .eq("is_published", true)
             .maybeSingle();
@@ -108,6 +108,9 @@ export const Route = createFileRoute("/api/chat")({
               name: `${preset.name}（标准）`,
               description: preset.description,
               modules: preset.modules as LogicRow["modules"],
+              formatting: (preset as { formatting?: unknown }).formatting as
+                | Record<string, unknown>
+                | null,
               is_active: true,
             };
           }
@@ -115,9 +118,9 @@ export const Route = createFileRoute("/api/chat")({
         if (!activeLogic) {
           const { data: allLogics } = await supabaseAdmin
             .from("copy_logics")
-            .select("id, name, description, modules, is_active")
+            .select("id, name, description, modules, formatting, is_active")
             .eq("user_id", userId);
-          const logics = (allLogics ?? []) as LogicRow[];
+          const logics = (allLogics ?? []) as unknown as LogicRow[];
           if (body.copyLogicId) {
             activeLogic = logics.find((l) => l.id === body.copyLogicId) ?? null;
           }
