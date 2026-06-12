@@ -55,7 +55,7 @@ export const listCopyLogics = createServerFn({ method: "GET" }).handler(async ()
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
-  return { logics: (data ?? []) as CopyLogic[] };
+  return { logics: (data ?? []) as unknown as CopyLogic[] };
 });
 
 const UpsertInput = z.object({
@@ -93,7 +93,7 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
         .select("*")
         .single();
       if (error) throw new Error(error.message);
-      return { logic: row as CopyLogic };
+      return { logic: row as unknown as CopyLogic };
     }
 
     if (data.is_active === true) {
@@ -114,7 +114,7 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return { logic: row as CopyLogic };
+    return { logic: row as unknown as CopyLogic };
   });
 
 export const deleteCopyLogic = createServerFn({ method: "POST" })

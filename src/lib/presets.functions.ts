@@ -25,7 +25,7 @@ export const listPresetCopyLogics = createServerFn({ method: "GET" }).handler(as
     .eq("is_published", true)
     .order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
-  return { presets: (data ?? []) as PresetCopyLogic[] };
+  return { presets: (data ?? []) as unknown as PresetCopyLogic[] };
 });
 
 function rid() {
@@ -71,5 +71,5 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return { logic: row as CopyLogic };
+    return { logic: row as unknown as CopyLogic };
   });
