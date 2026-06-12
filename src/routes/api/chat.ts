@@ -304,7 +304,7 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
           tools: {
             update_intro: tool({
               description:
-                "更新介绍 Tab 内容。只传需要修改的字段；blocks 若传则整体替换。注意：blocks 默认由用户在右侧手动点按钮添加，AI 只在用户明确要求时才传。",
+                "渐进更新介绍 Tab。首次撰写先写 title/description，再按模块逐次用 blocksAppend 追加一个段落；图片用 blocksReplaceAt 原地替换；blocks 仅用于用户明确要求整体重排。",
               inputSchema: z.object({
                 title: z
                   .string()
@@ -319,22 +319,68 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
                 blocks: z
                   .array(IntroBlockSchema)
                   .describe(
-                    "图文模块数组，整体替换。仅当用户明确要求添加大图/小图九宫格/视频/文字段落/标签时才传；默认留空不动。",
+                    "图文模块数组，整体替换。仅当用户明确要求整体重排时使用。",
                   )
+                  .optional(),
+                blocksAppend: z
+                  .array(IntroBlockSchema)
+                  .max(1)
+                  .describe("渐进追加一个模块。首次撰写每次必须只传一个元素。")
+                  .optional(),
+                blocksReplaceAt: z
+                  .array(
+                    z.object({
+                      index: z.number().int().min(0),
+                      block: IntroBlockSchema,
+                    }),
+                  )
+                  .describe("按索引原地替换图位，不改动其他模块。")
                   .optional(),
               }),
               execute: async (input) => {
-                const patch: Record<string, unknown> = { ...input };
+                const { data: freshRow, error: readError } = await supabaseAdmin
+                  .from("projects")
+                  .select("intro")
+                  .eq("id", projectId)
+                  .maybeSingle();
+                if (readError) return { ok: false, error: readError.message };
+                const freshIntro = (freshRow?.intro ?? {}) as Record<string, unknown>;
+                const currentBlocks = Array.isArray(freshIntro.blocks)
+                  ? ([...freshIntro.blocks] as Array<Record<string, unknown>>)
+                  : [];
+                const { blocksAppend, blocksReplaceAt, ...fields } = input;
+                const patch: Record<string, unknown> = { ...fields };
                 if (Array.isArray(input.blocks)) {
                   patch.blocks = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                } else {
+                  let nextBlocks = currentBlocks;
+                  if (blocksAppend?.length) {
+                    nextBlocks = [
+                      ...nextBlocks,
+                      ...blocksAppend.map((b) => ({ id: genBlockId(), ...b })),
+                    ];
+                  }
+                  for (const replacement of blocksReplaceAt ?? []) {
+                    if (replacement.index < nextBlocks.length) {
+                      nextBlocks[replacement.index] = {
+                        id: genBlockId(),
+                        ...replacement.block,
+                      };
+                    }
+                  }
+                  if (blocksAppend?.length || blocksReplaceAt?.length) patch.blocks = nextBlocks;
                 }
-                const next = { ...intro, ...patch };
+                const next = { ...freshIntro, ...patch };
                 const { error } = await supabaseAdmin
                   .from("projects")
                   .update({ intro: next as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
-                return { ok: true, updated: Object.keys(input) };
+                return {
+                  ok: true,
+                  updated: Object.keys(input),
+                  blockCount: Array.isArray(next.blocks) ? next.blocks.length : currentBlocks.length,
+                };
               },
             }),
             update_skus: tool({
