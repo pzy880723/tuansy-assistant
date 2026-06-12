@@ -446,15 +446,28 @@ function ChatPane({
               ))}
             </SelectContent>
           </Select>
-          <Link
-            to="/settings"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="打开设置 / 编辑文案逻辑"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:text-foreground"
-          >
-            <SettingsIcon className="h-3.5 w-3.5" />
-          </Link>
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                title="编辑文案逻辑（修改自动保存）"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:text-foreground"
+              >
+                <SettingsIcon className="h-3.5 w-3.5" />
+              </button>
+            </DialogTrigger>
+            <DialogContent className="w-[min(960px,95vw)] max-w-5xl gap-0 overflow-hidden p-0 sm:rounded-lg">
+              <DialogHeader className="border-b px-5 py-3 text-left">
+                <DialogTitle className="text-sm">文案逻辑</DialogTitle>
+                <p className="text-[11px] text-muted-foreground">
+                  在这里直接修改，团宝下次写文案就会按新规则来。所有改动自动保存。
+                </p>
+              </DialogHeader>
+              <div className="max-h-[75vh] overflow-y-auto">
+                <CopyLogicSection embedded />
+              </div>
+            </DialogContent>
+          </Dialog>
         <Popover>
           <PopoverTrigger asChild>
             <button
