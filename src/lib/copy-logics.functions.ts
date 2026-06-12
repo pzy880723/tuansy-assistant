@@ -24,17 +24,20 @@ const ModuleSchema = z.object({
 export type CopyModule = z.infer<typeof ModuleSchema>;
 
 export const FormattingSchema = z.object({
-  paragraphMode: z.enum(["natural", "one-sentence-per-line"]).default("natural"),
+  paragraphMode: z
+    .enum(["natural", "one-sentence-per-line", "period-only"])
+    .default("natural"),
   lineGap: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(1),
-  indentFirstLine: z.boolean().default(false),
-  tailBlankLines: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
+  indentFirstLine: z.boolean().optional(),
+  headBlankLines: z.number().int().min(0).max(10).default(0),
+  tailBlankLines: z.number().int().min(0).max(10).default(0),
   emojiDensity: z.enum(["none", "light", "rich"]).default("light"),
 });
 export type CopyFormatting = z.infer<typeof FormattingSchema>;
 export const DEFAULT_FORMATTING: CopyFormatting = {
   paragraphMode: "natural",
   lineGap: 1,
-  indentFirstLine: false,
+  headBlankLines: 0,
   tailBlankLines: 0,
   emojiDensity: "light",
 };
