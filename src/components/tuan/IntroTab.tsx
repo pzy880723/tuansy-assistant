@@ -394,11 +394,32 @@ export function IntroTab({
         } else if (y > r.bottom - EDGE) {
           dy = MAX_SPEED * (1 - Math.max(0, (r.bottom - y) / EDGE));
         }
-        if (dy !== 0) s.scrollTop += dy;
+        if (dy !== 0) {
+          const before = s.scrollTop;
+          s.scrollTop += dy;
+          if (s.scrollTop !== before) {
+            // Recompute drop index against newly visible blocks, and
+            // trigger a re-render so the dragged module's translateY
+            // (which depends on scrollTop) follows the scroll.
+            const others = blocks.filter((b) => b.id !== cur.id);
+            let nextIdx = others.length;
+            for (let i = 0; i < others.length; i++) {
+              const el = ghostBlockRefs.current.get(others[i].id);
+              if (!el) continue;
+              const rr = el.getBoundingClientRect();
+              if (cur.pointerY < rr.top + rr.height / 2) {
+                nextIdx = i;
+                break;
+              }
+            }
+            setDrag((c) => (c ? { ...c, dropIndex: nextIdx } : c));
+          }
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
+
 
     return () => {
       window.removeEventListener("pointermove", onMove);
@@ -695,14 +716,17 @@ export function IntroTab({
                                     left: 12,
                                     right: 12,
                                     top: 0,
-                                    opacity: 0.95,
+                                    opacity: 1,
                                     outline: "2px dashed #07c160",
-                                    background: "rgba(255,255,255,0.95)",
-                                    borderRadius: 8,
-                                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                    background: "#ffffff",
+                                    borderRadius: 10,
+                                    padding: 10,
+                                    boxShadow:
+                                      "0 16px 36px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08)",
                                     pointerEvents: "none",
                                   }}
                                 >
+
                                   <BlockGhost block={b} />
                                 </div>
                               );
@@ -715,8 +739,14 @@ export function IntroTab({
                                   transform: `translateY(${ghostTranslateOf(b.id)}px)`,
                                   transition:
                                     "transform 220ms cubic-bezier(.2,.8,.2,1)",
+                                  background: "#ffffff",
+                                  borderRadius: 10,
+                                  padding: 10,
+                                  boxShadow:
+                                    "0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
                                 }}
                               >
+
                                 <BlockGhost block={b} />
                               </div>
                             );
