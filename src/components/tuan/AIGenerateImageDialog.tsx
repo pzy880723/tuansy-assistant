@@ -437,7 +437,23 @@ export function AIGenerateImageDialog({
                       draggable && "cursor-grab active:cursor-grabbing",
                     )}
                   >
-                    {slot.status === "loading" && <TechLoader />}
+                    {slot.status === "loading" && (
+                      <>
+                        {slot.previewUrl && (
+                          <img
+                            src={slot.previewUrl}
+                            alt=""
+                            className={cn(
+                              "h-full w-full object-cover transition-[filter,opacity] duration-500",
+                              slot.isFinal ? "blur-0 opacity-100" : "blur-xl opacity-80",
+                            )}
+                          />
+                        )}
+                        <div className="absolute inset-0">
+                          <TechLoader translucent={Boolean(slot.previewUrl)} />
+                        </div>
+                      </>
+                    )}
                     {slot.status === "done" && slot.url && (
                       <>
                         <img
