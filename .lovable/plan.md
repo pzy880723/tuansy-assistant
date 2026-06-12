@@ -1,17 +1,33 @@
-修复缩略图的三处问题：
 
-1. 模块背景改为不透明白色
-   - 每个模块卡片背景从透明改为纯白 `#ffffff`，确保文字和内容清晰可读，不再透出后面的毛玻璃。
+## 问题
 
-2. 每个模块加阴影
-   - 给缩略图内的每个模块卡片加轻量阴影（如 `0 2px 8px rgba(0,0,0,0.06)` + 圆角），形成清晰的卡片堆叠感。
-   - 被拖拽的模块保留更明显的浮起阴影和绿色虚线描边。
+拖动模块时，"下面还有内容却拖不下去"。原因是缩略图的高度直接等于整个介绍卡片的高度（`cRect.height - 16`），当卡片比视口高时，缩略图的底边其实是在屏幕之外的：
 
-3. 自动滚动时拖拽模块跟随移动
-   - 当前问题：靠近缩略图上/下边缘触发 auto-scroll 时，scrollTop 变化但 React 没有重渲染，导致被拖拽模块"卡住"不跟着滚动，drop index 也不实时更新。
-   - 修复：在自动滚动的 RAF tick 中，每次 scrollTop 发生变化时都触发一次 setDrag(更新一个 tick 计数或重新计算 dropIndex)，让被拖模块的 translateY 和其他模块的让位实时跟随滚动位置变化。
-   - 效果：拖到顶部边缘，缩略图自动向上滚动暴露上面内容，被拖模块视觉上跟着内容一起移动；拖到底部同理向下滚动。
+- 自动向下滚动的判定 `pointerY > r.bottom - EDGE` 永远不成立（因为 r.bottom 在视口下方，指针碰不到）。
+- 缩略图的下半部分被屏幕裁掉，看不到也滑不进去。
 
-技术细节（仅修改 `src/components/tuan/IntroTab.tsx`）：
-- 调整缩略图内每个 block 容器的内联样式：`background: #fff`、`borderRadius: 8`、`boxShadow: 0 2px 8px rgba(0,0,0,0.06)`、内边距 padding。
-- 调整 auto-scroll RAF：滚动后调用 `setDrag(cur => cur ? { ...cur } : cur)` 或重新计算 dropIndex 并 set，确保依赖 scrollTop 的 dragged 元素重新计算位置。
+## 修复（只改 `src/components/tuan/IntroTab.tsx`）
+
+1. 引入视口夹紧的尺寸计算（在渲染缩略图的 IIFE 里）：
+   ```
+   const VPAD = 16;
+   const ghostTop    = Math.max(VPAD, drag.cRect.top + 8);
+   const maxBottom   = window.innerHeight - VPAD;
+   const ghostHeight = Math.max(200, Math.min(drag.cRect.height - 16, maxBottom - ghostTop));
+   ```
+   缩略图始终完整落在视口里，底部边缘可被指针触达。
+
+2. 用 `ghostTop` / `ghostHeight` 同时设置：
+   - 毛玻璃 backdrop 的 `top` / `height`（仍然只覆盖原预览区域的横向范围 `cRect.left` / `cRect.width`，但纵向夹紧到视口）。
+   - 缩略图浮层的 `top` / `height`。
+
+3. 自动滚动逻辑不变（`tick` 里依据 `ghostScrollRef.getBoundingClientRect()` 的 top/bottom 判断），但因为 1)，`r.bottom` 现在真的在屏幕内，向下拖到接近底边时就会触发 `s.scrollTop += dy`，并通过 `setDrag(c => ({...c}))` 触发重渲染，露出下方模块、被拖块的 `translateY` 同步跟随。
+
+4. 被拖块在缩略图内的 `yInScaled` 公式保持不变（`(pointerY - baseTop + scrollTop)/GHOST_SCALE - blockHeight/2`），因为它依赖的是 `ghostScrollRef.getBoundingClientRect().top`，会自动反映新的 `ghostTop`。
+
+5. 顶部边缘自动向上滚动同理生效（之前如果 `cRect.top` 是负值/在视口外，顶边检测也会失常；现在被 `Math.max(VPAD, ...)` 夹紧后顶边一定在屏幕内）。
+
+## 不改的内容
+
+- 模块业务逻辑、`commitReorder`、`computeDropIndex`、模块卡片样式、文字大小（已是按比例 `GHOST_SCALE=0.5` 缩放，文字也跟着缩小，不需要再调）。
+- 其他 tab、其他组件、数据层。

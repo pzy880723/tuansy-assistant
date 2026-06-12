@@ -641,15 +641,29 @@ export function IntroTab({
           others slide to open a gap; auto-scrolls near top/bottom edges. */}
       {drag && draggedBlock &&
         createPortal(
-          <>
+          (() => {
+            const VIEWPORT_PAD = 16;
+            const viewportHeight = typeof window === "undefined" ? drag.cRect.height : window.innerHeight;
+            const maxAvailableHeight = Math.max(200, viewportHeight - VIEWPORT_PAD * 2);
+            const ghostHeight = Math.min(Math.max(200, drag.cRect.height - 16), maxAvailableHeight);
+            const desiredTop = drag.cRect.top + 8;
+            const ghostTop = Math.min(
+              Math.max(VIEWPORT_PAD, desiredTop),
+              Math.max(VIEWPORT_PAD, viewportHeight - VIEWPORT_PAD - ghostHeight),
+            );
+            const halfW = drag.cRect.width * 0.5;
+            const fullW = halfW / GHOST_SCALE;
+            const left = drag.cRect.left + (drag.cRect.width - halfW) / 2;
+
+            return <>
             {/* Frosted glass — covers ONLY the preview editor area */}
             <div
               className="pointer-events-none fixed z-40 animate-in fade-in duration-150"
               style={{
                 left: drag.cRect.left,
-                top: drag.cRect.top,
+                top: ghostTop,
                 width: drag.cRect.width,
-                height: drag.cRect.height,
+                height: ghostHeight,
                 background: "rgba(255,255,255,0.35)",
                 backdropFilter: "blur(8px) saturate(1.05)",
                 WebkitBackdropFilter: "blur(8px) saturate(1.05)",
@@ -659,18 +673,14 @@ export function IntroTab({
             {/* Fixed half-width thumbnail centered over the preview area.
                 Inner content is rendered at full width then visually scaled
                 so text/images/spacing all shrink proportionally. */}
-            {(() => {
-              const halfW = drag.cRect.width * 0.5;
-              const fullW = halfW / GHOST_SCALE;
-              const left = drag.cRect.left + (drag.cRect.width - halfW) / 2;
-              return (
+            {(
                 <div
                   className="fixed z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden rounded-xl bg-white/98 shadow-2xl ring-1 ring-black/10"
                   style={{
                     left,
-                    top: drag.cRect.top + 8,
+                    top: ghostTop,
                     width: halfW,
-                    height: drag.cRect.height - 16,
+                    height: ghostHeight,
                   }}
                 >
                   <div
@@ -756,9 +766,9 @@ export function IntroTab({
                     </div>
                   </div>
                 </div>
-              );
-            })()}
-          </>,
+              )}
+          </>;
+          })(),
           document.body,
         )}
 
