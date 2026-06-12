@@ -519,6 +519,83 @@ function LogicEditor({
         />
       </div>
 
+      <div className="rounded-md border bg-muted/30 p-3">
+        <div className="mb-2 text-[11px] font-medium text-muted-foreground">
+          排版预设（团宝写文案时自动套用，省得每次都讲）
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-muted-foreground">段落模式</span>
+            <select
+              value={formatting.paragraphMode}
+              onChange={(e) =>
+                updateFormatting({
+                  paragraphMode: e.target.value as CopyFormatting["paragraphMode"],
+                })
+              }
+              className="h-7 rounded border bg-background px-2 text-[11px]"
+            >
+              <option value="natural">自然分段</option>
+              <option value="one-sentence-per-line">一句一段</option>
+            </select>
+          </label>
+          <label className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-muted-foreground">段间空行</span>
+            <select
+              value={formatting.lineGap}
+              onChange={(e) =>
+                updateFormatting({ lineGap: Number(e.target.value) as 0 | 1 | 2 })
+              }
+              className="h-7 rounded border bg-background px-2 text-[11px]"
+            >
+              <option value={0}>0 行</option>
+              <option value={1}>1 行</option>
+              <option value={2}>2 行</option>
+            </select>
+          </label>
+          <label className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-muted-foreground">首行缩进两格</span>
+            <Switch
+              checked={formatting.indentFirstLine}
+              onCheckedChange={(v) => updateFormatting({ indentFirstLine: v })}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-muted-foreground">尾部空行</span>
+            <select
+              value={formatting.tailBlankLines}
+              onChange={(e) =>
+                updateFormatting({
+                  tailBlankLines: Number(e.target.value) as 0 | 1 | 2,
+                })
+              }
+              className="h-7 rounded border bg-background px-2 text-[11px]"
+            >
+              <option value={0}>0 行</option>
+              <option value={1}>1 行</option>
+              <option value={2}>2 行</option>
+            </select>
+          </label>
+          <label className="flex items-center justify-between gap-2 text-[11px] sm:col-span-2">
+            <span className="text-muted-foreground">Emoji 浓度</span>
+            <select
+              value={formatting.emojiDensity}
+              onChange={(e) =>
+                updateFormatting({
+                  emojiDensity: e.target.value as CopyFormatting["emojiDensity"],
+                })
+              }
+              className="h-7 rounded border bg-background px-2 text-[11px]"
+            >
+              <option value="none">无 Emoji</option>
+              <option value="light">适量（每段 ≤1 个）</option>
+              <option value="rich">丰富（标题+段首）</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+
       <div>
         <div className="mb-2 flex items-center justify-between">
           <label className="text-[11px] font-medium text-muted-foreground">
