@@ -594,7 +594,9 @@ export function AIGenerateImageDialog({
                 ) : (
                   <>
                     <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    确认插入 {doneCount} 张
+                    {saveMode === "sm"
+                      ? `插入九宫格（${doneCount} 张）`
+                      : `插入大图 ${doneCount} 个模块`}
                   </>
                 )}
               </Button>
