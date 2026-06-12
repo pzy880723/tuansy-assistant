@@ -34,6 +34,8 @@ type Slot = {
   isFinal?: boolean;
   error?: string;
   variantSeed: string;
+  startedAt: number;
+  hasPartial?: boolean;
 };
 
 type ImageStreamPayload = {
@@ -187,7 +189,7 @@ export function AIGenerateImageDialog({
       const finalB64 = await readImageStream(res, (dataUrl, isFinal) => {
         setSlots((cur) =>
           cur.map((s) =>
-            s.id === slotId ? { ...s, previewUrl: dataUrl, isFinal } : s,
+            s.id === slotId ? { ...s, previewUrl: dataUrl, isFinal, hasPartial: true } : s,
           ),
         );
       });
@@ -215,6 +217,7 @@ export function AIGenerateImageDialog({
       id: crypto.randomUUID(),
       status: "loading" as const,
       variantSeed: genSeed(),
+      startedAt: Date.now(),
     }));
     setSlots(initial);
     setPhase("generating");
@@ -240,6 +243,8 @@ export function AIGenerateImageDialog({
               previewUrl: undefined,
               isFinal: false,
               variantSeed: newSeed,
+              startedAt: Date.now(),
+              hasPartial: false,
             }
           : s,
       ),
@@ -450,7 +455,7 @@ export function AIGenerateImageDialog({
                           />
                         )}
                         <div className="absolute inset-0">
-                          <TechLoader translucent={Boolean(slot.previewUrl)} />
+                          <TechLoader translucent={Boolean(slot.previewUrl)} startedAt={slot.startedAt} hasPartial={Boolean(slot.hasPartial)} />
                         </div>
                       </>
                     )}
@@ -562,8 +567,61 @@ export function AIGenerateImageDialog({
   );
 }
 
-/** Siri / Apple-Intelligence style liquid loader. */
-function TechLoader({ translucent = false }: { translucent?: boolean }) {
+/** Siri / Apple-Intelligence style liquid loader with progress + thinking phrases. */
+const THINKING_PHRASES = [
+  { at: 0, text: "正在阅读你的描述…" },
+  { at: 2200, text: "拆解段落，理解商品要点…" },
+  { at: 5000, text: "搜索相似商品的视觉特征…" },
+  { at: 8500, text: "构思画面构图与镜头…" },
+  { at: 12000, text: "铺设光影与材质…" },
+  { at: 16000, text: "绘制主体细节…" },
+  { at: 21000, text: "微调色彩与质感…" },
+  { at: 26000, text: "即将完成…" },
+];
+
+function easeProgress(elapsedMs: number): number {
+  // Smooth curve: 0→35% by 6s, 35→75% by 18s, then asymptotic toward 90%.
+  if (elapsedMs <= 6000) return (elapsedMs / 6000) * 35;
+  if (elapsedMs <= 18000) return 35 + ((elapsedMs - 6000) / 12000) * 40;
+  return 75 + (1 - Math.exp(-(elapsedMs - 18000) / 12000)) * 15;
+}
+
+function TechLoader({
+  translucent = false,
+  startedAt,
+  hasPartial = false,
+}: {
+  translucent?: boolean;
+  startedAt: number;
+  hasPartial?: boolean;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const loop = () => {
+      setTick(Date.now());
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const elapsed = Math.max(0, tick - startedAt);
+  const baseProgress = easeProgress(elapsed);
+  const progress = Math.min(95, hasPartial ? Math.max(baseProgress, 82) : baseProgress);
+
+  // Pick a phrase. If a partial frame arrived, jump to "绘制主体细节…".
+  let phraseIdx = 0;
+  for (let i = 0; i < THINKING_PHRASES.length; i++) {
+    if (elapsed >= THINKING_PHRASES[i].at) phraseIdx = i;
+  }
+  if (hasPartial && phraseIdx < 5) phraseIdx = 5;
+  const phrase = THINKING_PHRASES[phraseIdx].text;
+
+  const labelColor = translucent ? "rgba(255,255,255,0.92)" : "rgba(60, 40, 90, 0.72)";
+  const subColor = translucent ? "rgba(255,255,255,0.6)" : "rgba(60, 40, 90, 0.45)";
+  const trackBg = translucent ? "rgba(255,255,255,0.18)" : "rgba(60, 40, 90, 0.10)";
+
   return (
     <div
       className={cn("relative h-full w-full overflow-hidden", translucent && "bg-white/20 backdrop-blur-sm")}
@@ -575,8 +633,8 @@ function TechLoader({ translucent = false }: { translucent?: boolean }) {
       <div className="siri-blob siri-blob-c" />
 
       {/* Rainbow conic ring (blurred halo) */}
-      <div className="absolute inset-0 grid place-items-center">
-        <div className="relative h-16 w-16">
+      <div className="absolute inset-0 grid place-items-center" style={{ transform: "translateY(-10px)" }}>
+        <div className="relative h-14 w-14">
           <div
             className="absolute inset-0 rounded-full siri-spin"
             style={{
@@ -586,7 +644,6 @@ function TechLoader({ translucent = false }: { translucent?: boolean }) {
               opacity: 0.9,
             }}
           />
-          {/* Crisp inner ring (counter-spin) */}
           <div
             className="absolute inset-1.5 rounded-full siri-spin-rev"
             style={{
@@ -596,7 +653,6 @@ function TechLoader({ translucent = false }: { translucent?: boolean }) {
               WebkitMask: "radial-gradient(circle, transparent 58%, #000 60%)",
             }}
           />
-          {/* Breathing core */}
           <div className="absolute inset-0 grid place-items-center">
             <div
               className="h-3 w-3 rounded-full bg-white siri-breathe"
@@ -615,13 +671,40 @@ function TechLoader({ translucent = false }: { translucent?: boolean }) {
         }}
       />
 
-      {/* Label */}
-      <div
-        className="absolute inset-x-0 bottom-2 text-center text-[10px] font-light tracking-[0.3em]"
-        style={{ color: translucent ? "rgba(255,255,255,0.82)" : "rgba(60, 40, 90, 0.55)" }}
-      >
-        DESIGNING
+      {/* Thinking phrase + progress bar */}
+      <div className="absolute inset-x-0 bottom-0 px-3 pb-2.5">
+        <div className="relative h-4 overflow-hidden">
+          <div
+            key={phraseIdx}
+            className="absolute inset-0 flex items-center justify-center text-[11px] font-medium tracking-wide animate-in fade-in slide-in-from-bottom-1 duration-500"
+            style={{ color: labelColor, textShadow: translucent ? "0 1px 6px rgba(0,0,0,0.35)" : "none" }}
+          >
+            {phrase}
+          </div>
+        </div>
+        <div
+          className="mt-1.5 h-[2px] w-full overflow-hidden rounded-full"
+          style={{ background: trackBg }}
+        >
+          <div
+            className="h-full rounded-full siri-shimmer"
+            style={{
+              width: `${progress}%`,
+              background:
+                "linear-gradient(90deg, #ff6ec7, #b388ff 40%, #6ec1ff 70%, #4cc9f0)",
+              boxShadow: "0 0 8px rgba(179,136,255,0.6)",
+              transition: "width 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          />
+        </div>
+        <div
+          className="mt-1 text-center text-[9px] tabular-nums tracking-[0.25em]"
+          style={{ color: subColor }}
+        >
+          {Math.round(progress)}%
+        </div>
       </div>
+
 
       <style>{`
         .siri-blob {
