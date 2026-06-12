@@ -224,8 +224,9 @@ function CopyLogicSection() {
         <div>
           <div className="text-sm font-semibold">文案编辑逻辑</div>
           <div className="text-[11px] text-muted-foreground">
-            团宝写文案时会遵循当前激活的逻辑
+            可同时启用多条，团宝会按商品品类自动挑一条来写
           </div>
+
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild>
@@ -287,9 +288,10 @@ function CopyLogicSection() {
               </div>
               {l.is_active && (
                 <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
-                  <Check className="h-2.5 w-2.5" /> 激活
+                  <Check className="h-2.5 w-2.5" /> 已启用
                 </span>
               )}
+
             </button>
           ))}
         </aside>
@@ -318,14 +320,16 @@ function CopyLogicSection() {
                 }
               }}
               onActivate={async () => {
+                const nextActive = !selected.is_active;
                 try {
-                  await setActive({ data: { id: selected.id } });
+                  await setActive({ data: { id: selected.id, active: nextActive } });
                   await refresh();
-                  toast.success("已设为当前激活");
+                  toast.success(nextActive ? "已启用" : "已停用");
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : "切换失败");
                 }
               }}
+
               onDelete={async () => {
                 if (!window.confirm(`确认删除「${selected.name}」？`)) return;
                 try {
@@ -480,9 +484,10 @@ function LogicEditor({
         </div>
         <div className="flex flex-col items-end gap-1 pt-5">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">激活</span>
+            <span className="text-muted-foreground">启用</span>
             <Switch checked={logic.is_active} onCheckedChange={() => onActivate()} />
           </div>
+
           {lastSavedAt && (
             <div className="text-[10px] text-muted-foreground">
               已保存 {new Date(lastSavedAt).toLocaleTimeString().slice(0, 5)}

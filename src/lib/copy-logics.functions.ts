@@ -95,13 +95,6 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
 
     if (data.id) {
       await assertOwner(data.id, userId);
-      if (data.is_active === true) {
-        await supabaseAdmin
-          .from("copy_logics")
-          .update({ is_active: false })
-          .eq("user_id", userId)
-          .neq("id", data.id);
-      }
       const { data: row, error } = await supabaseAdmin
         .from("copy_logics")
         .update({
@@ -118,12 +111,6 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
       return { logic: row as unknown as CopyLogic };
     }
 
-    if (data.is_active === true) {
-      await supabaseAdmin
-        .from("copy_logics")
-        .update({ is_active: false })
-        .eq("user_id", userId);
-    }
     const { data: row, error } = await supabaseAdmin
       .from("copy_logics")
       .insert({
@@ -140,6 +127,7 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
     return { logic: row as unknown as CopyLogic };
   });
 
+
 export const deleteCopyLogic = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
@@ -155,22 +143,22 @@ export const deleteCopyLogic = createServerFn({ method: "POST" })
   });
 
 export const setActiveCopyLogic = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: { id: string; active?: boolean }) =>
+    z.object({ id: z.string().uuid(), active: z.boolean().optional() }).parse(d),
+  )
   .handler(async ({ data }) => {
     const userId = await requireUserId();
     await assertOwner(data.id, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("copy_logics")
-      .update({ is_active: false })
-      .eq("user_id", userId);
+    const nextActive = data.active ?? true;
     const { error } = await supabaseAdmin
       .from("copy_logics")
-      .update({ is_active: true })
+      .update({ is_active: nextActive })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, is_active: nextActive };
   });
+
 
 function rid() {
   return Math.random().toString(36).slice(2, 10);

@@ -126,18 +126,21 @@ export const Route = createFileRoute("/api/chat")({
             activeLogic = logics.find((l) => l.id === body.copyLogicId) ?? null;
           }
           if (!activeLogic && logics.length > 0) {
-            const fallback = logics.find((l) => l.is_active) ?? logics[0];
-            if (logics.length === 1) {
+            // 候选池：优先取「已启用」逻辑；若一条都没启用，回落到全部逻辑兜底
+            const enabled = logics.filter((l) => l.is_active);
+            const pool = enabled.length > 0 ? enabled : logics;
+            const fallback = pool[0];
+            if (pool.length === 1) {
               activeLogic = fallback;
             } else {
               try {
-                const ids = logics.map((l) => l.id);
+                const ids = pool.map((l) => l.id);
                 const matcherGateway = createLovableAiGatewayProvider(key);
                 const productTitle =
                   (product.title as string | undefined) ??
                   (project?.name as string | undefined) ??
                   "";
-                const candidates = logics
+                const candidates = pool
                   .map(
                     (l, i) =>
                       `${i + 1}. id=${l.id} | 名称：${l.name} | 简介：${(l.description ?? "").slice(0, 200)} | 模块：${(l.modules ?? []).map((m) => m.label).join("/")}`,
@@ -151,12 +154,12 @@ export const Route = createFileRoute("/api/chat")({
                       id: z.enum(["__none__", ...ids] as [string, ...string[]]),
                     }),
                   }),
-                  prompt: `从下列文案逻辑中挑一条最适合当前商品；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选：\n${candidates}`,
+                  prompt: `你在为团长挑选最合适的文案撰写逻辑。请根据商品品类、标题与简单描述，从下列候选里选出最贴合的一条；都不匹配返回 __none__。\n商品品类：${category}\n商品标题：${productTitle}\n候选（均为团长已启用的逻辑）：\n${candidates}`,
                 });
                 const picked = (matched.output as { id?: string } | undefined)?.id;
                 activeLogic =
                   picked && picked !== "__none__"
-                    ? (logics.find((l) => l.id === picked) ?? fallback)
+                    ? (pool.find((l) => l.id === picked) ?? fallback)
                     : fallback;
               } catch {
                 activeLogic = fallback;
@@ -164,6 +167,7 @@ export const Route = createFileRoute("/api/chat")({
             }
           }
         }
+
 
         const fmt = (activeLogic?.formatting ?? {}) as {
           paragraphMode?: "natural" | "one-sentence-per-line" | "period-only";
