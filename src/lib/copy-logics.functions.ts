@@ -23,12 +23,29 @@ const ModuleSchema = z.object({
 
 export type CopyModule = z.infer<typeof ModuleSchema>;
 
+export const FormattingSchema = z.object({
+  paragraphMode: z.enum(["natural", "one-sentence-per-line"]).default("natural"),
+  lineGap: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(1),
+  indentFirstLine: z.boolean().default(false),
+  tailBlankLines: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
+  emojiDensity: z.enum(["none", "light", "rich"]).default("light"),
+});
+export type CopyFormatting = z.infer<typeof FormattingSchema>;
+export const DEFAULT_FORMATTING: CopyFormatting = {
+  paragraphMode: "natural",
+  lineGap: 1,
+  indentFirstLine: false,
+  tailBlankLines: 0,
+  emojiDensity: "light",
+};
+
 export type CopyLogic = {
   id: string;
   user_id: string;
   name: string;
   description: string;
   modules: CopyModule[];
+  formatting: CopyFormatting;
   is_active: boolean;
   created_at: string;
   updated_at: string;
