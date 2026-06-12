@@ -216,7 +216,7 @@ export const adminListPresets = createServerFn({ method: "GET" }).handler(async 
     .select("*")
     .order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
-  return { presets: (data ?? []) as PresetCopyLogic[] };
+  return { presets: (data ?? []) as unknown as PresetCopyLogic[] };
 });
 
 export const adminUpsertPreset = createServerFn({ method: "POST" })
@@ -253,7 +253,7 @@ export const adminUpsertPreset = createServerFn({ method: "POST" })
         .select("*")
         .single();
       if (error) throw new Error(error.message);
-      return { preset: row as PresetCopyLogic };
+      return { preset: row as unknown as PresetCopyLogic };
     }
     const { data: row, error } = await supabaseAdmin
       .from("preset_copy_logics")
@@ -269,7 +269,7 @@ export const adminUpsertPreset = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return { preset: row as PresetCopyLogic };
+    return { preset: row as unknown as PresetCopyLogic };
   });
 
 export const adminDeletePreset = createServerFn({ method: "POST" })
