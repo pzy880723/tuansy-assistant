@@ -80,6 +80,7 @@ const UpsertInput = z.object({
   name: z.string().min(1).max(60),
   description: z.string().max(8000).default(""),
   modules: z.array(ModuleSchema).max(40).default([]),
+  formatting: FormattingSchema.optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -104,6 +105,7 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
           name: data.name,
           description: data.description,
           modules: data.modules,
+          ...(data.formatting !== undefined ? { formatting: data.formatting } : {}),
           ...(data.is_active !== undefined ? { is_active: data.is_active } : {}),
         })
         .eq("id", data.id)
@@ -126,6 +128,7 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
         name: data.name,
         description: data.description,
         modules: data.modules,
+        formatting: data.formatting ?? DEFAULT_FORMATTING,
         is_active: data.is_active ?? false,
       })
       .select("*")
