@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +10,7 @@ import {
   ImagePlus,
   RotateCcw,
   Send,
+  Settings as SettingsIcon,
   Wrench,
   Loader2,
   ClipboardList,
@@ -437,6 +438,15 @@ function ChatPane({
               ))}
             </SelectContent>
           </Select>
+          <Link
+            to="/settings"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="打开设置 / 编辑文案逻辑"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:text-foreground"
+          >
+            <SettingsIcon className="h-3.5 w-3.5" />
+          </Link>
         <Popover>
           <PopoverTrigger asChild>
             <button
