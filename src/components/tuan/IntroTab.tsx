@@ -474,7 +474,15 @@ export function IntroTab({
       </div>
 
       {/* Intro card */}
-      <div className="relative rounded-xl bg-white p-3">
+      <div
+        ref={containerRef}
+        className="relative rounded-xl bg-white p-3"
+        style={
+          drag
+            ? { filter: "blur(2px) saturate(0.85)", pointerEvents: "none", transition: "filter 160ms" }
+            : { transition: "filter 160ms" }
+        }
+      >
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
@@ -522,7 +530,7 @@ export function IntroTab({
                 isLast={i === blocks.length - 1}
                 isDragging={drag?.id === b.id}
                 isEditing={editingId === b.id}
-                dragOffset={translateOf(b.id)}
+                dragOffset={0}
                 anyDragging={!!drag}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
@@ -582,29 +590,64 @@ export function IntroTab({
         </div>
       </div>
 
-      {/* Drag backdrop + ghost */}
+      {/* Drag: localized frosted backdrop + half-width floating thumbnail */}
       {drag && draggedBlock &&
         createPortal(
           <>
-            <div className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[3px] animate-in fade-in duration-150" />
+            {/* Frosted glass — covers ONLY the preview editor area */}
             <div
-              className="pointer-events-none fixed z-50 origin-top-left"
+              className="pointer-events-none fixed z-40 animate-in fade-in duration-150"
               style={{
-                left: drag.pointerX - drag.offsetX * 0.5,
-                top: drag.pointerY - drag.offsetY * 0.5,
-                width: drag.width,
-                transform: "scale(0.5)",
-                transformOrigin: "top left",
-                transition: "transform 160ms cubic-bezier(.2,.8,.2,1)",
+                left: drag.cRect.left,
+                top: drag.cRect.top,
+                width: drag.cRect.width,
+                height: drag.cRect.height,
+                background: "rgba(255,255,255,0.35)",
+                backdropFilter: "blur(8px) saturate(1.05)",
+                WebkitBackdropFilter: "blur(8px) saturate(1.05)",
+                borderRadius: 12,
+              }}
+            />
+            {/* Half-width floating preview thumbnail, anchored under cursor */}
+            <div
+              className="pointer-events-none fixed z-50 animate-in fade-in zoom-in-95 duration-150"
+              style={{
+                left: drag.pointerX - drag.grabRelX * 0.5,
+                top: drag.pointerY - drag.grabRelY * 0.5,
+                width: drag.cRect.width * 0.5,
+                transition: "none",
               }}
             >
-              <div className="rounded-xl bg-white/95 p-3 shadow-2xl ring-1 ring-black/5 backdrop-blur">
-                <BlockGhost block={draggedBlock} />
+              <div className="rounded-xl bg-white/98 p-2 shadow-2xl ring-1 ring-black/10">
+                <div className="mb-1 truncate text-[10px] font-semibold text-[#1a1a1a]">
+                  {intro.title || "团购介绍"}
+                </div>
+                <div className="space-y-1.5">
+                  {blocks.map((b) => {
+                    const isMe = b.id === drag.id;
+                    return (
+                      <div
+                        key={b.id}
+                        ref={isMe ? undefined : registerGhostRef(b.id)}
+                        style={{
+                          transform: `translateY(${ghostTranslateOf(b.id)}px)`,
+                          transition: "transform 220ms cubic-bezier(.2,.8,.2,1)",
+                          opacity: isMe ? 0.55 : 1,
+                          outline: isMe ? "2px dashed #07c160" : undefined,
+                          borderRadius: 6,
+                        }}
+                      >
+                        <BlockGhost block={b} />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </>,
           document.body,
         )}
+
 
       {projectId && (
         <AIGenerateImageDialog
