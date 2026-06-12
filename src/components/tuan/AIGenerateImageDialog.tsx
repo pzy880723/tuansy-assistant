@@ -217,6 +217,7 @@ export function AIGenerateImageDialog({
       id: crypto.randomUUID(),
       status: "loading" as const,
       variantSeed: genSeed(),
+      startedAt: Date.now(),
     }));
     setSlots(initial);
     setPhase("generating");
