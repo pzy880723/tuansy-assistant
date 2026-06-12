@@ -65,11 +65,18 @@ function parsePublicCookie(): { user: ClientUser | null; error: string | null } 
 
 function readPublicCookie(): ClientUser | null {
   const cookieUser = parsePublicCookie()?.user ?? null;
-  if (cookieUser) return cookieUser;
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined") return cookieUser;
+  // The server only trusts the request when either the httpOnly cookie is sent
+  // OR an x-tuan-session header is attached from localStorage. In preview
+  // iframes cookies are often partitioned, so without the localStorage token
+  // every server-fn 401s. Treat the user as logged-out when the token is gone
+  // to avoid UI/server mismatch.
+  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  if (cookieUser && token) return cookieUser;
   try {
     const raw = window.localStorage.getItem(AUTH_USER_KEY);
-    return raw ? (JSON.parse(raw) as ClientUser) : null;
+    const lsUser = raw ? (JSON.parse(raw) as ClientUser) : null;
+    return lsUser && token ? lsUser : null;
   } catch {
     window.localStorage.removeItem(AUTH_USER_KEY);
     return null;

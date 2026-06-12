@@ -21,7 +21,22 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 
 const attachTuanSession = createMiddleware({ type: "function" }).client(async ({ next }) => {
   const token = readAuthToken();
-  return next({ headers: token ? { "x-tuan-session": token } : undefined });
+  try {
+    return await next({ headers: token ? { "x-tuan-session": token } : undefined });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (typeof window !== "undefined" && /未登录|登录状态/.test(msg)) {
+      const { clearAuthCookies, setAuthSessionError, notifyAuthChange } = await import("@/lib/use-current-user");
+      clearAuthCookies();
+      setAuthSessionError("登录状态已失效，请重新登录");
+      notifyAuthChange();
+      if (!window.location.pathname.startsWith("/auth")) {
+        const redirect = window.location.pathname + window.location.search;
+        window.location.replace(`/auth?redirect=${encodeURIComponent(redirect)}`);
+      }
+    }
+    throw err;
+  }
 });
 
 export const startInstance = createStart(() => ({
