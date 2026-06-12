@@ -255,24 +255,41 @@ export function IntroTab({
   };
 
   // ============= Drag-to-reorder state =============
+  // UX: pressing the grip immediately shrinks the WHOLE intro preview into a
+  // half-width floating thumbnail anchored under the cursor. Only the preview
+  // area gets a blur backdrop; the rest of the page is unaffected. Inside
+  // the thumbnail, blocks slide to open a gap at the live drop position so
+  // the user can land precisely.
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const registerBlockRef = (id: string) => (el: HTMLDivElement | null) => {
     if (el) blockRefs.current.set(id, el);
     else blockRefs.current.delete(id);
   };
+  // Refs to the block elements rendered INSIDE the floating thumbnail.
+  // These are what we hit-test against for the drop index.
+  const ghostBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerGhostRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) ghostBlockRefs.current.set(id, el);
+    else ghostBlockRefs.current.delete(id);
+  };
 
   type DragState = {
     id: string;
     pointerId: number;
-    startX: number;
-    startY: number;
-    offsetX: number;
-    offsetY: number;
-    width: number;
-    height: number;
+    // Bounding rect of the preview at drag-start (for the blur backdrop and
+    // the thumbnail's initial position/size).
+    cRect: { left: number; top: number; width: number; height: number };
+    // Pointer position at grab time, relative to the container's top-left.
+    grabRelX: number;
+    grabRelY: number;
+    // Current pointer in viewport coords.
     pointerX: number;
     pointerY: number;
-    dropIndex: number; // index in compacted (others) list
+    // Drop index within the compacted (others) list.
+    dropIndex: number;
+    // Height of the dragged block in the live preview (for the in-ghost gap).
+    blockHeight: number;
   };
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -289,22 +306,22 @@ export function IntroTab({
   };
 
   const startDrag = (id: string, e: React.PointerEvent) => {
+    const container = containerRef.current;
     const el = blockRefs.current.get(id);
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const bRect = el.getBoundingClientRect();
     const origIdx = blocks.findIndex((b) => b.id === id);
     setDrag({
       id,
       pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-      width: rect.width,
-      height: rect.height,
+      cRect: { left: cRect.left, top: cRect.top, width: cRect.width, height: cRect.height },
+      grabRelX: e.clientX - cRect.left,
+      grabRelY: e.clientY - cRect.top,
       pointerX: e.clientX,
       pointerY: e.clientY,
       dropIndex: origIdx < 0 ? 0 : origIdx,
+      blockHeight: bRect.height,
     });
     try {
       (e.target as Element).releasePointerCapture?.(e.pointerId);
@@ -320,9 +337,11 @@ export function IntroTab({
     const pid = drag.pointerId;
 
     const computeDropIndex = (y: number): number => {
+      // Hit-test against blocks rendered INSIDE the floating thumbnail —
+      // that's the surface the user actually sees and aims at.
       const others = blocks.filter((b) => b.id !== id);
       for (let i = 0; i < others.length; i++) {
-        const el = blockRefs.current.get(others[i].id);
+        const el = ghostBlockRefs.current.get(others[i].id);
         if (!el) continue;
         const r = el.getBoundingClientRect();
         if (y < r.top + r.height / 2) return i;
@@ -355,7 +374,6 @@ export function IntroTab({
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onCancel);
     window.addEventListener("keydown", onKey);
-    // Prevent body scroll while dragging
     const prevOverflow = document.body.style.overflow;
     const prevTouchAction = document.body.style.touchAction;
     document.body.style.overflow = "hidden";
@@ -371,21 +389,14 @@ export function IntroTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag?.id, drag?.pointerId]);
 
-  // Compute per-block translateY for the let-it-flow animation.
-  const translateOf = (blockId: string): number => {
-    if (!drag) return 0;
-    if (blockId === drag.id) return 0;
-    const origIdx = blocks.findIndex((b) => b.id === drag.id);
-    const j = blocks.findIndex((b) => b.id === blockId);
-    if (origIdx < 0 || j < 0) return 0;
-    const gap = 12; // matches space-y-3 (~12px)
-    const shift = drag.height + gap;
-    const compactedIdx = j < origIdx ? j : j - 1;
-    if (j < origIdx) {
-      return compactedIdx >= drag.dropIndex ? shift : 0;
-    } else {
-      return compactedIdx >= drag.dropIndex ? 0 : -shift;
-    }
+  // Per-block translateY INSIDE the thumbnail — opens a gap where the
+  // dragged block will land.
+  const ghostTranslateOf = (blockId: string): number => {
+    if (!drag || blockId === drag.id) return 0;
+    const others = blocks.filter((b) => b.id !== drag.id);
+    const ci = others.findIndex((b) => b.id === blockId);
+    if (ci < 0) return 0;
+    return ci >= drag.dropIndex ? 24 : 0;
   };
 
   const openAIForBlock = (id: string, fallback: string) => {
@@ -463,7 +474,15 @@ export function IntroTab({
       </div>
 
       {/* Intro card */}
-      <div className="relative rounded-xl bg-white p-3">
+      <div
+        ref={containerRef}
+        className="relative rounded-xl bg-white p-3"
+        style={
+          drag
+            ? { filter: "blur(2px) saturate(0.85)", pointerEvents: "none", transition: "filter 160ms" }
+            : { transition: "filter 160ms" }
+        }
+      >
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
@@ -511,7 +530,7 @@ export function IntroTab({
                 isLast={i === blocks.length - 1}
                 isDragging={drag?.id === b.id}
                 isEditing={editingId === b.id}
-                dragOffset={translateOf(b.id)}
+                dragOffset={0}
                 anyDragging={!!drag}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
@@ -571,29 +590,64 @@ export function IntroTab({
         </div>
       </div>
 
-      {/* Drag backdrop + ghost */}
+      {/* Drag: localized frosted backdrop + half-width floating thumbnail */}
       {drag && draggedBlock &&
         createPortal(
           <>
-            <div className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[3px] animate-in fade-in duration-150" />
+            {/* Frosted glass — covers ONLY the preview editor area */}
             <div
-              className="pointer-events-none fixed z-50 origin-top-left"
+              className="pointer-events-none fixed z-40 animate-in fade-in duration-150"
               style={{
-                left: drag.pointerX - drag.offsetX * 0.5,
-                top: drag.pointerY - drag.offsetY * 0.5,
-                width: drag.width,
-                transform: "scale(0.5)",
-                transformOrigin: "top left",
-                transition: "transform 160ms cubic-bezier(.2,.8,.2,1)",
+                left: drag.cRect.left,
+                top: drag.cRect.top,
+                width: drag.cRect.width,
+                height: drag.cRect.height,
+                background: "rgba(255,255,255,0.35)",
+                backdropFilter: "blur(8px) saturate(1.05)",
+                WebkitBackdropFilter: "blur(8px) saturate(1.05)",
+                borderRadius: 12,
+              }}
+            />
+            {/* Half-width floating preview thumbnail, anchored under cursor */}
+            <div
+              className="pointer-events-none fixed z-50 animate-in fade-in zoom-in-95 duration-150"
+              style={{
+                left: drag.pointerX - drag.grabRelX * 0.5,
+                top: drag.pointerY - drag.grabRelY * 0.5,
+                width: drag.cRect.width * 0.5,
+                transition: "none",
               }}
             >
-              <div className="rounded-xl bg-white/95 p-3 shadow-2xl ring-1 ring-black/5 backdrop-blur">
-                <BlockGhost block={draggedBlock} />
+              <div className="rounded-xl bg-white/98 p-2 shadow-2xl ring-1 ring-black/10">
+                <div className="mb-1 truncate text-[10px] font-semibold text-[#1a1a1a]">
+                  {intro.title || "团购介绍"}
+                </div>
+                <div className="space-y-1.5">
+                  {blocks.map((b) => {
+                    const isMe = b.id === drag.id;
+                    return (
+                      <div
+                        key={b.id}
+                        ref={isMe ? undefined : registerGhostRef(b.id)}
+                        style={{
+                          transform: `translateY(${ghostTranslateOf(b.id)}px)`,
+                          transition: "transform 220ms cubic-bezier(.2,.8,.2,1)",
+                          opacity: isMe ? 0.55 : 1,
+                          outline: isMe ? "2px dashed #07c160" : undefined,
+                          borderRadius: 6,
+                        }}
+                      >
+                        <BlockGhost block={b} />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </>,
           document.body,
         )}
+
 
       {projectId && (
         <AIGenerateImageDialog
