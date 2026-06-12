@@ -484,9 +484,10 @@ function LogicEditor({
         </div>
         <div className="flex flex-col items-end gap-1 pt-5">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">激活</span>
+            <span className="text-muted-foreground">启用</span>
             <Switch checked={logic.is_active} onCheckedChange={() => onActivate()} />
           </div>
+
           {lastSavedAt && (
             <div className="text-[10px] text-muted-foreground">
               已保存 {new Date(lastSavedAt).toLocaleTimeString().slice(0, 5)}
