@@ -394,11 +394,32 @@ export function IntroTab({
         } else if (y > r.bottom - EDGE) {
           dy = MAX_SPEED * (1 - Math.max(0, (r.bottom - y) / EDGE));
         }
-        if (dy !== 0) s.scrollTop += dy;
+        if (dy !== 0) {
+          const before = s.scrollTop;
+          s.scrollTop += dy;
+          if (s.scrollTop !== before) {
+            // Recompute drop index against newly visible blocks, and
+            // trigger a re-render so the dragged module's translateY
+            // (which depends on scrollTop) follows the scroll.
+            const others = blocks.filter((b) => b.id !== cur.id);
+            let nextIdx = others.length;
+            for (let i = 0; i < others.length; i++) {
+              const el = ghostBlockRefs.current.get(others[i].id);
+              if (!el) continue;
+              const rr = el.getBoundingClientRect();
+              if (cur.pointerY < rr.top + rr.height / 2) {
+                nextIdx = i;
+                break;
+              }
+            }
+            setDrag((c) => (c ? { ...c, dropIndex: nextIdx } : c));
+          }
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
+
 
     return () => {
       window.removeEventListener("pointermove", onMove);
