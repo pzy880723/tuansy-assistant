@@ -716,14 +716,17 @@ export function IntroTab({
                                     left: 12,
                                     right: 12,
                                     top: 0,
-                                    opacity: 0.95,
+                                    opacity: 1,
                                     outline: "2px dashed #07c160",
-                                    background: "rgba(255,255,255,0.95)",
-                                    borderRadius: 8,
-                                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                    background: "#ffffff",
+                                    borderRadius: 10,
+                                    padding: 10,
+                                    boxShadow:
+                                      "0 16px 36px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08)",
                                     pointerEvents: "none",
                                   }}
                                 >
+
                                   <BlockGhost block={b} />
                                 </div>
                               );
