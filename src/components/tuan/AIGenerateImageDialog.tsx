@@ -563,11 +563,11 @@ export function AIGenerateImageDialog({
 }
 
 /** Siri / Apple-Intelligence style liquid loader. */
-function TechLoader() {
+function TechLoader({ translucent = false }: { translucent?: boolean }) {
   return (
     <div
-      className="relative h-full w-full overflow-hidden"
-      style={{ background: "oklch(0.99 0.005 270)" }}
+      className={cn("relative h-full w-full overflow-hidden", translucent && "bg-white/20 backdrop-blur-sm")}
+      style={{ background: translucent ? undefined : "oklch(0.99 0.005 270)" }}
     >
       {/* Liquid color blobs */}
       <div className="siri-blob siri-blob-a" />
@@ -618,7 +618,7 @@ function TechLoader() {
       {/* Label */}
       <div
         className="absolute inset-x-0 bottom-2 text-center text-[10px] font-light tracking-[0.3em]"
-        style={{ color: "rgba(60, 40, 90, 0.55)" }}
+        style={{ color: translucent ? "rgba(255,255,255,0.82)" : "rgba(60, 40, 90, 0.55)" }}
       >
         DESIGNING
       </div>
