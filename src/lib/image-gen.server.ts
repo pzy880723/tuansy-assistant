@@ -17,6 +17,13 @@ export type GenerateOneInput = {
 
 type GatewayError = Error & { status?: number; code?: string };
 
+function gatewayHeaders(apiKey: string) {
+  return {
+    "Lovable-API-Key": apiKey,
+    "Content-Type": "application/json",
+  };
+}
+
 function buildError(status: number, text: string): GatewayError {
   let code: string | undefined;
   try {
@@ -39,14 +46,11 @@ function withRealism(prompt: string): string {
 async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> {
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: gatewayHeaders(apiKey),
     body: JSON.stringify({
       model: OPENAI_MODEL,
       prompt: withRealism(prompt),
-      quality: "high",
+      quality: "low",
       size: "1024x1024",
       n: 1,
     }),
@@ -74,10 +78,7 @@ async function callGeminiImage(
   }
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: gatewayHeaders(apiKey),
     body: JSON.stringify({
       model: GEMINI_MODEL,
       messages: [{ role: "user", content }],
@@ -92,6 +93,44 @@ async function callGeminiImage(
   const b64 = json.data?.[0]?.b64_json;
   if (!b64) throw new Error("AI 生图返回空数据");
   return b64;
+}
+
+/** Opens a single-image streaming generation request and returns the upstream SSE response. */
+export async function createImageGenerationStream(
+  apiKey: string,
+  { prompt, referenceImages }: GenerateOneInput,
+): Promise<Response> {
+  const hasReferences = referenceImages && referenceImages.length > 0;
+  const body = hasReferences
+    ? {
+        model: GEMINI_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: withRealism(prompt) },
+              ...referenceImages.map((url) => ({ type: "image_url", image_url: { url } })),
+            ],
+          },
+        ],
+        modalities: ["image", "text"],
+        stream: true,
+      }
+    : {
+        model: OPENAI_MODEL,
+        prompt: withRealism(prompt),
+        quality: "low",
+        size: "1024x1024",
+        n: 1,
+        stream: true,
+        partial_images: 1,
+      };
+
+  return fetch(GATEWAY_URL, {
+    method: "POST",
+    headers: gatewayHeaders(apiKey),
+    body: JSON.stringify(body),
+  });
 }
 
 /** Calls the Gateway once and returns the base64 PNG payload (no data: prefix). */
