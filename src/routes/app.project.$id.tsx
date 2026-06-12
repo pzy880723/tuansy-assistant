@@ -237,6 +237,28 @@ function ChatPane({
     void qc.invalidateQueries({ queryKey: ["project", projectId] });
   }, [messages, projectId, qc, status]);
 
+  const appliedIntroResultsRef = useRef(new Set<string>());
+  useEffect(() => {
+    for (const message of messages) {
+      message.parts.forEach((rawPart, partIndex) => {
+        if (rawPart.type !== "tool-update_intro") return;
+        const part = rawPart as ToolPart;
+        if (part.state !== "output-available") return;
+        const output = part.output as { ok?: boolean; intro?: IntroData } | undefined;
+        if (!output?.ok || !output.intro) return;
+        const resultKey = `${message.id}:${partIndex}`;
+        if (appliedIntroResultsRef.current.has(resultKey)) return;
+        appliedIntroResultsRef.current.add(resultKey);
+        qc.setQueryData(["project", projectId], (current: unknown) => {
+          if (!current || typeof current !== "object") return current;
+          const result = current as { project?: Record<string, unknown> };
+          if (!result.project) return current;
+          return { ...result, project: { ...result.project, intro: output.intro } };
+        });
+      });
+    }
+  }, [messages, projectId, qc]);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, [projectId, status]);
@@ -902,6 +924,27 @@ function ToolCard({ part }: { part: ToolPart }) {
   const isRunning = part.state === "input-streaming" || part.state === "input-available";
   const hasOutput = part.state === "output-available";
   const failed = part.state === "output-error" || !!part.errorText;
+  const readableDetails = (() => {
+    if (name !== "update_intro") return [];
+    const details: Array<{ label: string; value: string }> = [];
+    if (introInput?.title) details.push({ label: "标题", value: introInput.title });
+    const description = (part.input as { description?: string } | undefined)?.description;
+    if (description) details.push({ label: "摘要", value: description });
+    const appended = introInput?.blocksAppend?.[0];
+    if (appended?.text) details.push({ label: "本次写入", value: appended.text });
+    else if (appended?.type) {
+      details.push({ label: "本次写入", value: appended.type === "image_lg" ? "一张大图" : appended.type === "image_sm" ? "一组九宫格图片" : "一个内容模块" });
+    }
+    if (introInput?.blocksReplaceAt?.length) {
+      details.push({ label: "图片安排", value: `已将图片放入 ${introInput.blocksReplaceAt.length} 个对应内容位置` });
+    }
+    const output = part.output as { ok?: boolean; blockCount?: number; error?: string } | undefined;
+    if (output?.ok && typeof output.blockCount === "number") {
+      details.push({ label: "应用结果", value: `右侧预览现有 ${output.blockCount} 个内容模块` });
+    }
+    if (output?.error) details.push({ label: "失败原因", value: output.error });
+    return details;
+  })();
 
   return (
     <details className="group max-w-[95%] overflow-hidden rounded-xl border bg-background/70">
@@ -923,21 +966,18 @@ function ToolCard({ part }: { part: ToolPart }) {
           {failed ? "失败" : hasOutput ? "已应用" : isRunning ? "执行中" : ""}
         </span>
       </summary>
-      <div className="space-y-2 border-t bg-muted/30 px-3 py-2 text-[11px]">
-        {part.input != null && (
-          <div>
-            <div className="mb-1 font-semibold text-muted-foreground">输入</div>
-            <pre className="overflow-x-auto rounded bg-background p-2 leading-relaxed">
-              {JSON.stringify(part.input, null, 2)}
-            </pre>
+      <div className="space-y-3 border-t bg-muted/30 px-3 py-3 text-[11px]">
+        {readableDetails.map((detail) => (
+          <div key={`${detail.label}-${detail.value.slice(0, 20)}`}>
+            <div className="mb-1 font-semibold text-muted-foreground">{detail.label}</div>
+            <div className="rounded-lg bg-background px-3 py-2 text-foreground whitespace-pre-wrap leading-relaxed">
+              {detail.value}
+            </div>
           </div>
-        )}
-        {part.output != null && (
-          <div>
-            <div className="mb-1 font-semibold text-muted-foreground">结果</div>
-            <pre className="overflow-x-auto rounded bg-background p-2 leading-relaxed">
-              {JSON.stringify(part.output, null, 2)}
-            </pre>
+        ))}
+        {name !== "update_intro" && part.output != null && (
+          <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
+            {failed ? "执行失败，请重试" : "已完成并应用到右侧预览"}
           </div>
         )}
         {part.errorText && (
