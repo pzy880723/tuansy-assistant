@@ -447,6 +447,7 @@ function ChatPane({
           >
             <SettingsIcon className="h-3.5 w-3.5" />
           </Link>
+        <Popover>
           <PopoverTrigger asChild>
             <button
               type="button"
