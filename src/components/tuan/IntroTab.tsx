@@ -711,7 +711,7 @@ export function IntroTab({
                               const scrollEl = ghostScrollRef.current;
                               const baseTop = scrollEl
                                 ? scrollEl.getBoundingClientRect().top
-                                : drag.cRect.top + 8;
+                                : ghostTop;
                               const yInScaled =
                                 (drag.pointerY - baseTop + (scrollEl?.scrollTop ?? 0)) /
                                   GHOST_SCALE -
