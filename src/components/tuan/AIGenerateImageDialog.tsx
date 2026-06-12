@@ -455,7 +455,7 @@ export function AIGenerateImageDialog({
                           />
                         )}
                         <div className="absolute inset-0">
-                          <TechLoader translucent={Boolean(slot.previewUrl)} />
+                          <TechLoader translucent={Boolean(slot.previewUrl)} startedAt={slot.startedAt} hasPartial={Boolean(slot.hasPartial)} />
                         </div>
                       </>
                     )}
