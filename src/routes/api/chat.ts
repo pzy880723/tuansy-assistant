@@ -49,6 +49,7 @@ export const Route = createFileRoute("/api/chat")({
           projectId?: string;
           snapshot?: unknown;
           copyLogicId?: string | null;
+          startupMode?: "draft" | "plan";
         };
         if (!Array.isArray(body.messages) || !body.projectId) {
           return new Response("Bad request", { status: 400 });
@@ -192,6 +193,7 @@ export const Route = createFileRoute("/api/chat")({
         const gateway = createLovableAiGatewayProvider(key, initialRunId);
         const model = gateway("google/gemini-3-flash-preview");
 
+        const isSeededStart = body.messages.length === 1 && body.messages[0]?.role === "user";
         const result = streamText({
           model,
           stopWhen: stepCountIs(50),
@@ -199,6 +201,8 @@ export const Route = createFileRoute("/api/chat")({
 
 当前项目: 「${project?.name ?? "未命名"}」
 当前商品品类: ${category}
+当前是否首次开团: ${isSeededStart ? "是" : "否"}
+首页模式: ${body.startupMode === "plan" ? "计划模式" : "立即撰写"}
 
 【右侧预览正在显示的真实数据，必须基于这个来改】
 介绍 intro: ${JSON.stringify(intro, null, 2)}
@@ -236,17 +240,25 @@ ${logicPromptBlock}
 
 description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本无 Markdown，120-300 字（卖点多可放宽到 500 字）。
 
+【首次开团的真人感工作流】
+- 如果当前是首次开团且为计划模式：不要修改项目。先复述你看懂的商品/品类/用户目标，再调用 ask_questions 提 3-4 个关键问题，最后调用 suggest_next。
+- 如果当前是首次开团且为立即撰写：先用 2-3 句复述你看懂的项目、品类、用户原文要点、当前文案逻辑以及是否带图；再说一句「我先理一下这次的文案节奏」，然后开始调用工具。
+- 首次立即撰写必须渐进完成：先单独调用 update_intro 只写 title 和不超过 60 字的 description；随后严格按模块顺序，每个模块单独调用一次 update_intro，只传一个 blocksAppend 元素。每次工具调用前先用一句自然的过程说明，例如「先把痛点说透」「接着补上品质背书」。
+- 禁止一次调用塞入全部 blocks。即使多个模块都已想好，也必须逐模块调用，让用户在右侧看到段落逐个出现。
+- 所有模块完成后，用一句话总结本版的核心转化角度；再给 3 条带中文编号的、针对当前商品的调整建议，并问用户想先改哪一项；最后调用 suggest_next 给出 3-4 个可直接点击的调整指令。
+- 后续对话优先微调已有段落，不要无故整篇重写。
+
 【图文配对工作流 — 模块化优先，两阶段】
 
 阶段 A：用户只丢文字/口头描述（聊天没有图片附件）
-  1) 立刻调用 update_intro，必须传 blocks（不能只写 description），按当前文案逻辑模块清单顺序逐一产出：
+  1) 立刻开始渐进撰写，按当前文案逻辑模块清单顺序逐一产出，每个模块必须单独调用 update_intro 的 blocksAppend：
      - 每个 [title] / [paragraph] / [params] 模块 → 生成一个 type:"text" 的 block，内容严格按对应 guidance 撰写，并完全套用上面【排版规则】（分段、空行、首行缩进、emoji 浓度）。
      - 每个 [image_large] 模块 → 插入一个 type:"text" 占位 block，固定格式：「[图位·大图建议：xxx]」（xxx 描述此处应放什么图，例如：模特正面上身实拍）。
      - 每个 [image_grid] 模块 → 插入 type:"text" 占位 block：「[图位·九宫格建议：xxx]」。
      - 每个 [video] 模块 → 插入 type:"text" 占位 block：「[图位·视频建议：xxx]」。
   2) intro.title 仍要按第 1 步公式写好；intro.description 只写 1-2 句封面摘要（≤60 字），正文全部承载在 blocks 里。
-  3) 聊天回复 3-5 行：告诉用户「已按 X 个模块分好段落，预留了 N 个图位，丢图过来我自动塞进对应位置」。
-  4) 没有启用任何文案逻辑时，退回旧的五步框架：title + description 完整版，blocks 不主动加。
+  3) 全部完成后告诉用户「已按 X 个模块分好段落，预留了 N 个图位」，再总结和给 3 条调整建议。
+  4) 没有启用任何文案逻辑时，也必须按默认五步框架渐进生成：痛点共鸣、品质背书、卖点拆解、场景体验、参数/下单建议各自成为独立 text block，每段单独调用一次 blocksAppend。
 
 阶段 B：用户后续丢图片进来（聊天里有 file part）
   1) 读现有 intro.blocks，找出所有「[图位·...]」占位 text block，按图片语义把它们替换为 image_lg / image_sm / video block：
@@ -255,7 +267,7 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
      - 对比/痛点场景 → 痛点段后的图位
      - 尺码表/参数 → 末段图位
   2) 同段 1 张用 image_lg；同段 ≥3 张合并成 1 个 image_sm 九宫格 block 替换原占位。
-  3) 整体调用 update_intro 传完整 blocks 数组（替换，不要 append 到末尾）。严禁把图堆在结尾。
+   3) 调用 update_intro 的 blocksReplaceAt 原地替换对应索引。严禁把图堆在结尾，也不要重写其他文字块。
   4) 占位用完后还有多余图，按语义补到最相关段落后；判断不出归属时调 ask_questions 让用户选。
   5) 没有启用文案逻辑时，沿用旧的"文字-图交替穿插"重排逻辑。
 
@@ -269,7 +281,7 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
 工作原则（极其重要 — 工具必须对应右侧预览的字段）：
 - 团购活动标题（短，10-20 字）→ update_intro 的 title
 - 团购正文/卖点描述（长段落 120-300 字）→ update_intro 的 description；不要把整段塞到 title
-- 图文模块 blocks：阶段 A 不主动加；阶段 B（用户上传图片）或用户明确说"加张大图/加段文字/加九宫格"时，必须用 update_intro 传 blocks
+- 图文模块 blocks：首次阶段 A 按逻辑逐模块使用 blocksAppend；阶段 B 用 blocksReplaceAt；只有用户明确要求整体重排时才传 blocks
 - 改 SKU（增、删、改价格/库存/规格名）→ update_skus，必须传完整的 SKU 数组
 - 改配送、起团、保障、自提、截团时间等设置项 → update_settings
 - 改商品标题、副标题、服务标签、封面 → update_product_meta
@@ -292,7 +304,7 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
           tools: {
             update_intro: tool({
               description:
-                "更新介绍 Tab 内容。只传需要修改的字段；blocks 若传则整体替换。注意：blocks 默认由用户在右侧手动点按钮添加，AI 只在用户明确要求时才传。",
+                "渐进更新介绍 Tab。首次撰写先写 title/description，再按模块逐次用 blocksAppend 追加一个段落；图片用 blocksReplaceAt 原地替换；blocks 仅用于用户明确要求整体重排。",
               inputSchema: z.object({
                 title: z
                   .string()
@@ -301,28 +313,74 @@ description 整体要求：四到六个自然段，覆盖第 2-5 步，纯文本
                 description: z
                   .string()
                   .describe(
-                    "团购活动正文卖点描述。必须写成完整段落，120-300 字，分 2-4 个自然段，结合品类要点突出卖点（产地/口感/适用人群/保障等）。禁止只写一句话。可选。",
+                    "团购活动封面摘要。首次渐进撰写时只写 1-2 句且不超过 60 字，正文放在逐次追加的 blocks 中；仅旧项目整体修改时可写 120-300 字完整版。",
                   )
                   .optional(),
                 blocks: z
                   .array(IntroBlockSchema)
                   .describe(
-                    "图文模块数组，整体替换。仅当用户明确要求添加大图/小图九宫格/视频/文字段落/标签时才传；默认留空不动。",
+                    "图文模块数组，整体替换。仅当用户明确要求整体重排时使用。",
                   )
+                  .optional(),
+                blocksAppend: z
+                  .array(IntroBlockSchema)
+                  .max(1)
+                  .describe("渐进追加一个模块。首次撰写每次必须只传一个元素。")
+                  .optional(),
+                blocksReplaceAt: z
+                  .array(
+                    z.object({
+                      index: z.number().int().min(0),
+                      block: IntroBlockSchema,
+                    }),
+                  )
+                  .describe("按索引原地替换图位，不改动其他模块。")
                   .optional(),
               }),
               execute: async (input) => {
-                const patch: Record<string, unknown> = { ...input };
+                const { data: freshRow, error: readError } = await supabaseAdmin
+                  .from("projects")
+                  .select("intro")
+                  .eq("id", projectId)
+                  .maybeSingle();
+                if (readError) return { ok: false, error: readError.message };
+                const freshIntro = (freshRow?.intro ?? {}) as Record<string, unknown>;
+                const currentBlocks = Array.isArray(freshIntro.blocks)
+                  ? ([...freshIntro.blocks] as Array<Record<string, unknown>>)
+                  : [];
+                const { blocksAppend, blocksReplaceAt, ...fields } = input;
+                const patch: Record<string, unknown> = { ...fields };
                 if (Array.isArray(input.blocks)) {
                   patch.blocks = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                } else {
+                  let nextBlocks = currentBlocks;
+                  if (blocksAppend?.length) {
+                    nextBlocks = [
+                      ...nextBlocks,
+                      ...blocksAppend.map((b) => ({ id: genBlockId(), ...b })),
+                    ];
+                  }
+                  for (const replacement of blocksReplaceAt ?? []) {
+                    if (replacement.index < nextBlocks.length) {
+                      nextBlocks[replacement.index] = {
+                        id: genBlockId(),
+                        ...replacement.block,
+                      };
+                    }
+                  }
+                  if (blocksAppend?.length || blocksReplaceAt?.length) patch.blocks = nextBlocks;
                 }
-                const next = { ...intro, ...patch };
+                const next = { ...freshIntro, ...patch };
                 const { error } = await supabaseAdmin
                   .from("projects")
                   .update({ intro: next as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
-                return { ok: true, updated: Object.keys(input) };
+                return {
+                  ok: true,
+                  updated: Object.keys(input),
+                  blockCount: Array.isArray(next.blocks) ? next.blocks.length : currentBlocks.length,
+                };
               },
             }),
             update_skus: tool({

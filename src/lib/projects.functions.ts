@@ -48,17 +48,14 @@ export const startProject = createServerFn({ method: "POST" })
 
     const planHint =
       data.mode === "plan"
-        ? "用户选择了【计划模式】：不要立即撰写文案，seedAssistantText 要先抛出 3 到 5 个针对该品类的关键澄清问题（如目标人群、价格档位、产地/材质、配送方式等），帮助用户先想清楚再动笔。autoUserPrompt 必须为 null。"
-        : "用户选择了【立即开团】：seedAssistantText 是一句不超过 60 字的开场，告诉用户你已经识别出品类、马上动笔。autoUserPrompt 是一段 30 到 80 字的隐形指令，作为用户的第一条消息触发 AI 立刻调用 update_product 与 update_skus 生成首版标题、卖点、标签和 SKU。";
+        ? "用户选择了【计划模式】：只需完成品类、项目名、商品名和标签判断；进入编辑页后团宝会自动提出澄清问题。"
+        : "用户选择了【立即开团】：只需完成品类、项目名、商品名和标签判断；进入编辑页后团宝会自动逐段撰写。";
 
     const OutputSchema = z.object({
       category: z.enum(CATEGORIES),
       projectName: z.string().min(2).max(60).transform((s) => s.slice(0, 18)),
       productName: z.string().min(2).max(120).transform((s) => s.slice(0, 30)),
       tags: z.array(z.string().min(1).max(20).transform((s) => s.slice(0, 10))).min(1).max(6),
-      seedAssistantText: z.string().min(10).max(600).transform((s) => s.slice(0, 260)),
-      autoUserPrompt: z.string().max(400).nullable().transform((s) => (s ? s.slice(0, 200) : s)),
-      suggestNext: z.array(z.string().min(2).max(40).transform((s) => s.slice(0, 18))).min(1).max(6),
     });
 
     const imageHint =
@@ -82,10 +79,7 @@ ${planHint}
   "category": 在 ${CATEGORIES.join(" / ")} 中挑一个最贴近的,
   "projectName": "给团长看的项目名，吸睛口语化，不超过 18 个汉字",
   "productName": "商品本身的名字，不超过 30 字",
-  "tags": ["2 到 4 个服务或卖点短标签，每个不超过 10 字"],
-  "seedAssistantText": "编辑页首条 AI 开场消息，纯文本中文，不超过 260 字",
-  "autoUserPrompt": "立即模式下为一段 30 到 80 字的隐形指令；计划模式下必须为 null",
-  "suggestNext": ["2 到 4 条用户可能想点的快捷指令，每条不超过 18 字"]
+  "tags": ["2 到 4 个服务或卖点短标签，每个不超过 10 字"]
 }
 
 所有文案使用纯文本中文，不要任何 Markdown 符号。`,
@@ -128,27 +122,21 @@ ${planHint}
       );
     }
 
-    const seedMessages = [
-      {
-        id: `seed-assistant-${Date.now()}`,
-        role: "assistant" as const,
-        parts: [
-          { type: "text" as const, text: output.seedAssistantText },
-          {
-            type: "tool-suggest_next" as const,
-            toolCallId: `seed-suggest-${Date.now()}`,
-            state: "output-available" as const,
-            input: { suggestions: output.suggestNext },
-            output: { ok: true, suggestions: output.suggestNext },
-          },
-        ],
-      },
-    ];
+    const seedParts: Array<
+      { type: "text"; text: string } | { type: "file"; mediaType: string; url: string }
+    > = [{ type: "text", text: data.description }];
+    for (const url of data.imageUrls ?? []) {
+      seedParts.push({ type: "file", mediaType: "image/*", url });
+    }
+    const seedMessages = [{
+      id: `seed-${data.mode}-${Date.now()}`,
+      role: "user" as const,
+      parts: seedParts,
+    }];
 
     return {
       id: row.id,
       seedMessages,
-      autoUserPrompt: output.autoUserPrompt,
       category: output.category,
     };
   });

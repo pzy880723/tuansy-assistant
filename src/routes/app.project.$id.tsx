@@ -200,12 +200,13 @@ function ChatPane({
           messages,
           projectId,
           copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
+          startupMode: messages[0]?.id.startsWith("seed-plan-") ? "plan" : "draft",
         },
       }),
     }),
   ).current;
 
-  const { messages, sendMessage, setMessages, status, error } = useChat({
+  const { messages, sendMessage, setMessages, regenerate, status, error } = useChat({
     id: projectId,
     messages: initial,
     transport,
@@ -230,6 +231,11 @@ function ChatPane({
     window.localStorage.setItem(storageKey, JSON.stringify(messages));
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, storageKey]);
+
+  useEffect(() => {
+    if (status !== "streaming") return;
+    void qc.invalidateQueries({ queryKey: ["project", projectId] });
+  }, [messages, projectId, qc, status]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -319,19 +325,16 @@ function ChatPane({
     });
   };
 
-  // Auto-trigger the first AI write when arriving from the home "开团" dialog
+  // A seeded home-page prompt is already the first visible user message. Resume from it once.
   const bootedRef = useRef(false);
   useEffect(() => {
     if (bootedRef.current) return;
-    if (typeof window === "undefined") return;
-    if (isLoading) return;
-    const key = `tuanbao.boot.${projectId}`;
-    const boot = window.sessionStorage.getItem(key);
-    if (!boot) return;
+    if (status !== "ready") return;
+    const last = messages.at(-1);
+    if (!last || last.role !== "user" || !last.id.startsWith("seed-")) return;
     bootedRef.current = true;
-    window.sessionStorage.removeItem(key);
-    void sendMessage({ text: boot });
-  }, [projectId, isLoading, sendMessage]);
+    void regenerate({ messageId: last.id });
+  }, [messages, regenerate, status]);
 
 
   const suggestions: string[] = (() => {
@@ -665,10 +668,6 @@ function MessageRow({
     .replace(/\*\*/g, "")
     .replace(/(^|\s)\*(?!\s)/g, "$1");
 
-  const toolParts = msg.parts.filter(
-    (p) => p.type.startsWith("tool-") && p.type !== "tool-suggest_next",
-  ) as ToolPart[];
-
   if (msg.role === "system") {
     return (
       <div className="flex justify-center">
@@ -700,7 +699,21 @@ function MessageRow({
         className="h-7 w-7 shrink-0 rounded-full bg-[var(--brand-soft)] object-contain"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {toolParts.map((part, i) => {
+        {msg.parts.map((rawPart, i) => {
+          if (rawPart.type === "text") {
+            const partText = rawPart.text
+              .replace(/\*\*/g, "")
+              .replace(/(^|\s)\*(?!\s)/g, "$1");
+            return partText ? (
+              <div key={i} className="max-w-[95%] px-1 text-sm leading-relaxed whitespace-pre-wrap">
+                {partText}
+              </div>
+            ) : null;
+          }
+          if (!rawPart.type.startsWith("tool-") || rawPart.type === "tool-suggest_next") {
+            return null;
+          }
+          const part = rawPart as ToolPart;
           if (part.type === "tool-ask_questions") {
             return (
               <Questionnaire
@@ -713,11 +726,6 @@ function MessageRow({
           }
           return <ToolCard key={i} part={part} />;
         })}
-        {text && (
-          <div className="max-w-[95%] rounded-2xl rounded-tl-md bg-muted px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-            {text}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -873,8 +881,24 @@ function Questionnaire({
 
 function ToolCard({ part }: { part: ToolPart }) {
   const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
+  const introInput = part.input as
+    | { title?: string; blocksAppend?: Array<{ type?: string; text?: string }>; blocksReplaceAt?: unknown[] }
+    | undefined;
+  const introAction = introInput?.blocksAppend?.[0]?.text
+    ? `写入新段落：${introInput.blocksAppend[0].text.slice(0, 14)}${introInput.blocksAppend[0].text.length > 14 ? "…" : ""}`
+    : introInput?.title
+      ? "构思并写入标题"
+      : introInput?.blocksReplaceAt
+        ? "把图片放到对应段落"
+        : "更新介绍文案";
   const label =
-    name === "update_product" ? "更新商品信息" : name === "update_skus" ? "更新 SKU" : name;
+    name === "update_intro"
+      ? `✍️ ${introAction}`
+      : name === "update_product"
+        ? "更新商品信息"
+        : name === "update_skus"
+          ? "更新 SKU"
+          : name;
   const isRunning = part.state === "input-streaming" || part.state === "input-available";
   const hasOutput = part.state === "output-available";
   const failed = part.state === "output-error" || !!part.errorText;
