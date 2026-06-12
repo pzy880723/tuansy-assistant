@@ -71,6 +71,22 @@ function rid() {
 }
 
 function SettingsPage() {
+  const user = useCurrentUser();
+  const navigate = useNavigate();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  useEffect(() => {
+    if (hydrated && user === null) {
+      navigate({ to: "/auth", replace: true, search: { redirect: "/settings" } });
+    }
+  }, [hydrated, user, navigate]);
+  if (!hydrated || !user) {
+    return (
+      <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">
+        {hydrated ? "正在跳转登录…" : null}
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b">
