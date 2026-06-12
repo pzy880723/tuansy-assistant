@@ -356,6 +356,7 @@ function LogicEditor({
     name?: string;
     description?: string;
     modules?: CopyModule[];
+    formatting?: CopyFormatting;
   }) => Promise<void>;
   onActivate: () => Promise<void>;
   onDelete: () => Promise<void>;
@@ -363,6 +364,9 @@ function LogicEditor({
   const [name, setName] = useState(logic.name);
   const [description, setDescription] = useState(logic.description);
   const [modules, setModules] = useState<CopyModule[]>(logic.modules);
+  const [formatting, setFormatting] = useState<CopyFormatting>(
+    { ...DEFAULT_FORMATTING, ...(logic.formatting ?? {}) },
+  );
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [genModules, setGenModules] = useState(false);
   const [genText, setGenText] = useState(false);
@@ -375,12 +379,19 @@ function LogicEditor({
     name?: string;
     description?: string;
     modules?: CopyModule[];
+    formatting?: CopyFormatting;
   }) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       await onSave(patch);
       setLastSavedAt(Date.now());
     }, 800);
+  };
+
+  const updateFormatting = (patch: Partial<CopyFormatting>) => {
+    const next = { ...formatting, ...patch };
+    setFormatting(next);
+    queueSave({ formatting: next });
   };
 
   const updateModule = (id: string, patch: Partial<CopyModule>) => {
