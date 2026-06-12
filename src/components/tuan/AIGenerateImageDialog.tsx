@@ -189,7 +189,7 @@ export function AIGenerateImageDialog({
       const finalB64 = await readImageStream(res, (dataUrl, isFinal) => {
         setSlots((cur) =>
           cur.map((s) =>
-            s.id === slotId ? { ...s, previewUrl: dataUrl, isFinal } : s,
+            s.id === slotId ? { ...s, previewUrl: dataUrl, isFinal, hasPartial: true } : s,
           ),
         );
       });
