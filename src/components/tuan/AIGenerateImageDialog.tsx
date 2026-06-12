@@ -243,6 +243,8 @@ export function AIGenerateImageDialog({
               previewUrl: undefined,
               isFinal: false,
               variantSeed: newSeed,
+              startedAt: Date.now(),
+              hasPartial: false,
             }
           : s,
       ),
