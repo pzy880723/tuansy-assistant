@@ -307,6 +307,9 @@ function CopyLogicSection() {
                       name: patch.name ?? selected.name,
                       description: patch.description ?? selected.description,
                       modules: patch.modules ?? selected.modules,
+                      ...(patch.formatting !== undefined
+                        ? { formatting: patch.formatting }
+                        : {}),
                     },
                   });
                   await refresh();
