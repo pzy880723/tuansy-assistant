@@ -540,6 +540,7 @@ function LogicEditor({
             >
               <option value="natural">自然分段</option>
               <option value="one-sentence-per-line">一句一段</option>
+              <option value="period-only">句号分段</option>
             </select>
           </label>
           <label className="flex items-center justify-between gap-2 text-[11px]">
@@ -556,29 +557,16 @@ function LogicEditor({
               <option value={2}>2 行</option>
             </select>
           </label>
-          <label className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="text-muted-foreground">首行缩进两格</span>
-            <Switch
-              checked={formatting.indentFirstLine}
-              onCheckedChange={(v) => updateFormatting({ indentFirstLine: v })}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="text-muted-foreground">尾部空行</span>
-            <select
-              value={formatting.tailBlankLines}
-              onChange={(e) =>
-                updateFormatting({
-                  tailBlankLines: Number(e.target.value) as 0 | 1 | 2,
-                })
-              }
-              className="h-7 rounded border bg-background px-2 text-[11px]"
-            >
-              <option value={0}>0 行</option>
-              <option value={1}>1 行</option>
-              <option value={2}>2 行</option>
-            </select>
-          </label>
+          <BlankLinesField
+            label="首行空行"
+            value={formatting.headBlankLines ?? 0}
+            onChange={(v) => updateFormatting({ headBlankLines: v })}
+          />
+          <BlankLinesField
+            label="尾行空行"
+            value={formatting.tailBlankLines ?? 0}
+            onChange={(v) => updateFormatting({ tailBlankLines: v })}
+          />
           <label className="flex items-center justify-between gap-2 text-[11px] sm:col-span-2">
             <span className="text-muted-foreground">Emoji 浓度</span>
             <select
