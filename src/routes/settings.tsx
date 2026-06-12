@@ -711,3 +711,55 @@ function LogicEditor({
     </div>
   );
 }
+
+function BlankLinesField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const presets = [1, 2, 3];
+  const isPreset = presets.includes(value);
+  const [custom, setCustom] = useState(!isPreset);
+  return (
+    <div className="flex items-center justify-between gap-2 text-[11px]">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1">
+        <select
+          value={custom ? "custom" : String(value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "custom") {
+              setCustom(true);
+            } else {
+              setCustom(false);
+              onChange(Number(v));
+            }
+          }}
+          className="h-7 rounded border bg-background px-2 text-[11px]"
+        >
+          <option value="1">1 行</option>
+          <option value="2">2 行</option>
+          <option value="3">3 行</option>
+          <option value="custom">自定义</option>
+        </select>
+        {custom && (
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={value}
+            onChange={(e) => {
+              const n = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+              onChange(n);
+            }}
+            className="h-7 w-14 rounded border bg-background px-2 text-[11px]"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
