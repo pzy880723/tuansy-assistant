@@ -68,12 +68,6 @@ export function ProjectStarter({
           `tuanbao.chat.${res.id}`,
           JSON.stringify(res.seedMessages),
         );
-        if (res.autoUserPrompt) {
-          window.sessionStorage.setItem(
-            `tuanbao.boot.${res.id}`,
-            res.autoUserPrompt,
-          );
-        }
       }
       toast.success(`已识别为「${res.category}」，跳转工作台…`);
       navigate({ to: "/app/project/$id", params: { id: res.id } });
