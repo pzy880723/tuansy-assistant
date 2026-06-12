@@ -166,19 +166,25 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const fmt = (activeLogic?.formatting ?? {}) as {
-          paragraphMode?: "natural" | "one-sentence-per-line";
+          paragraphMode?: "natural" | "one-sentence-per-line" | "period-only";
           lineGap?: 0 | 1 | 2;
-          indentFirstLine?: boolean;
-          tailBlankLines?: 0 | 1 | 2;
+          headBlankLines?: number;
+          tailBlankLines?: number;
           emojiDensity?: "none" | "light" | "rich";
         };
         const fmtParaMode = fmt.paragraphMode ?? "natural";
         const fmtLineGap = fmt.lineGap ?? 1;
-        const fmtIndent = fmt.indentFirstLine ?? false;
-        const fmtTail = fmt.tailBlankLines ?? 0;
+        const fmtHead = Math.max(0, Math.min(10, fmt.headBlankLines ?? 0));
+        const fmtTail = Math.max(0, Math.min(10, fmt.tailBlankLines ?? 0));
         const fmtEmoji = fmt.emojiDensity ?? "light";
+        const paraModeDesc =
+          fmtParaMode === "one-sentence-per-line"
+            ? "一句一段（遇到句号「。」、问号「？?」、感叹号「！!」后立即换行另起一段）"
+            : fmtParaMode === "period-only"
+              ? "句号分段（仅在中文句号「。」后换行另起一段，问号、感叹号保留在当前段落不分段）"
+              : "自然分段（按语义自由组织段落）";
         const formattingPromptBlock = activeLogic
-          ? `\n【排版规则 — 写每个 text block 时严格执行】\n- 段落模式：${fmtParaMode === "one-sentence-per-line" ? "一句一段（句号/问号/感叹号后强制换行另起一段）" : "自然分段（按语义分段）"}\n- 段间空行：每段之间空 ${fmtLineGap} 个空白行（用 \\n${"\\n".repeat(fmtLineGap)} 拼接）\n- 首行缩进：${fmtIndent ? "每段首行加 2 个全角空格「　　」" : "不缩进"}\n- 尾部空行：整段文本最后追加 ${fmtTail} 个空行\n- Emoji 浓度：${fmtEmoji === "none" ? "禁止使用任何 emoji" : fmtEmoji === "light" ? "每段最多 1 个 emoji，仅在段首或句末点缀" : "标题和每段段首都可以放 emoji"}\n`
+          ? `\n【排版规则 — 写每个 text block 时严格执行】\n- 段落模式：${paraModeDesc}\n- 段间空行：每段之间空 ${fmtLineGap} 个空白行（用 \\n${"\\n".repeat(fmtLineGap)} 拼接）\n- 首行空行：整段文本最前面追加 ${fmtHead} 个空行\n- 尾行空行：整段文本最后追加 ${fmtTail} 个空行\n- Emoji 浓度：${fmtEmoji === "none" ? "禁止使用任何 emoji" : fmtEmoji === "light" ? "每段最多 1 个 emoji，仅在段首或句末点缀" : "标题和每段段首都可以放 emoji"}\n`
           : "";
         const logicPromptBlock = activeLogic
           ? `\n【当前启用文案逻辑：${activeLogic.name}】（用户在「设置 → 文案编辑逻辑」里定义）\n总纲：${activeLogic.description ?? ""}\n模块清单（必须严格按此顺序，每个模块产生一个 block，不可合并、不可跳过）：\n${(activeLogic.modules ?? [])

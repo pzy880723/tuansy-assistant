@@ -540,6 +540,7 @@ function LogicEditor({
             >
               <option value="natural">自然分段</option>
               <option value="one-sentence-per-line">一句一段</option>
+              <option value="period-only">句号分段</option>
             </select>
           </label>
           <label className="flex items-center justify-between gap-2 text-[11px]">
@@ -556,29 +557,16 @@ function LogicEditor({
               <option value={2}>2 行</option>
             </select>
           </label>
-          <label className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="text-muted-foreground">首行缩进两格</span>
-            <Switch
-              checked={formatting.indentFirstLine}
-              onCheckedChange={(v) => updateFormatting({ indentFirstLine: v })}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="text-muted-foreground">尾部空行</span>
-            <select
-              value={formatting.tailBlankLines}
-              onChange={(e) =>
-                updateFormatting({
-                  tailBlankLines: Number(e.target.value) as 0 | 1 | 2,
-                })
-              }
-              className="h-7 rounded border bg-background px-2 text-[11px]"
-            >
-              <option value={0}>0 行</option>
-              <option value={1}>1 行</option>
-              <option value={2}>2 行</option>
-            </select>
-          </label>
+          <BlankLinesField
+            label="首行空行"
+            value={formatting.headBlankLines ?? 0}
+            onChange={(v) => updateFormatting({ headBlankLines: v })}
+          />
+          <BlankLinesField
+            label="尾行空行"
+            value={formatting.tailBlankLines ?? 0}
+            onChange={(v) => updateFormatting({ tailBlankLines: v })}
+          />
           <label className="flex items-center justify-between gap-2 text-[11px] sm:col-span-2">
             <span className="text-muted-foreground">Emoji 浓度</span>
             <select
@@ -719,6 +707,58 @@ function LogicEditor({
         >
           <Trash2 className="h-3 w-3" /> 删除此逻辑
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function BlankLinesField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const presets = [1, 2, 3];
+  const isPreset = presets.includes(value);
+  const [custom, setCustom] = useState(!isPreset);
+  return (
+    <div className="flex items-center justify-between gap-2 text-[11px]">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1">
+        <select
+          value={custom ? "custom" : String(value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "custom") {
+              setCustom(true);
+            } else {
+              setCustom(false);
+              onChange(Number(v));
+            }
+          }}
+          className="h-7 rounded border bg-background px-2 text-[11px]"
+        >
+          <option value="1">1 行</option>
+          <option value="2">2 行</option>
+          <option value="3">3 行</option>
+          <option value="custom">自定义</option>
+        </select>
+        {custom && (
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={value}
+            onChange={(e) => {
+              const n = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+              onChange(n);
+            }}
+            className="h-7 w-14 rounded border bg-background px-2 text-[11px]"
+          />
+        )}
       </div>
     </div>
   );
