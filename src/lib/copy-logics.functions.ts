@@ -95,13 +95,6 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
 
     if (data.id) {
       await assertOwner(data.id, userId);
-      if (data.is_active === true) {
-        await supabaseAdmin
-          .from("copy_logics")
-          .update({ is_active: false })
-          .eq("user_id", userId)
-          .neq("id", data.id);
-      }
       const { data: row, error } = await supabaseAdmin
         .from("copy_logics")
         .update({
@@ -118,12 +111,6 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
       return { logic: row as unknown as CopyLogic };
     }
 
-    if (data.is_active === true) {
-      await supabaseAdmin
-        .from("copy_logics")
-        .update({ is_active: false })
-        .eq("user_id", userId);
-    }
     const { data: row, error } = await supabaseAdmin
       .from("copy_logics")
       .insert({
@@ -139,6 +126,7 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { logic: row as unknown as CopyLogic };
   });
+
 
 export const deleteCopyLogic = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
