@@ -130,6 +130,7 @@ export function AIGenerateImageDialog({
   const [dragId, setDragId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { attachments, addFiles, remove, clear } = useImageAttachments({ projectId });
+  const uploadGenerated = useServerFn(uploadAiGeneratedImage);
 
   useEffect(() => {
     if (open) {
@@ -167,7 +168,6 @@ export function AIGenerateImageDialog({
         },
         body: JSON.stringify({
           prompt: p,
-          count: 1,
           referenceImages: referenceUrls.length > 0 ? referenceUrls : undefined,
           projectId,
           variant,
@@ -175,31 +175,31 @@ export function AIGenerateImageDialog({
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "生图失败");
-        const short = text.slice(0, 120);
-        if (res.status === 401) toast.error("登录状态失效，请刷新页面重新登录");
-        else if (res.status === 402) toast.error("AI 额度不足，请联系管理员充值");
-        else if (res.status === 429) toast.error("请求太频繁，请稍后再试");
-        else toast.error(`生图失败 (${res.status}): ${short}`);
+        const msg = userFacingError(res.status, text);
+        toast.error(msg);
         setSlots((cur) =>
           cur.map((s) =>
-            s.id === slotId ? { ...s, status: "error", error: text || "生图失败" } : s,
+            s.id === slotId ? { ...s, status: "error", error: msg } : s,
           ),
         );
         return;
       }
-      const data = (await res.json()) as { urls?: string[] };
-      const url = data.urls?.[0];
-      if (!url) {
+      const finalB64 = await readImageStream(res, (dataUrl, isFinal) => {
         setSlots((cur) =>
-          cur.map((s) => (s.id === slotId ? { ...s, status: "error", error: "空数据" } : s)),
+          cur.map((s) =>
+            s.id === slotId ? { ...s, previewUrl: dataUrl, isFinal } : s,
+          ),
         );
-        return;
-      }
+      });
+      const { url } = await uploadGenerated({ data: { b64: finalB64, projectId } });
       setSlots((cur) =>
-        cur.map((s) => (s.id === slotId ? { ...s, status: "done", url } : s)),
+        cur.map((s) =>
+          s.id === slotId ? { ...s, status: "done", url, previewUrl: undefined, isFinal: true } : s,
+        ),
       );
     } catch (e) {
       const msg = (e as Error).message;
+      toast.error(msg || "生图失败，请重试");
       setSlots((cur) =>
         cur.map((s) => (s.id === slotId ? { ...s, status: "error", error: msg } : s)),
       );
