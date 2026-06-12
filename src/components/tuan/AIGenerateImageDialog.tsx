@@ -34,6 +34,8 @@ type Slot = {
   isFinal?: boolean;
   error?: string;
   variantSeed: string;
+  startedAt: number;
+  hasPartial?: boolean;
 };
 
 type ImageStreamPayload = {
