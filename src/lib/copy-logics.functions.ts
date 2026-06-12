@@ -23,12 +23,29 @@ const ModuleSchema = z.object({
 
 export type CopyModule = z.infer<typeof ModuleSchema>;
 
+export const FormattingSchema = z.object({
+  paragraphMode: z.enum(["natural", "one-sentence-per-line"]).default("natural"),
+  lineGap: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(1),
+  indentFirstLine: z.boolean().default(false),
+  tailBlankLines: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
+  emojiDensity: z.enum(["none", "light", "rich"]).default("light"),
+});
+export type CopyFormatting = z.infer<typeof FormattingSchema>;
+export const DEFAULT_FORMATTING: CopyFormatting = {
+  paragraphMode: "natural",
+  lineGap: 1,
+  indentFirstLine: false,
+  tailBlankLines: 0,
+  emojiDensity: "light",
+};
+
 export type CopyLogic = {
   id: string;
   user_id: string;
   name: string;
   description: string;
   modules: CopyModule[];
+  formatting: CopyFormatting;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -55,7 +72,7 @@ export const listCopyLogics = createServerFn({ method: "GET" }).handler(async ()
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
-  return { logics: (data ?? []) as CopyLogic[] };
+  return { logics: (data ?? []) as unknown as CopyLogic[] };
 });
 
 const UpsertInput = z.object({
@@ -63,6 +80,7 @@ const UpsertInput = z.object({
   name: z.string().min(1).max(60),
   description: z.string().max(8000).default(""),
   modules: z.array(ModuleSchema).max(40).default([]),
+  formatting: FormattingSchema.optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -87,13 +105,14 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
           name: data.name,
           description: data.description,
           modules: data.modules,
+          ...(data.formatting !== undefined ? { formatting: data.formatting } : {}),
           ...(data.is_active !== undefined ? { is_active: data.is_active } : {}),
         })
         .eq("id", data.id)
         .select("*")
         .single();
       if (error) throw new Error(error.message);
-      return { logic: row as CopyLogic };
+      return { logic: row as unknown as CopyLogic };
     }
 
     if (data.is_active === true) {
@@ -109,12 +128,13 @@ export const upsertCopyLogic = createServerFn({ method: "POST" })
         name: data.name,
         description: data.description,
         modules: data.modules,
+        formatting: data.formatting ?? DEFAULT_FORMATTING,
         is_active: data.is_active ?? false,
       })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return { logic: row as CopyLogic };
+    return { logic: row as unknown as CopyLogic };
   });
 
 export const deleteCopyLogic = createServerFn({ method: "POST" })

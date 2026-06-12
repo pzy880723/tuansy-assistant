@@ -75,6 +75,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          formatting: Json
           id: string
           is_active: boolean
           modules: Json
@@ -85,6 +86,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string
+          formatting?: Json
           id?: string
           is_active?: boolean
           modules?: Json
@@ -95,6 +97,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          formatting?: Json
           id?: string
           is_active?: boolean
           modules?: Json
@@ -158,6 +161,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          formatting: Json
           id: string
           industry: string
           is_published: boolean
@@ -170,6 +174,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string
+          formatting?: Json
           id?: string
           industry?: string
           is_published?: boolean
@@ -182,6 +187,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          formatting?: Json
           id?: string
           industry?: string
           is_published?: boolean

@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireUserId } from "@/lib/auth-session.server";
-import type { CopyLogic, CopyModule } from "@/lib/copy-logics.functions";
+import {
+  DEFAULT_FORMATTING,
+  type CopyFormatting,
+  type CopyLogic,
+  type CopyModule,
+} from "@/lib/copy-logics.functions";
 
 export type PresetCopyLogic = {
   id: string;
@@ -10,6 +15,7 @@ export type PresetCopyLogic = {
   industry: string;
   description: string;
   modules: CopyModule[];
+  formatting: CopyFormatting;
   sort_order: number;
   is_published: boolean;
   created_at: string;
@@ -25,7 +31,7 @@ export const listPresetCopyLogics = createServerFn({ method: "GET" }).handler(as
     .eq("is_published", true)
     .order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
-  return { presets: (data ?? []) as PresetCopyLogic[] };
+  return { presets: (data ?? []) as unknown as PresetCopyLogic[] };
 });
 
 function rid() {
@@ -41,7 +47,7 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: preset, error: pErr } = await supabaseAdmin
       .from("preset_copy_logics")
-      .select("name, description, modules")
+      .select("name, description, modules, formatting")
       .eq("id", data.presetId)
       .eq("is_published", true)
       .maybeSingle();
@@ -53,6 +59,9 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
       ...m,
       id: rid(),
     }));
+    const formatting =
+      ((preset as { formatting?: unknown }).formatting as CopyFormatting | undefined) ??
+      DEFAULT_FORMATTING;
 
     const { count } = await supabaseAdmin
       .from("copy_logics")
@@ -66,10 +75,11 @@ export const copyPresetToMine = createServerFn({ method: "POST" })
         name: `${preset.name}（我的副本）`,
         description: preset.description,
         modules,
+        formatting,
         is_active: (count ?? 0) === 0,
       })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return { logic: row as CopyLogic };
+    return { logic: row as unknown as CopyLogic };
   });
