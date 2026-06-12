@@ -739,8 +739,14 @@ export function IntroTab({
                                   transform: `translateY(${ghostTranslateOf(b.id)}px)`,
                                   transition:
                                     "transform 220ms cubic-bezier(.2,.8,.2,1)",
+                                  background: "#ffffff",
+                                  borderRadius: 10,
+                                  padding: 10,
+                                  boxShadow:
+                                    "0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
                                 }}
                               >
+
                                 <BlockGhost block={b} />
                               </div>
                             );
