@@ -100,7 +100,8 @@ export async function createImageGenerationStream(
   apiKey: string,
   { prompt, referenceImages }: GenerateOneInput,
 ): Promise<Response> {
-  const hasReferences = referenceImages && referenceImages.length > 0;
+  const refs = referenceImages ?? [];
+  const hasReferences = refs.length > 0;
   const body = hasReferences
     ? {
         model: GEMINI_MODEL,
@@ -109,7 +110,7 @@ export async function createImageGenerationStream(
             role: "user",
             content: [
               { type: "text", text: withRealism(prompt) },
-              ...referenceImages.map((url) => ({ type: "image_url", image_url: { url } })),
+              ...refs.map((url) => ({ type: "image_url", image_url: { url } })),
             ],
           },
         ],
