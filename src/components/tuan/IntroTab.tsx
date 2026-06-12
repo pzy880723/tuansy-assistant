@@ -254,8 +254,139 @@ export function IntroTab({
     setEditingId((cur) => (cur === id ? null : cur));
   };
 
-  // Reorder overlay state
-  const [reorderingId, setReorderingId] = useState<string | null>(null);
+  // ============= Drag-to-reorder state =============
+  const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerBlockRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) blockRefs.current.set(id, el);
+    else blockRefs.current.delete(id);
+  };
+
+  type DragState = {
+    id: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    offsetX: number;
+    offsetY: number;
+    width: number;
+    height: number;
+    pointerX: number;
+    pointerY: number;
+    dropIndex: number; // index in compacted (others) list
+  };
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  dragRef.current = drag;
+
+  const commitReorder = (id: string, dropIndex: number) => {
+    const src = blocks.findIndex((b) => b.id === id);
+    if (src < 0) return;
+    const next = blocks.slice();
+    const [item] = next.splice(src, 1);
+    const clamped = Math.max(0, Math.min(next.length, dropIndex));
+    next.splice(clamped, 0, item);
+    setBlocks(next);
+  };
+
+  const startDrag = (id: string, e: React.PointerEvent) => {
+    const el = blockRefs.current.get(id);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const origIdx = blocks.findIndex((b) => b.id === id);
+    setDrag({
+      id,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      dropIndex: origIdx < 0 ? 0 : origIdx,
+    });
+    try {
+      (e.target as Element).releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!drag) return;
+    const id = drag.id;
+    const pid = drag.pointerId;
+
+    const computeDropIndex = (y: number): number => {
+      const others = blocks.filter((b) => b.id !== id);
+      for (let i = 0; i < others.length; i++) {
+        const el = blockRefs.current.get(others[i].id);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (y < r.top + r.height / 2) return i;
+      }
+      return others.length;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerId !== pid) return;
+      const dropIndex = computeDropIndex(e.clientY);
+      setDrag((cur) =>
+        cur ? { ...cur, pointerX: e.clientX, pointerY: e.clientY, dropIndex } : cur,
+      );
+    };
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerId !== pid) return;
+      const final = dragRef.current;
+      if (final) commitReorder(final.id, final.dropIndex);
+      setDrag(null);
+    };
+    const onCancel = (e: PointerEvent) => {
+      if (e.pointerId !== pid) return;
+      setDrag(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrag(null);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("keydown", onKey);
+    // Prevent body scroll while dragging
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag?.id, drag?.pointerId]);
+
+  // Compute per-block translateY for the let-it-flow animation.
+  const translateOf = (blockId: string): number => {
+    if (!drag) return 0;
+    if (blockId === drag.id) return 0;
+    const origIdx = blocks.findIndex((b) => b.id === drag.id);
+    const j = blocks.findIndex((b) => b.id === blockId);
+    if (origIdx < 0 || j < 0) return 0;
+    const gap = 12; // matches space-y-3 (~12px)
+    const shift = drag.height + gap;
+    const compactedIdx = j < origIdx ? j : j - 1;
+    if (j < origIdx) {
+      return compactedIdx >= drag.dropIndex ? shift : 0;
+    } else {
+      return compactedIdx >= drag.dropIndex ? 0 : -shift;
+    }
+  };
 
   const openAIForBlock = (id: string, fallback: string) => {
     aiTargetIdRef.current = id;
@@ -287,6 +418,7 @@ export function IntroTab({
     setBlocks(list);
   };
 
+  const draggedBlock = drag ? blocks.find((b) => b.id === drag.id) : null;
 
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
@@ -331,7 +463,7 @@ export function IntroTab({
       </div>
 
       {/* Intro card */}
-      <div className="rounded-xl bg-white p-3">
+      <div className="relative rounded-xl bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
@@ -373,11 +505,14 @@ export function IntroTab({
             {blocks.map((b, i) => (
               <BlockCard
                 key={b.id}
+                refCb={registerBlockRef(b.id)}
                 block={b}
                 isFirst={i === 0}
                 isLast={i === blocks.length - 1}
-                isReordering={reorderingId === b.id}
+                isDragging={drag?.id === b.id}
                 isEditing={editingId === b.id}
+                dragOffset={translateOf(b.id)}
+                anyDragging={!!drag}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
                 onUploadReplace={() => {
@@ -389,7 +524,7 @@ export function IntroTab({
                 onChangeText={(v) => updateText(b.id, v)}
                 onFinishEditText={(v) => finishEditing(b.id, v)}
                 onRemoveSmallImage={(idx) => removeSmallImage(b.id, idx)}
-                onStartReorder={() => setReorderingId(b.id)}
+                onPointerDownDrag={(e) => startDrag(b.id, e)}
                 onAIGenerate={
                   projectId && b.type === "text"
                     ? () => openAIForBlock(b.id, b.text)
@@ -436,18 +571,29 @@ export function IntroTab({
         </div>
       </div>
 
-      {reorderingId && (
-        <ReorderOverlay
-          blocks={blocks}
-          draggingId={reorderingId}
-          onCommit={(index) => {
-            moveToIndex(reorderingId, index);
-            setReorderingId(null);
-          }}
-          onCancel={() => setReorderingId(null)}
-        />
-      )}
-
+      {/* Drag backdrop + ghost */}
+      {drag && draggedBlock &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[3px] animate-in fade-in duration-150" />
+            <div
+              className="pointer-events-none fixed z-50 origin-top-left"
+              style={{
+                left: drag.pointerX - drag.offsetX * 0.5,
+                top: drag.pointerY - drag.offsetY * 0.5,
+                width: drag.width,
+                transform: "scale(0.5)",
+                transformOrigin: "top left",
+                transition: "transform 160ms cubic-bezier(.2,.8,.2,1)",
+              }}
+            >
+              <div className="rounded-xl bg-white/95 p-3 shadow-2xl ring-1 ring-black/5 backdrop-blur">
+                <BlockGhost block={draggedBlock} />
+              </div>
+            </div>
+          </>,
+          document.body,
+        )}
 
       {projectId && (
         <AIGenerateImageDialog
@@ -468,11 +614,14 @@ function BlockLabel({ type }: { type: IntroBlock["type"] }) {
 }
 
 function BlockCard({
+  refCb,
   block,
   isFirst,
   isLast,
-  isReordering,
+  isDragging,
   isEditing,
+  dragOffset,
+  anyDragging,
   onMove,
   onRemove,
   onUploadReplace,
@@ -480,14 +629,17 @@ function BlockCard({
   onChangeText,
   onFinishEditText,
   onRemoveSmallImage,
-  onStartReorder,
+  onPointerDownDrag,
   onAIGenerate,
 }: {
+  refCb: (el: HTMLDivElement | null) => void;
   block: IntroBlock;
   isFirst: boolean;
   isLast: boolean;
-  isReordering: boolean;
+  isDragging: boolean;
   isEditing: boolean;
+  dragOffset: number;
+  anyDragging: boolean;
   onMove: (dir: "up" | "down" | "top") => void;
   onRemove: () => void;
   onUploadReplace: () => void;
@@ -495,31 +647,35 @@ function BlockCard({
   onChangeText: (v: string) => void;
   onFinishEditText: (v: string) => void;
   onRemoveSmallImage: (idx: number) => void;
-  onStartReorder: () => void;
+  onPointerDownDrag: (e: React.PointerEvent) => void;
   onAIGenerate?: () => void;
 }) {
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
 
   return (
     <div
-      className={
-        "border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0 " +
-        (isReordering ? "opacity-50" : "")
-      }
+      ref={refCb}
+      style={{
+        transform: `translateY(${dragOffset}px)`,
+        transition: "transform 220ms cubic-bezier(.2,.8,.2,1)",
+        visibility: isDragging ? "hidden" : undefined,
+      }}
+      className="border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0"
     >
       <div className="mb-1.5 flex items-center justify-between">
         <BlockLabel type={block.type} />
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onStartReorder}
-            title="拖动排序"
-            className="cursor-grab rounded-md border border-[#dcdee0] bg-white px-1.5 py-0.5 text-[#646566] hover:border-[#07c160] hover:text-[#07c160] active:cursor-grabbing"
+            onPointerDown={onPointerDownDrag}
+            title="按住拖动排序"
+            style={{ touchAction: "none" }}
+            className="cursor-grab select-none rounded-md border border-[#dcdee0] bg-white px-1.5 py-0.5 text-[#646566] hover:border-[#07c160] hover:text-[#07c160] active:cursor-grabbing"
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
 
-          {onAIGenerate && (
+          {onAIGenerate && !anyDragging && (
             <button
               type="button"
               onClick={onAIGenerate}
@@ -669,165 +825,43 @@ export function ProductEntryCard({ count }: { count: number }) {
   );
 }
 
-function ReorderOverlay({
-  blocks,
-  draggingId,
-  onCommit,
-  onCancel,
-}: {
-  blocks: IntroBlock[];
-  draggingId: string;
-  onCommit: (index: number) => void;
-  onCancel: () => void;
-}) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const hoverRef = useRef<number | null>(null);
-  hoverRef.current = hoverIndex;
-
-  useEffect(() => {
-    const onUp = () => {
-      const idx = hoverRef.current;
-      if (idx === null) onCancel();
-      else onCommit(idx);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      const t = e.touches[0];
-      if (!t) return;
-      const el = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
-      const slot = el?.closest<HTMLElement>("[data-slot-index]");
-      if (slot) {
-        const i = Number(slot.dataset.slotIndex);
-        setHoverIndex(Number.isFinite(i) ? i : null);
-      } else {
-        setHoverIndex(null);
-      }
-    };
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("touchend", onUp);
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("touchend", onUp);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onCommit, onCancel]);
-
-  const currentIndex = blocks.findIndex((b) => b.id === draggingId);
-
-  const slot = (index: number) => {
-    const active = hoverIndex === index;
-    const isCurrent = index === currentIndex || index === currentIndex + 1;
-    return (
-      <div
-        data-slot-index={index}
-        onMouseEnter={() => setHoverIndex(index)}
-        onMouseLeave={() => setHoverIndex((cur) => (cur === index ? null : cur))}
-        className="-my-1 flex h-3 cursor-pointer items-center"
-      >
-        <div
-          className={
-            "h-[2px] w-full rounded-full transition-all " +
-            (active
-              ? "bg-[#07c160] shadow-[0_0_0_2px_rgba(7,193,96,0.18)]"
-              : isCurrent
-              ? "bg-[#07c160]/30"
-              : "bg-[#e8e9eb]")
-          }
-        />
-      </div>
-    );
-  };
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
-    >
-      <div
-        className="flex max-h-[80vh] w-[300px] flex-col rounded-2xl bg-white p-3 shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="mb-2 flex items-center justify-between px-1">
-          <div className="text-[13px] font-medium text-[#1a1a1a]">拖到目标位置松开</div>
-          <button
-            onClick={onCancel}
-            className="rounded-md p-1 text-[#969799] hover:bg-[#f4f5f7]"
-            title="取消"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto pr-1">
-          {blocks.length === 0 ? (
-            <div className="py-8 text-center text-[12px] text-[#969799]">暂无模块</div>
-          ) : (
-            <>
-              {slot(0)}
-              {blocks.map((b, i) => (
-                <div key={b.id}>
-                  <ThumbBlock block={b} highlighted={b.id === draggingId} />
-                  {slot(i + 1)}
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-function ThumbBlock({ block, highlighted }: { block: IntroBlock; highlighted: boolean }) {
-  const border = highlighted ? "border-[#07c160] ring-2 ring-[#07c160]/30" : "border-[#f0f1f2]";
+/** Compact preview rendered inside the floating drag ghost. */
+function BlockGhost({ block }: { block: IntroBlock }) {
   return (
-    <div className={`relative rounded-md border ${border} bg-white p-1.5`}>
-      {highlighted && (
-        <span className="absolute -top-1.5 left-1.5 rounded bg-[#07c160] px-1 py-px text-[9px] font-medium leading-none text-white">
-          拖动中
-        </span>
-      )}
+    <div>
       {block.type === "text" && (
-        <div className="truncate text-[11px] text-[#646566]">
-          {block.text?.split("\n")[0] || <span className="text-[#c8c9cc]">（空文字）</span>}
+        <div className="whitespace-pre-wrap text-[13px] leading-snug text-[#323233] line-clamp-3">
+          {block.text || <span className="text-[#c8c9cc]">（空文字）</span>}
         </div>
       )}
       {block.type === "image_lg" && (
         block.url ? (
-          <img src={block.url} alt="" className="block aspect-[16/10] w-full rounded object-cover" loading="lazy" />
+          <img src={block.url} alt="" className="block h-auto w-full rounded-md" />
         ) : (
-          <div className="grid aspect-[16/10] w-full place-items-center rounded bg-[#fafbfc] text-[10px] text-[#c8c9cc]">大图</div>
+          <div className="grid aspect-[16/10] w-full place-items-center rounded-md bg-[#fafbfc] text-[12px] text-[#c8c9cc]">大图</div>
         )
       )}
       {block.type === "image_sm" && (
-        <div className="grid grid-cols-3 gap-0.5">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="grid grid-cols-3 gap-1">
+          {block.urls.slice(0, 9).map((u, i) => (
             <div key={i} className="aspect-square overflow-hidden rounded bg-[#fafbfc]">
-              {block.urls[i] ? (
-                <img src={block.urls[i]} alt="" className="h-full w-full object-cover" loading="lazy" />
-              ) : null}
+              <img src={u} alt="" className="h-full w-full object-cover" />
             </div>
           ))}
         </div>
       )}
       {block.type === "video" && (
-        <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
+        <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
           {block.url ? (
             <video src={block.url} className="h-full w-full object-cover" muted />
           ) : null}
           <div className="absolute inset-0 grid place-items-center">
-            <Play className="h-5 w-5 text-white/85" fill="currentColor" />
+            <Play className="h-6 w-6 text-white/85" fill="currentColor" />
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
