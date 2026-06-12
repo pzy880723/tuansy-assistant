@@ -28,6 +28,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { CopyLogicSection } from "@/components/copy-logic/CopyLogicSection";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
