@@ -89,6 +89,7 @@ export const Route = createFileRoute("/api/chat")({
           name: string;
           description: string | null;
           modules: Array<{ type: string; label: string; guidance: string }> | null;
+          formatting: Record<string, unknown> | null;
           is_active: boolean;
         };
         let activeLogic: LogicRow | null = null;
