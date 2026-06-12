@@ -615,7 +615,9 @@ export function IntroTab({
         </div>
       </div>
 
-      {/* Drag: localized frosted backdrop + half-width floating thumbnail */}
+      {/* Drag: localized frosted backdrop + fixed half-width thumbnail.
+          Only the dragged module moves inside the (fixed) thumbnail;
+          others slide to open a gap; auto-scrolls near top/bottom edges. */}
       {drag && draggedBlock &&
         createPortal(
           <>
@@ -633,45 +635,102 @@ export function IntroTab({
                 borderRadius: 12,
               }}
             />
-            {/* Half-width floating preview thumbnail, anchored under cursor */}
-            <div
-              className="pointer-events-none fixed z-50 animate-in fade-in zoom-in-95 duration-150"
-              style={{
-                left: drag.pointerX - drag.grabRelX * 0.5,
-                top: drag.pointerY - drag.grabRelY * 0.5,
-                width: drag.cRect.width * 0.5,
-                transition: "none",
-              }}
-            >
-              <div className="rounded-xl bg-white/98 p-2 shadow-2xl ring-1 ring-black/10">
-                <div className="mb-1 truncate text-[10px] font-semibold text-[#1a1a1a]">
-                  {intro.title || "团购介绍"}
-                </div>
-                <div className="space-y-1.5">
-                  {blocks.map((b) => {
-                    const isMe = b.id === drag.id;
-                    return (
-                      <div
-                        key={b.id}
-                        ref={isMe ? undefined : registerGhostRef(b.id)}
-                        style={{
-                          transform: `translateY(${ghostTranslateOf(b.id)}px)`,
-                          transition: "transform 220ms cubic-bezier(.2,.8,.2,1)",
-                          opacity: isMe ? 0.55 : 1,
-                          outline: isMe ? "2px dashed #07c160" : undefined,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <BlockGhost block={b} />
+            {/* Fixed half-width thumbnail centered over the preview area.
+                Inner content is rendered at full width then visually scaled
+                so text/images/spacing all shrink proportionally. */}
+            {(() => {
+              const halfW = drag.cRect.width * 0.5;
+              const fullW = halfW / GHOST_SCALE;
+              const left = drag.cRect.left + (drag.cRect.width - halfW) / 2;
+              return (
+                <div
+                  className="fixed z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden rounded-xl bg-white/98 shadow-2xl ring-1 ring-black/10"
+                  style={{
+                    left,
+                    top: drag.cRect.top + 8,
+                    width: halfW,
+                    height: drag.cRect.height - 16,
+                  }}
+                >
+                  <div
+                    ref={ghostScrollRef}
+                    className="h-full overflow-y-auto"
+                    style={{ scrollBehavior: "auto" }}
+                  >
+                    {/* Scaled inner content */}
+                    <div
+                      style={{
+                        width: fullW,
+                        transform: `scale(${GHOST_SCALE})`,
+                        transformOrigin: "top left",
+                      }}
+                    >
+                      <div className="p-3">
+                        <div className="mb-2 truncate text-[15px] font-semibold text-[#1a1a1a]">
+                          {intro.title || "团购介绍"}
+                        </div>
+                        <div className="space-y-3">
+                          {blocks.map((b) => {
+                            const isMe = b.id === drag.id;
+                            if (isMe) {
+                              // The dragged block — floats vertically with
+                              // the pointer (in scaled coords) and is
+                              // visually highlighted.
+                              const scrollEl = ghostScrollRef.current;
+                              const baseTop = scrollEl
+                                ? scrollEl.getBoundingClientRect().top
+                                : drag.cRect.top + 8;
+                              const yInScaled =
+                                (drag.pointerY - baseTop + (scrollEl?.scrollTop ?? 0)) /
+                                  GHOST_SCALE -
+                                drag.blockHeight / 2;
+                              return (
+                                <div
+                                  key={b.id}
+                                  style={{
+                                    transform: `translateY(${yInScaled}px)`,
+                                    transition: "none",
+                                    position: "absolute",
+                                    left: 12,
+                                    right: 12,
+                                    top: 0,
+                                    opacity: 0.95,
+                                    outline: "2px dashed #07c160",
+                                    background: "rgba(255,255,255,0.95)",
+                                    borderRadius: 8,
+                                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                    pointerEvents: "none",
+                                  }}
+                                >
+                                  <BlockGhost block={b} />
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                key={b.id}
+                                ref={registerGhostRef(b.id)}
+                                style={{
+                                  transform: `translateY(${ghostTranslateOf(b.id)}px)`,
+                                  transition:
+                                    "transform 220ms cubic-bezier(.2,.8,.2,1)",
+                                }}
+                              >
+                                <BlockGhost block={b} />
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
           </>,
           document.body,
         )}
+
 
 
       {projectId && (
