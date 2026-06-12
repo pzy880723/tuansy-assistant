@@ -255,24 +255,41 @@ export function IntroTab({
   };
 
   // ============= Drag-to-reorder state =============
+  // UX: pressing the grip immediately shrinks the WHOLE intro preview into a
+  // half-width floating thumbnail anchored under the cursor. Only the preview
+  // area gets a blur backdrop; the rest of the page is unaffected. Inside
+  // the thumbnail, blocks slide to open a gap at the live drop position so
+  // the user can land precisely.
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const registerBlockRef = (id: string) => (el: HTMLDivElement | null) => {
     if (el) blockRefs.current.set(id, el);
     else blockRefs.current.delete(id);
   };
+  // Refs to the block elements rendered INSIDE the floating thumbnail.
+  // These are what we hit-test against for the drop index.
+  const ghostBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerGhostRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) ghostBlockRefs.current.set(id, el);
+    else ghostBlockRefs.current.delete(id);
+  };
 
   type DragState = {
     id: string;
     pointerId: number;
-    startX: number;
-    startY: number;
-    offsetX: number;
-    offsetY: number;
-    width: number;
-    height: number;
+    // Bounding rect of the preview at drag-start (for the blur backdrop and
+    // the thumbnail's initial position/size).
+    cRect: { left: number; top: number; width: number; height: number };
+    // Pointer position at grab time, relative to the container's top-left.
+    grabRelX: number;
+    grabRelY: number;
+    // Current pointer in viewport coords.
     pointerX: number;
     pointerY: number;
-    dropIndex: number; // index in compacted (others) list
+    // Drop index within the compacted (others) list.
+    dropIndex: number;
+    // Height of the dragged block in the live preview (for the in-ghost gap).
+    blockHeight: number;
   };
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -289,22 +306,22 @@ export function IntroTab({
   };
 
   const startDrag = (id: string, e: React.PointerEvent) => {
+    const container = containerRef.current;
     const el = blockRefs.current.get(id);
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const bRect = el.getBoundingClientRect();
     const origIdx = blocks.findIndex((b) => b.id === id);
     setDrag({
       id,
       pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-      width: rect.width,
-      height: rect.height,
+      cRect: { left: cRect.left, top: cRect.top, width: cRect.width, height: cRect.height },
+      grabRelX: e.clientX - cRect.left,
+      grabRelY: e.clientY - cRect.top,
       pointerX: e.clientX,
       pointerY: e.clientY,
       dropIndex: origIdx < 0 ? 0 : origIdx,
+      blockHeight: bRect.height,
     });
     try {
       (e.target as Element).releasePointerCapture?.(e.pointerId);
@@ -320,9 +337,11 @@ export function IntroTab({
     const pid = drag.pointerId;
 
     const computeDropIndex = (y: number): number => {
+      // Hit-test against blocks rendered INSIDE the floating thumbnail —
+      // that's the surface the user actually sees and aims at.
       const others = blocks.filter((b) => b.id !== id);
       for (let i = 0; i < others.length; i++) {
-        const el = blockRefs.current.get(others[i].id);
+        const el = ghostBlockRefs.current.get(others[i].id);
         if (!el) continue;
         const r = el.getBoundingClientRect();
         if (y < r.top + r.height / 2) return i;
@@ -355,7 +374,6 @@ export function IntroTab({
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onCancel);
     window.addEventListener("keydown", onKey);
-    // Prevent body scroll while dragging
     const prevOverflow = document.body.style.overflow;
     const prevTouchAction = document.body.style.touchAction;
     document.body.style.overflow = "hidden";
@@ -371,21 +389,14 @@ export function IntroTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag?.id, drag?.pointerId]);
 
-  // Compute per-block translateY for the let-it-flow animation.
-  const translateOf = (blockId: string): number => {
-    if (!drag) return 0;
-    if (blockId === drag.id) return 0;
-    const origIdx = blocks.findIndex((b) => b.id === drag.id);
-    const j = blocks.findIndex((b) => b.id === blockId);
-    if (origIdx < 0 || j < 0) return 0;
-    const gap = 12; // matches space-y-3 (~12px)
-    const shift = drag.height + gap;
-    const compactedIdx = j < origIdx ? j : j - 1;
-    if (j < origIdx) {
-      return compactedIdx >= drag.dropIndex ? shift : 0;
-    } else {
-      return compactedIdx >= drag.dropIndex ? 0 : -shift;
-    }
+  // Per-block translateY INSIDE the thumbnail — opens a gap where the
+  // dragged block will land.
+  const ghostTranslateOf = (blockId: string): number => {
+    if (!drag || blockId === drag.id) return 0;
+    const others = blocks.filter((b) => b.id !== drag.id);
+    const ci = others.findIndex((b) => b.id === blockId);
+    if (ci < 0) return 0;
+    return ci >= drag.dropIndex ? 24 : 0;
   };
 
   const openAIForBlock = (id: string, fallback: string) => {
