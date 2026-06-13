@@ -242,10 +242,12 @@ function formatDate(iso: string) {
 
 function ProjectCard({
   project,
+  pendingCount,
   onEdit,
   onDelete,
 }: {
   project: ProjectRow;
+  pendingCount: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -253,6 +255,14 @@ function ProjectCard({
   const slots = [0, 1, 2];
   return (
     <div className="group relative rounded-2xl border bg-card p-4 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_20px_40px_-20px_oklch(0.7_0.19_45/0.35)]">
+      {pendingCount > 0 && (
+        <div
+          className="absolute -right-1.5 -top-1.5 z-10 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-500 px-1.5 text-[11px] font-semibold text-white shadow-[0_4px_12px_-2px_rgba(239,68,68,0.5)]"
+          title={`手机端新发来了 ${pendingCount} 条素材`}
+        >
+          {pendingCount > 99 ? "99+" : pendingCount}
+        </div>
+      )}
       <Link
         to="/app/project/$id"
         params={{ id: project.id }}
