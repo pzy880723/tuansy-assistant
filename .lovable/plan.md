@@ -1,40 +1,90 @@
-## 目标
 
-让顶部「团长卡片」自带模拟数据、支持自定义，且背景图永远不为空。
+# 手机收料 → 电脑出稿 实施方案
 
-## 改动
+按你的选择落地：**先做 H5 验证流程**，团长用**手机号登录**（复用现有腾讯短信），素材到达后**智能推荐项目 + 可手动改**，电脑端**对话框弹消息 + 项目列表红点提醒**。
 
-### 1. 数据模型 (`src/components/tuan/types.ts`)
-- `IntroData` 新增 `leader_bg_url?: string | null`。
+## 一、整体流程
 
-### 2. 团长名称 & 头像（IntroTab，约 511–537 行）
-- **模拟默认值**：项目创建时若 `leader_name` 为空，从内置池随机一个（如「团团妈、小美选物、邻居老王、甜甜的店、阿May 严选」等）写入。`leader_avatar` 为空时随机一个内置头像（用 DiceBear `https://api.dicebear.com/7.x/avataaars/svg?seed=<projectId>` 这种确定性 URL，无需上传）。
-- **支持自定义**：
-  - 头像方块改为可点击 → 弹原生 file input（复用现有 `uploadProductImage` serverFn）上传后写入 `leader_avatar`。
-  - 名称沿用现有 `InlineText`，已可编辑，仅把 placeholder 行为改成「点击可改」。
+```text
+供应商在微信群发图/文/链接
+      ↓ 团长长按 → 复制 / 保存图片
+      ↓ 打开手机浏览器里的「团宝收料台」（H5，已加桌面图标）
+      ↓ 粘贴文字 / 选图片 / 贴链接 → 选项目（默认推荐最近编辑的）
+      ↓ 点「丢给团宝」
+      ↓
+后端 inbox 接收 → 存储 + 关联项目
+      ↓
+团宝 Agent 自动触发：分析素材 → 生成介绍草稿
+      ↓
+电脑端 实时（Realtime）：
+   · 左侧项目列表对应项目出现红点
+   · 进入项目后，对话框自动弹出团宝消息：
+     "刚收到你手机发来的 3 张图 + 一段供应商描述，正在分析…"
+     "✍️ 已生成新版介绍，右侧预览已更新"
+```
 
-### 3. 背景图自动填充（IntroTab，约 514–519 行）
-- 顶部 div 背景改为 `style={{ backgroundImage: url(intro.leader_bg_url) }}`；当前的渐变+点阵作为「加载中/兜底」层。
-- **自动补全策略**（首次进入项目时，由 `app.project.$id.tsx` 在加载完成后触发一次）：
-  1. 若已有 `leader_bg_url` → 不动。
-  2. 否则若 `project_images` 中至少有 1 张图 → 取第 1 张作为背景，写入 `leader_bg_url`。
-  3. 否则调用 `/api/generate-image`（已存在的流式接口）用「项目名 + 商品名 + 标签」作为 prompt 生成一张横向背景图，上传到 `product-images` 后写入 `leader_bg_url`。生成期间显示当前渐变占位。
-- **「设置背景图」按钮**：去掉「即将上线」toast，改为弹出小菜单：
-  - 「从已上传图片中选择」→ 列出 `project_images` 缩略图。
-  - 「AI 重新生成」→ 重跑上面第 3 步。
-  - 「上传新图」→ 复用 file input。
-- 选中后立即写入 `leader_bg_url` 并通过现有 `updateProject` 持久化。
+## 二、手机端 H5（`/m/inbox`）
 
-### 4. 触发位置
-- 进入 `app.project.$id.tsx` 加载到 `intro` 后，用 `useEffect` 跑一次「确保有名称/头像/背景」的补全函数，结果通过现有 `onChange(intro)` 写回数据库；避免重复触发（用 ref 标记本会话已尝试过）。
+新增一个**移动端专用路由**，不复用电脑端布局：
 
-### 5. 文件清单
-- `src/components/tuan/types.ts`：加字段。
-- `src/components/tuan/IntroTab.tsx`：团长卡片交互 + 背景图。
-- `src/routes/app.project.$id.tsx`：首次进入时的自动补全逻辑。
-- 不动后端 schema（`leader_bg_url` 存在 `projects.product` 或 `intro` JSON 里，跟现有 `leader_avatar` 同处）。
+- **登录**：复用现有手机号 + 短信验证码（`app_sessions` / `app_users`）。首次进入引导"添加到主屏幕"。
+- **三个 Tab**：图片 / 文字 / 链接
+  - 图片：调用系统相册多选（`<input type=file accept="image/*" multiple>`），本地预览，可删
+  - 文字：大文本框，自动识别粘贴
+  - 链接：单行输入 + 自动抓取标题（能抓的抓，抓不到留空）
+- **目标项目选择器**：
+  - 顶部默认显示「最近编辑：XXX 团」+ 一个下拉
+  - 下拉里：最近 10 个项目 + "新建项目"
+- **提交按钮**：「丢给团宝 →」，提交后显示「团宝已收到，去电脑看看吧 ☕」
 
-## 不做
+## 三、后端
 
-- 不新建表、不动 RLS、不动 chat / skill 逻辑。
-- 不做完整的「素材库」UI，只在背景图按钮里给三个最小选项。
+### 数据表（新增 `inbox_items`）
+
+```text
+inbox_items
+  id, user_id, project_id (nullable, 新建时先空)
+  kind: 'image' | 'text' | 'link'
+  payload: jsonb  // 图片url列表 / 文本内容 / 链接url+抓取的标题
+  status: 'pending' | 'processing' | 'consumed' | 'failed'
+  created_at, processed_at
+```
+
+实时订阅 `inbox_items` 和 `projects.updated_at`，电脑端据此点红点。
+
+### Server Functions
+- `createInboxItem`（手机端调用）：写入 `inbox_items`，图片走现有 `product-images` bucket
+- `consumeInboxForProject`（电脑端进入项目时自动调用 + 触发器）：拉取该项目所有 `pending`，喂给现有 Agent 生成新版介绍，状态置 `consumed`
+
+### 智能推荐项目
+手机端选择器默认值 = 用户最近 30 分钟内编辑过的项目；没有则显示「新建项目」。
+
+## 四、电脑端
+
+### 项目列表红点
+左侧项目列表订阅 `inbox_items where status=pending`，按 project_id 聚合显示红点 + 数量徽章。
+
+### 对话框自动消息
+进入项目时，如有 pending 素材：
+1. 团宝先发一条："📥 收到你刚从手机发来的 N 张图 / 一段文字，正在分析…"
+2. 调用 Agent 生成 → 写入 copy_versions
+3. 团宝再发："✍️ 已生成《XX 介绍》新版本，右侧预览已更新，看看要不要调整？"
+
+复用现有"正在分析需求 / 正在生成文字描述"那套自然语言进度提示。
+
+## 五、技术要点
+
+- **路由**：`src/routes/m/inbox.tsx`（移动端 H5），`src/routes/api/inbox.upload.ts`（图片上传 server route）
+- **Server fns**：`src/lib/inbox.functions.ts`（createInboxItem, listMyRecentProjects, consumeInboxForProject）
+- **Realtime**：电脑端 `useEffect` 订阅 `inbox_items` 表变更
+- **不做的事**：本期不接微信公众号 / 企业微信 / 小程序；不做链接深度抓取（淘宝/拼多多反爬复杂，先抓 og:title/og:image 能抓就抓）；不做小程序卡片解析
+
+## 六、上线后第二阶段（不在本次范围）
+
+H5 跑通 + Agent 出稿质量验证后，再把同样的 `/api/inbox` 后端接到微信小程序「分享菜单」入口，团长体验从"打开 H5"升级到"群里长按直接分享"。
+
+---
+
+**实施顺序（建议分两次提交，方便你边用边反馈）**：
+1. 先做后端表 + 手机 H5 收料 + 电脑端红点提醒（不接 Agent，先验收料链路）
+2. 再接 Agent 自动出稿 + 对话框自然语言播报

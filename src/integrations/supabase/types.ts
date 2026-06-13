@@ -157,6 +157,57 @@ export type Database = {
           },
         ]
       }
+      inbox_items: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          note: string | null
+          payload: Json
+          processed_at: string | null
+          project_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          note?: string | null
+          payload?: Json
+          processed_at?: string | null
+          project_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          payload?: Json
+          processed_at?: string | null
+          project_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbox_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       preset_copy_logics: {
         Row: {
           created_at: string

@@ -36,8 +36,10 @@ import {
   listProjects,
   updateProjectMeta,
 } from "@/lib/projects.functions";
+import { listPendingInboxCounts } from "@/lib/inbox.functions";
 import { clearAuthCookies, notifyAuthChange, setAuthSessionError, useCurrentUser } from "@/lib/use-current-user";
 import { ProjectStarter } from "@/components/project-starter";
+import { Smartphone, Inbox } from "lucide-react";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "我的项目 — 团宝助手" }] }),
@@ -68,6 +70,14 @@ function AppIndex() {
     queryKey: ["projects"],
     queryFn: () => list(),
     retry: false,
+  });
+
+  const countsFn = useServerFn(listPendingInboxCounts);
+  const { data: counts } = useQuery({
+    queryKey: ["inbox-pending-counts"],
+    queryFn: () => countsFn(),
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const resetAndLogin = () => {
@@ -135,8 +145,11 @@ function AppIndex() {
         />
       </div>
 
+      {/* 手机收料台入口 + 未读总数 */}
+      <MobileInboxBanner total={counts?.total ?? 0} unassigned={counts?.unassigned ?? 0} />
+
       {/* Existing projects */}
-      <section className="mt-16">
+      <section className="mt-12">
         <div className="mb-5 flex items-end justify-between">
           <h2 className="text-lg font-semibold">最近项目</h2>
           {!isLoading && !isError && projects.length > 0 && (
@@ -159,6 +172,7 @@ function AppIndex() {
               <ProjectCard
                 key={p.id}
                 project={p}
+                pendingCount={counts?.byProject?.[p.id] ?? 0}
                 onEdit={() => setEditProject(p)}
                 onDelete={() => delMut.mutate(p.id)}
               />
@@ -226,12 +240,55 @@ function formatDate(iso: string) {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日发布`;
 }
 
+function MobileInboxBanner({ total, unassigned }: { total: number; unassigned: number }) {
+  const url =
+    typeof window !== "undefined" ? `${window.location.origin}/m/inbox` : "/m/inbox";
+  const qr = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(url)}`;
+  return (
+    <section className="mt-10 overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-[#fff7ed] to-white p-5 shadow-sm">
+      <div className="flex items-center gap-4">
+        <img src={qr} alt="扫码打开手机收料台" className="h-[110px] w-[110px] shrink-0 rounded-xl bg-white p-1.5 shadow" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[15px] font-semibold">
+            <Smartphone className="h-4 w-4 text-[oklch(0.7_0.19_45)]" />
+            手机收料台
+            {total > 0 && (
+              <span className="inline-flex h-5 items-center rounded-full bg-red-500 px-2 text-[11px] font-semibold text-white">
+                <Inbox className="mr-0.5 h-3 w-3" />
+                {total} 条待处理
+              </span>
+            )}
+          </div>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+            扫码后把链接保存到主屏幕。供应商在群里随手丢的图、文字、链接，长按复制后到收料台一粘 → 团宝在电脑端自动收到并生成新版文案。
+          </p>
+          {unassigned > 0 && (
+            <p className="mt-1 text-[12px] text-orange-600">
+              其中 {unassigned} 条还没指定项目，到电脑端打开任意项目后可以认领。
+            </p>
+          )}
+          <a
+            href="/m/inbox"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex h-7 items-center gap-1 rounded-full border bg-white px-3 text-[12px] text-foreground hover:bg-muted"
+          >
+            在本机打开预览 →
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ProjectCard({
   project,
+  pendingCount,
   onEdit,
   onDelete,
 }: {
   project: ProjectRow;
+  pendingCount: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -239,6 +296,14 @@ function ProjectCard({
   const slots = [0, 1, 2];
   return (
     <div className="group relative rounded-2xl border bg-card p-4 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_20px_40px_-20px_oklch(0.7_0.19_45/0.35)]">
+      {pendingCount > 0 && (
+        <div
+          className="absolute -right-1.5 -top-1.5 z-10 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-500 px-1.5 text-[11px] font-semibold text-white shadow-[0_4px_12px_-2px_rgba(239,68,68,0.5)]"
+          title={`手机端新发来了 ${pendingCount} 条素材`}
+        >
+          {pendingCount > 99 ? "99+" : pendingCount}
+        </div>
+      )}
       <Link
         to="/app/project/$id"
         params={{ id: project.id }}
