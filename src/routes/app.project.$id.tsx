@@ -1061,6 +1061,11 @@ function ToolCard({ part }: { part: ToolPart }) {
         </span>
       </summary>
       <div className="space-y-3 border-t bg-muted/30 px-3 py-3 text-[11px]">
+        {isRunning && (
+          <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
+            正在阅读上下文 → 生成内容 → 写入右侧预览…
+          </div>
+        )}
         {readableDetails.map((detail) => (
           <div key={`${detail.label}-${detail.value.slice(0, 20)}`}>
             <div className="mb-1 font-semibold text-muted-foreground">{detail.label}</div>
