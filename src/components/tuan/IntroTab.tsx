@@ -128,10 +128,14 @@ export function IntroTab({
   intro,
   onChange,
   projectId,
+  onAskAI,
 }: {
   intro: IntroData;
   onChange: (next: IntroData) => void;
   projectId?: string;
+  /** Send a natural-language instruction to 团宝 on behalf of the user.
+   *  Used by the per-block "AI 丰富" popover. */
+  onAskAI?: (text: string) => void;
 }) {
   const blocks = intro.blocks ?? [];
   const setBlocks = (next: IntroBlock[]) => onChange({ ...intro, blocks: next });
