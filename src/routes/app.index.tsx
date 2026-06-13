@@ -72,6 +72,14 @@ function AppIndex() {
     retry: false,
   });
 
+  const countsFn = useServerFn(listPendingInboxCounts);
+  const { data: counts } = useQuery({
+    queryKey: ["inbox-pending-counts"],
+    queryFn: () => countsFn(),
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+
   const resetAndLogin = () => {
     const message = "登录会话已失效，请重新登录一次。";
     clearAuthCookies();
