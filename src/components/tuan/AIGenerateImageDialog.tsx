@@ -83,6 +83,7 @@ export function AIGenerateImageDialog({
       setSlots([]);
       setDragId(null);
       setSaveMode("lg");
+      setAspect("portrait");
       clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
