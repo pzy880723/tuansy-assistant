@@ -36,8 +36,10 @@ import {
   listProjects,
   updateProjectMeta,
 } from "@/lib/projects.functions";
+import { listPendingInboxCounts } from "@/lib/inbox.functions";
 import { clearAuthCookies, notifyAuthChange, setAuthSessionError, useCurrentUser } from "@/lib/use-current-user";
 import { ProjectStarter } from "@/components/project-starter";
+import { Smartphone, Inbox } from "lucide-react";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "我的项目 — 团宝助手" }] }),
