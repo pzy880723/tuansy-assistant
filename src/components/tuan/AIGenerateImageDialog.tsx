@@ -64,9 +64,15 @@ export function AIGenerateImageDialog({
   const [slots, setSlots] = useState<Slot[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [saveMode, setSaveMode] = useState<"lg" | "sm">("lg");
+  const [aspect, setAspect] = useState<"square" | "portrait" | "landscape">("portrait");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { attachments, addFiles, remove, clear } = useImageAttachments({ projectId });
   const uploadGenerated = useServerFn(uploadAiGeneratedImage);
+
+  const aspectSize: "1024x1024" | "1024x1536" | "1536x1024" =
+    aspect === "square" ? "1024x1024" : aspect === "portrait" ? "1024x1536" : "1536x1024";
+  const aspectClass =
+    aspect === "square" ? "aspect-square" : aspect === "portrait" ? "aspect-[3/4]" : "aspect-[4/3]";
 
   useEffect(() => {
     if (open) {
