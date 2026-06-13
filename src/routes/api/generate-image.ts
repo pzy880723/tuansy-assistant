@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/generate-image")({
             : body.prompt;
           const upstream = await createImageGenerationStream(
             key,
-            { prompt: finalPrompt, referenceImages: body.referenceImages },
+            { prompt: finalPrompt, referenceImages: body.referenceImages, size: body.size },
           );
           if (!upstream.ok || !upstream.body) {
             return new Response(await upstream.text().catch(() => "生图失败"), {
