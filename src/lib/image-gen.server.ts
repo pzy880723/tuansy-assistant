@@ -47,7 +47,11 @@ function withRealism(prompt: string): string {
   return `${prompt}\n\n${REALISM_SUFFIX}`;
 }
 
-async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> {
+async function callOpenAIImage(
+  apiKey: string,
+  prompt: string,
+  size: ImageSize = "1024x1024",
+): Promise<string> {
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: gatewayHeaders(apiKey),
@@ -55,7 +59,7 @@ async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> 
       model: OPENAI_MODEL,
       prompt: withRealism(prompt),
       quality: "low",
-      size: "1024x1024",
+      size,
       n: 1,
     }),
   });
