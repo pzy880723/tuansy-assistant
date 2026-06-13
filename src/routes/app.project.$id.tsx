@@ -981,8 +981,21 @@ function ToolCard({ part }: { part: ToolPart }) {
   const isRunningState = part.state === "input-streaming" || part.state === "input-available";
   const hasOutputState = part.state === "output-available";
   const failedState = part.state === "output-error" || !!part.errorText;
-  const imgOutput = part.output as { ok?: boolean; urls?: string[]; count?: number } | undefined;
+  const imgOutput = part.output as
+    | { ok?: boolean; urls?: string[]; count?: number; aspect?: "square" | "portrait" | "landscape" }
+    | undefined;
   const imgCount = imgOutput?.urls?.length ?? imgOutput?.count ?? 0;
+  const insertOutput = part.output as
+    | { ok?: boolean; count?: number; anchor?: string; targetLabel?: string; reason?: string; error?: string }
+    | undefined;
+  const insertAnchorZh =
+    insertOutput?.anchor === "after_block"
+      ? "下面"
+      : insertOutput?.anchor === "before_block"
+        ? "上面"
+        : insertOutput?.anchor === "replace_block"
+          ? "（替换该块）"
+          : "末尾";
   const TOOL_LABELS: Record<string, { running: string; done: string; failed: string }> = {
     update_intro: {
       running: "正在阅读上下文，改写介绍文案…",
@@ -990,9 +1003,19 @@ function ToolCard({ part }: { part: ToolPart }) {
       failed: "介绍更新失败",
     },
     generate_product_images: {
-      running: "正在分析需求并生成商品图片…",
-      done: imgCount > 0 ? `🖼️ 已生成 ${imgCount} 张商品图片并插入预览` : "🖼️ 商品图片已生成",
+      running: "正在生成商品图片，稍候预览…",
+      done:
+        imgCount > 0
+          ? `🖼️ 已生成 ${imgCount} 张图，预览确认后告诉我放到哪个模块`
+          : "🖼️ 商品图片已生成",
       failed: "商品图片生成失败",
+    },
+    insert_generated_images: {
+      running: "正在按文案语义选位置…",
+      done: insertOutput?.ok
+        ? `📌 已插入到「${insertOutput?.targetLabel ?? "目标模块"}」${insertAnchorZh}`
+        : `❌ 插入失败：${insertOutput?.error ?? "未找到目标模块"}`,
+      failed: "图片插入失败",
     },
     update_product: {
       running: "正在更新商品信息…",
@@ -1015,6 +1038,7 @@ function ToolCard({ part }: { part: ToolPart }) {
       failed: "建议生成失败",
     },
   };
+
   const fallbackZh = `正在执行：${name}`;
   const toolMeta = TOOL_LABELS[name];
   const label = failedState
