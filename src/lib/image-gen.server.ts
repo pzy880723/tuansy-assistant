@@ -106,7 +106,7 @@ async function callGeminiImage(
 /** Opens a single-image streaming generation request and returns the upstream SSE response. */
 export async function createImageGenerationStream(
   apiKey: string,
-  { prompt, referenceImages }: GenerateOneInput,
+  { prompt, referenceImages, size }: GenerateOneInput,
 ): Promise<Response> {
   const refs = referenceImages ?? [];
   const hasReferences = refs.length > 0;
@@ -129,7 +129,7 @@ export async function createImageGenerationStream(
         model: OPENAI_MODEL,
         prompt: withRealism(prompt),
         quality: "low",
-        size: "1024x1024",
+        size: size ?? "1024x1024",
         n: 1,
         stream: true,
         partial_images: 1,
