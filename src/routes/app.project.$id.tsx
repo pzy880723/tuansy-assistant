@@ -608,9 +608,9 @@ function ChatPane({
                 send();
               }
             }}
-            rows={1}
-            placeholder="告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送)"
-            className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            rows={3}
+            placeholder="告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送，Shift+Enter 换行)"
+            className="max-h-[9rem] min-h-[72px] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             disabled={isLoading}
           />
           <button
