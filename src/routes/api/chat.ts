@@ -562,7 +562,7 @@ ${logicPromptBlock}
             }),
             generate_product_images: tool({
               description:
-                "根据中文场景描述用 AI 生成商品配图（1-9 张），自动插入到介绍 blocks 中。用户说『给我配图/生成图片/做几张场景图』时调用。referenceImages 传聊天中用户已上传的图 URL，可让 AI 保持商品一致性。",
+                "根据中文场景描述用 AI 生成商品配图（1-9 张）。**只生图、只返回 URL，不会自动插入到右侧预览**。用户看到图后再决定放哪里；除非用户在本轮消息里明确授权（『你帮我放/你来决定位置/自己丢进去/合适位置/你看着办』等），否则不要紧接着调用 insert_generated_images。",
               inputSchema: z.object({
                 prompt: z
                   .string()
@@ -574,46 +574,153 @@ ${logicPromptBlock}
                   .int()
                   .min(1)
                   .max(9)
-                  .describe("生成张数，建议 1/3/6/9，单图用 image_lg，多图用 image_sm 九宫格"),
+                  .describe("生成张数，建议 1/3/6/9"),
+                aspect: z
+                  .enum(["square", "portrait", "landscape"])
+                  .describe(
+                    "图片比例。商品大图默认 portrait（3:4 竖图，最适合手机预览）；横向场景图用 landscape（4:3）；九宫格小图用 square（1:1）。",
+                  )
+                  .default("portrait"),
                 referenceImages: z
                   .array(z.string().url())
                   .max(3)
                   .optional()
                   .describe("参考图 URL 数组，可让 AI 保持商品外观一致；通常传用户在聊天中上传的图"),
               }),
-              execute: async ({ prompt, count, referenceImages }) => {
+              execute: async ({ prompt, count, aspect, referenceImages }) => {
                 try {
                   const { generateImagesBatch, uploadGeneratedImage } = await import(
                     "@/lib/image-gen.server"
                   );
+                  const sizeMap = {
+                    square: "1024x1024",
+                    portrait: "1024x1536",
+                    landscape: "1536x1024",
+                  } as const;
+                  const aspectKey = aspect ?? "portrait";
+                  const size = sizeMap[aspectKey];
                   const b64s = await generateImagesBatch(
                     key,
-                    { prompt, referenceImages },
+                    { prompt, referenceImages, size },
                     count,
                   );
                   const urls = await Promise.all(
                     b64s.map((b) => uploadGeneratedImage(b, userId, projectId)),
                   );
                   if (urls.length === 0) return { ok: false, error: "没有生成任何图片" };
-
-                  // Append a new block to intro.blocks
-                  const currentBlocks = Array.isArray((intro as { blocks?: unknown }).blocks)
-                    ? ((intro as { blocks?: unknown[] }).blocks as Array<Record<string, unknown>>)
-                    : [];
-                  const newBlock =
-                    urls.length === 1
-                      ? { id: genBlockId(), type: "image_lg" as const, url: urls[0] }
-                      : { id: genBlockId(), type: "image_sm" as const, urls: urls.slice(0, 9) };
-                  const nextIntro = { ...intro, blocks: [...currentBlocks, newBlock] };
-                  const { error } = await supabaseAdmin
-                    .from("projects")
-                    .update({ intro: nextIntro as never })
-                    .eq("id", projectId);
-                  if (error) return { ok: false, error: error.message };
-                  return { ok: true, urls, count: urls.length };
+                  return { ok: true, urls, count: urls.length, aspect: aspectKey };
                 } catch (e) {
                   return { ok: false, error: (e as Error).message };
                 }
+              },
+            }),
+            insert_generated_images: tool({
+              description:
+                "把已生成（或用户上传）的图片 URL 放到 intro.blocks 的指定位置。**调用前必须先看右侧预览正在显示的 intro.blocks 的真实 id 和文字**，按文案语义选锚点（场景图→对应场景段、细节图→材质/工艺段、九宫格→『怎么吃/搭配』段）。anchor.blockId 必须是 intro.blocks 里真实存在的 id；找不到会直接报错，不会兜底到末尾。",
+              inputSchema: z.object({
+                urls: z.array(z.string().url()).min(1).max(9),
+                groupAsGrid: z
+                  .boolean()
+                  .describe("≥2 张时是否合并成九宫格 image_sm；false=每张单独 image_lg")
+                  .default(true),
+                anchor: z.object({
+                  mode: z.enum(["after_block", "before_block", "replace_block", "end"]),
+                  blockId: z
+                    .string()
+                    .optional()
+                    .describe("intro.blocks 里的真实 block id；mode=end 时可省"),
+                }),
+                reason: z
+                  .string()
+                  .min(4)
+                  .max(60)
+                  .describe("一句话说明为什么放这里，例如『放在卖点·新鲜直采下面，承接产地描述』"),
+              }),
+              execute: async ({ urls, groupAsGrid, anchor, reason }) => {
+                const { data: freshRow, error: readError } = await supabaseAdmin
+                  .from("projects")
+                  .select("intro")
+                  .eq("id", projectId)
+                  .maybeSingle();
+                if (readError) return { ok: false, error: readError.message };
+                const freshIntro = (freshRow?.intro ?? {}) as Record<string, unknown>;
+                const currentBlocks = Array.isArray(freshIntro.blocks)
+                  ? ([...freshIntro.blocks] as Array<Record<string, unknown>>)
+                  : [];
+
+                const newBlocks: Array<Record<string, unknown>> =
+                  urls.length === 1
+                    ? [{ id: genBlockId(), type: "image_lg" as const, url: urls[0] }]
+                    : groupAsGrid
+                      ? [{ id: genBlockId(), type: "image_sm" as const, urls: urls.slice(0, 9) }]
+                      : urls.map((u) => ({ id: genBlockId(), type: "image_lg" as const, url: u }));
+
+                let nextBlocks: Array<Record<string, unknown>>;
+                let targetLabel = "末尾";
+                if (anchor.mode === "end") {
+                  nextBlocks = [...currentBlocks, ...newBlocks];
+                } else {
+                  if (!anchor.blockId) {
+                    return { ok: false, error: "anchor.blockId 必填（mode≠end 时）" };
+                  }
+                  const idx = currentBlocks.findIndex(
+                    (b) => (b as { id?: string })?.id === anchor.blockId,
+                  );
+                  if (idx === -1) {
+                    return {
+                      ok: false,
+                      error: `intro.blocks 里找不到 id=${anchor.blockId} 的块，请重新读取后选择真实的锚点。`,
+                    };
+                  }
+                  const anchored = currentBlocks[idx] as {
+                    text?: string;
+                    type?: string;
+                    locked?: boolean;
+                  };
+                  targetLabel =
+                    (anchored?.text ?? "").trim().slice(0, 14) ||
+                    (anchored?.type === "image_lg"
+                      ? "大图块"
+                      : anchored?.type === "image_sm"
+                        ? "九宫格"
+                        : "该模块");
+                  if (anchor.mode === "after_block") {
+                    nextBlocks = [
+                      ...currentBlocks.slice(0, idx + 1),
+                      ...newBlocks,
+                      ...currentBlocks.slice(idx + 1),
+                    ];
+                  } else if (anchor.mode === "before_block") {
+                    nextBlocks = [
+                      ...currentBlocks.slice(0, idx),
+                      ...newBlocks,
+                      ...currentBlocks.slice(idx),
+                    ];
+                  } else {
+                    if (anchored?.locked) {
+                      return { ok: false, error: "该块已锁定，无法替换" };
+                    }
+                    nextBlocks = [
+                      ...currentBlocks.slice(0, idx),
+                      ...newBlocks,
+                      ...currentBlocks.slice(idx + 1),
+                    ];
+                  }
+                }
+
+                const nextIntro = { ...freshIntro, blocks: nextBlocks };
+                const { error } = await supabaseAdmin
+                  .from("projects")
+                  .update({ intro: nextIntro as never })
+                  .eq("id", projectId);
+                if (error) return { ok: false, error: error.message };
+                return {
+                  ok: true,
+                  count: urls.length,
+                  anchor: anchor.mode,
+                  targetLabel,
+                  reason,
+                };
               },
             }),
             remember_preference: tool({
