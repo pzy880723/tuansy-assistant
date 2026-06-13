@@ -749,14 +749,26 @@ function ChatPane({
                 <ClipboardList className="h-3.5 w-3.5" />
                 {planMode ? "计划 已开" : "计划"}
               </button>
-              <Button
-                size="sm"
-                onClick={send}
-                disabled={(!input.trim() && img.getReadyFiles().length === 0) || isLoading}
-                className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
-              >
-                {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              </Button>
+              {isLoading ? (
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => stop()}
+                  title="停止团宝"
+                  className="h-8 rounded-lg bg-foreground text-background hover:bg-foreground/85"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={send}
+                  disabled={!input.trim() && img.getReadyFiles().length === 0}
+                  className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
