@@ -94,6 +94,7 @@ export const Route = createFileRoute("/api/chat")({
           is_active: boolean;
         };
         let activeLogic: LogicRow | null = null;
+        let forkedDuringRequest = false;
         const presetPrefix = "preset:";
         if (body.copyLogicId && body.copyLogicId.startsWith(presetPrefix)) {
           const presetId = body.copyLogicId.slice(presetPrefix.length);
