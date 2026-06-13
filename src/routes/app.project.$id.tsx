@@ -369,6 +369,9 @@ function ChatPane({
   }, [messages, regenerate, status]);
 
 
+  const cleanSuggestion = (s: string) =>
+    s.replace(/[回复吧啦哦喔呢啊。！!.\s]+$/u, "").trim();
+
   const suggestions: string[] = (() => {
     if (isLoading) return [];
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -378,7 +381,8 @@ function ChatPane({
         (p) => p.type === "tool-suggest_next",
       ) as { output?: { suggestions?: string[] } } | undefined;
       const list = part?.output?.suggestions;
-      if (Array.isArray(list) && list.length) return list.slice(0, 4);
+      if (Array.isArray(list) && list.length)
+        return list.slice(0, 4).map(cleanSuggestion).filter((s) => s.length >= 2);
       return [];
     }
     return [];
