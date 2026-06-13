@@ -234,7 +234,7 @@ export function AddProductSheet({
           label="可购数量"
           value={p.purchaseLimit || "不限数量"}
           onClick={() => {
-            const v = window.prompt("可购数量（输入"不限"或正整数）", p.purchaseLimit ?? "不限");
+            const v = window.prompt("可购数量（输入「不限」或正整数）", p.purchaseLimit ?? "不限");
             if (v !== null) set({ purchaseLimit: v.trim() });
           }}
         />
