@@ -741,7 +741,7 @@ ${logicPromptBlock}
                 }
                 const { error: updateError } = await supabaseAdmin
                   .from("copy_logics")
-                  .update(patch)
+                  .update(patch as never)
                   .eq("id", activeLogic.id)
                   .eq("user_id", userId);
                 if (updateError) return { ok: false, error: updateError.message };
