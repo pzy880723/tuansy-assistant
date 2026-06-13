@@ -423,14 +423,19 @@ ${logicPromptBlock}
                   }
                   for (const replacement of blocksReplaceAt ?? []) {
                     if (replacement.index < nextBlocks.length) {
-                      const existing = nextBlocks[replacement.index] as { locked?: boolean };
+                      const existing = nextBlocks[replacement.index] as {
+                        id?: string;
+                        locked?: boolean;
+                      };
                       if (existing?.locked) {
                         skippedLocked.push(replacement.index);
                         continue;
                       }
+                      // Preserve the existing block id so @mention tokens
+                      // and front-end refs stay stable across edits.
                       nextBlocks[replacement.index] = {
-                        id: genBlockId(),
                         ...replacement.block,
+                        id: existing?.id ?? genBlockId(),
                       };
                     }
                   }
