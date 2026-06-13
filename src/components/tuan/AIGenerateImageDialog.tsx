@@ -115,6 +115,7 @@ export function AIGenerateImageDialog({
           referenceImages: referenceUrls.length > 0 ? referenceUrls : undefined,
           projectId,
           variant,
+          size: aspectSize,
         }),
       });
       if (!res.ok) {
