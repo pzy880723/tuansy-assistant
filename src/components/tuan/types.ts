@@ -14,8 +14,7 @@ export type IntroData = {
   leader_bg_url?: string | null;
 };
 
-/** Stable human-readable label for a block, e.g. 段落2 / 大图1 / 九宫格1 / 视频1.
- *  Numbering is per-type, in document order. */
+/** Stable human-readable label for a block, e.g. 段落2 / 大图1 / 九宫格1 / 视频1. */
 export function blockLabel(blocks: IntroBlock[], idx: number): string {
   const b = blocks[idx];
   if (!b) return `#${idx + 1}`;
@@ -36,7 +35,6 @@ export function blockShortId(id: string): string {
   return id.slice(0, 8);
 }
 
-/** "@[段落2#a1b2c3d4]" — the canonical mention token format. */
 export function blockMentionToken(blocks: IntroBlock[], idx: number): string {
   const b = blocks[idx];
   if (!b) return "";
@@ -50,12 +48,71 @@ export function blockPreview(b: IntroBlock): string {
   return b.url ? "视频（已上传）" : "视频（未上传）";
 }
 
+// ---------- Product / SKU ----------
+
+/** One value inside a spec group (e.g. "黑色白标", "M（80-100斤）"). */
+export type SpecValue = {
+  id: string;
+  label: string;
+  /** Only honored when the parent SpecGroup.hasImage is true (first group). */
+  image?: string | null;
+};
+
+/** A spec dimension (颜色 / 尺码 / 重量 ...). */
+export type SpecGroup = {
+  id: string;
+  name: string;
+  /** Only the first group may attach images to its values. */
+  hasImage?: boolean;
+  values: SpecValue[];
+};
+
+/** A concrete variant row (cartesian product of all SpecGroup values). */
+export type Variant = {
+  id: string;
+  /** Same length and order as ProductItem.specGroups; each entry references a SpecValue.id. */
+  optionValueIds: string[];
+  /** 团购价（必填） */
+  price: string;
+  /** 成本价 */
+  costPrice?: string;
+  /** 库存；空串 = 不限 */
+  stock: string;
+  image?: string | null;
+  /** 商品编码 */
+  code?: string;
+};
+
+/**
+ * A product. Legacy single-SKU fields (name/price/stock/image/spec) are kept so
+ * existing list cards keep working. New fields are optional; presence of
+ * `specGroups.length > 0` switches the editor into multi-spec mode.
+ */
 export type SkuItem = {
+  // legacy / always-present
   name: string;
   price: string;
   stock: string;
   image?: string | null;
   spec?: string;
+
+  // extended product fields
+  category?: string;
+  description?: string;
+  images?: string[];
+  videoUrl?: string | null;
+  tags?: string[];
+  totalWeightKg?: string;
+  strikePrice?: string;
+  costPrice?: string;
+  code?: string;
+  purchaseLimit?: string;
+  isFlashSale?: boolean;
+  group?: string;
+  showVariantCode?: boolean;
+
+  specGroups?: SpecGroup[];
+  variants?: Variant[];
 };
 
 export type SettingsData = Record<string, string | boolean>;
