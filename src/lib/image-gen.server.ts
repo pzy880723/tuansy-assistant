@@ -9,10 +9,14 @@ const GEMINI_MODEL = "google/gemini-2.5-flash-image";
 const REALISM_SUFFIX =
   "Ultra-realistic professional product photography, natural lighting, true-to-life materials and textures, sharp focus, shallow depth of field, photo-realistic, DSLR shot, no cartoon, no illustration, no 3D render, no plastic look, no oversaturation.";
 
+export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
+
 export type GenerateOneInput = {
   prompt: string;
   /** Reference image URLs (https) the model should take inspiration from. */
   referenceImages?: string[];
+  /** OpenAI image size; ignored by Gemini (Gemini takes ratio from reference). */
+  size?: ImageSize;
 };
 
 type GatewayError = Error & { status?: number; code?: string };
