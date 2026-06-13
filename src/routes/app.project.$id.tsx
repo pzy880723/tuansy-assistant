@@ -1315,7 +1315,7 @@ function PreviewPane({
           "Content-Type": "application/json",
           ...(token ? { "x-tuan-session": token } : {}),
         },
-        body: JSON.stringify({ prompt, projectId }),
+        body: JSON.stringify({ prompt, projectId, size: "1536x1024" }),
       });
       if (!res.ok) throw new Error(await res.text().catch(() => "生图失败"));
       const finalB64 = await readImageStream(res);
