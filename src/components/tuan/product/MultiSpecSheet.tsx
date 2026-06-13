@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Edit3, Plus, Trash2, Image as ImgIcon, GripVertical } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Edit3, Plus, Trash2, Image as ImgIcon, GripVertical, X } from "lucide-react";
 import { toast } from "sonner";
-import type { SkuItem, SpecGroup } from "../types";
+import type { SkuItem, SpecGroup, Variant } from "../types";
 import {
   MAX_SPEC_GROUPS,
   PRESET_SPEC_TYPES,
@@ -9,7 +9,6 @@ import {
   makeSpecGroup,
   makeSpecValue,
   reconcileVariants,
-  variantLabel,
 } from "./product-helpers";
 
 /** "多规格设置" page — full-screen overlay inside the phone shell. */
@@ -29,13 +28,9 @@ export function MultiSpecSheet({
       ? product.specGroups
       : [makeSpecGroup("颜色", true)],
   );
-  const [variants, setVariants] = useState(product.variants ?? []);
+  const [variants, setVariants] = useState<Variant[]>(product.variants ?? []);
   const [showCode, setShowCode] = useState(!!product.showVariantCode);
-
-  // batch-setting inputs
-  const [batchPrice, setBatchPrice] = useState("");
-  const [batchCost, setBatchCost] = useState("");
-  const [batchStock, setBatchStock] = useState("");
+  const [batchOpen, setBatchOpen] = useState(false);
 
   if (!open) return null;
 
@@ -94,30 +89,45 @@ export function MultiSpecSheet({
     setVariants(reconcileVariants(next, variants));
   };
 
-  const applyBatch = () => {
-    if (!batchPrice && !batchCost && !batchStock) {
-      toast.info("请先输入要批量设置的值");
-      return;
-    }
-    setVariants(
-      variants.map((v) => ({
-        ...v,
-        price: batchPrice || v.price,
-        costPrice: batchCost || v.costPrice,
-        stock: batchStock || v.stock,
-      })),
-    );
-    toast.success("已批量设置");
-  };
+  const headerName = groups.map((g) => g.name).join("/") || "规格";
 
   const handleDone = () => {
-    // Ensure variants are reconciled to current groups
     const ids = cartesianValueIds(groups);
     if (groups.length > 0 && ids.length === 0) {
       toast.error("请为每个规格添加至少一个具体规格");
       return;
     }
     onSave(groups, variants);
+  };
+
+  const applyBatch = (
+    selected: Record<string, Set<string>>,
+    payload: { price?: string; costPrice?: string; stock?: string; stockUnlimited?: boolean },
+  ) => {
+    setVariants(
+      variants.map((v) => {
+        const matches = groups.every((g, i) => {
+          const set = selected[g.id];
+          return set && set.has(v.optionValueIds[i]);
+        });
+        if (!matches) return v;
+        return {
+          ...v,
+          price: payload.price !== undefined && payload.price !== "" ? payload.price : v.price,
+          costPrice:
+            payload.costPrice !== undefined && payload.costPrice !== ""
+              ? payload.costPrice
+              : v.costPrice,
+          stock: payload.stockUnlimited
+            ? ""
+            : payload.stock !== undefined && payload.stock !== ""
+              ? payload.stock
+              : v.stock,
+        };
+      }),
+    );
+    setBatchOpen(false);
+    toast.success("已批量设置");
   };
 
   return (
@@ -235,106 +245,93 @@ export function MultiSpecSheet({
           </button>
         )}
 
-        {/* detail variants table */}
+        {/* detail variants */}
         {variants.length > 0 && (
           <div className="mx-2 mt-3 rounded-xl bg-white p-3">
             <div className="mb-2 flex items-center justify-between">
-              <div className="text-[14px] font-semibold">详细规格</div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1 text-[11px] text-[#646566]">
-                  <input
-                    type="checkbox"
-                    checked={showCode}
-                    onChange={(e) => setShowCode(e.target.checked)}
-                    className="h-3 w-3"
-                  />
-                  显示商品编码
-                </label>
-              </div>
-            </div>
-
-            {/* batch row */}
-            <div className="mb-3 rounded-lg bg-[#f4f5f7] p-2 text-[11px] text-[#646566]">
-              <div className="mb-1.5">批量设置</div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <input
-                  value={batchPrice}
-                  onChange={(e) => setBatchPrice(e.target.value)}
-                  placeholder="价格"
-                  className="rounded bg-white px-1.5 py-1 text-[12px] outline-none focus:ring-1 focus:ring-[#07c160]"
-                />
-                <input
-                  value={batchCost}
-                  onChange={(e) => setBatchCost(e.target.value)}
-                  placeholder="成本"
-                  className="rounded bg-white px-1.5 py-1 text-[12px] outline-none focus:ring-1 focus:ring-[#07c160]"
-                />
-                <input
-                  value={batchStock}
-                  onChange={(e) => setBatchStock(e.target.value)}
-                  placeholder="库存"
-                  className="rounded bg-white px-1.5 py-1 text-[12px] outline-none focus:ring-1 focus:ring-[#07c160]"
-                />
-              </div>
+              <div className="text-[15px] font-semibold">详细规格</div>
               <button
-                onClick={applyBatch}
-                className="mt-1.5 rounded bg-[#07c160] px-3 py-1 text-[11px] font-medium text-white"
+                onClick={() => setBatchOpen(true)}
+                className="text-[13px] font-medium text-[#07c160]"
               >
-                应用
+                批量设置
               </button>
             </div>
+            <div className="mb-3 flex items-center justify-between border-b border-[#f0f1f2] pb-2.5">
+              <div className="text-[13px] text-[#1a1a1a]">{headerName}</div>
+              <label className="flex items-center gap-1.5 text-[12px] text-[#646566]">
+                <input
+                  type="radio"
+                  checked={showCode}
+                  onClick={() => setShowCode(!showCode)}
+                  onChange={() => {}}
+                  className="h-3 w-3 accent-[#07c160]"
+                />
+                显示商品编码
+              </label>
+            </div>
 
-            {/* header */}
-            <div className="mb-1 grid grid-cols-[1.5fr_1fr_1fr_1fr_28px] gap-1 px-1 text-[10px] text-[#969799]">
-              <span>组合</span>
+            {/* column headers */}
+            <div className="mb-2 grid grid-cols-[1fr_1fr_1fr_56px] gap-2 px-0.5 text-[11px] text-[#969799]">
               <span>
                 价格<span className="text-[#fa5151]">*</span>
               </span>
               <span>成本价</span>
               <span>库存</span>
-              <span></span>
+              <span>图片</span>
             </div>
-            <div className="space-y-2">
+
+            <div className="space-y-3">
               {variants.map((v) => (
-                <div
-                  key={v.id}
-                  className="grid grid-cols-[1.5fr_1fr_1fr_1fr_28px] gap-1 rounded-md bg-[#fafbfc] p-1.5"
-                >
-                  <div className="truncate self-center text-[11px] text-[#1a1a1a]">
-                    {variantLabel(groups, v) || "—"}
-                  </div>
-                  <input
-                    value={v.price}
-                    onChange={(e) =>
-                      setVariants(variants.map((x) => (x.id === v.id ? { ...x, price: e.target.value } : x)))
-                    }
-                    placeholder="请输入"
-                    className="rounded bg-white px-1.5 py-1 text-[12px] outline-none focus:ring-1 focus:ring-[#07c160]"
-                  />
-                  <input
-                    value={v.costPrice ?? ""}
-                    onChange={(e) =>
-                      setVariants(
-                        variants.map((x) => (x.id === v.id ? { ...x, costPrice: e.target.value } : x)),
+                <div key={v.id}>
+                  <div className="mb-1.5 text-[13px] font-medium text-[#1a1a1a]">
+                    {groups
+                      .map(
+                        (g, i) =>
+                          g.values.find((x) => x.id === v.optionValueIds[i])?.label || "—",
                       )
-                    }
-                    placeholder="请输入"
-                    className="rounded bg-white px-1.5 py-1 text-[12px] outline-none focus:ring-1 focus:ring-[#07c160]"
-                  />
-                  <input
-                    value={v.stock}
-                    onChange={(e) =>
-                      setVariants(variants.map((x) => (x.id === v.id ? { ...x, stock: e.target.value } : x)))
-                    }
-                    placeholder="不限"
-                    className="rounded bg-white px-1.5 py-1 text-[12px] outline-none focus:ring-1 focus:ring-[#07c160]"
-                  />
-                  <button
-                    onClick={() => toast.info("规格图：即将上线")}
-                    className="grid h-7 w-7 place-items-center self-center rounded border border-dashed border-[#c8c9cc] text-[#c8c9cc]"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
+                      .join("/")}
+                  </div>
+                  <div className="grid grid-cols-[1fr_1fr_1fr_56px] gap-2">
+                    <input
+                      value={v.price}
+                      onChange={(e) =>
+                        setVariants(
+                          variants.map((x) => (x.id === v.id ? { ...x, price: e.target.value } : x)),
+                        )
+                      }
+                      placeholder="请输入"
+                      className="h-9 rounded-md border border-[#ebedf0] bg-white px-2 text-[13px] outline-none focus:border-[#07c160]"
+                    />
+                    <input
+                      value={v.costPrice ?? ""}
+                      onChange={(e) =>
+                        setVariants(
+                          variants.map((x) =>
+                            x.id === v.id ? { ...x, costPrice: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      placeholder="请输入"
+                      className="h-9 rounded-md border border-[#ebedf0] bg-white px-2 text-[13px] outline-none focus:border-[#07c160]"
+                    />
+                    <input
+                      value={v.stock}
+                      onChange={(e) =>
+                        setVariants(
+                          variants.map((x) => (x.id === v.id ? { ...x, stock: e.target.value } : x)),
+                        )
+                      }
+                      placeholder="不限"
+                      className="h-9 rounded-md border border-[#ebedf0] bg-white px-2 text-[13px] outline-none focus:border-[#07c160]"
+                    />
+                    <button
+                      onClick={() => toast.info("规格图：即将上线")}
+                      className="grid h-9 w-14 place-items-center rounded-md border border-dashed border-[#c8c9cc] text-[#c8c9cc]"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                   {showCode && (
                     <input
                       value={v.code ?? ""}
@@ -344,7 +341,7 @@ export function MultiSpecSheet({
                         )
                       }
                       placeholder="商品编码"
-                      className="col-span-5 rounded bg-white px-1.5 py-1 text-[11px] outline-none focus:ring-1 focus:ring-[#07c160]"
+                      className="mt-1.5 h-8 w-full rounded-md border border-[#ebedf0] bg-white px-2 text-[12px] outline-none focus:border-[#07c160]"
                     />
                   )}
                 </div>
@@ -353,6 +350,202 @@ export function MultiSpecSheet({
           </div>
         )}
       </div>
+
+      {batchOpen && (
+        <BatchSettingSheet
+          groups={groups}
+          onClose={() => setBatchOpen(false)}
+          onApply={applyBatch}
+        />
+      )}
+    </div>
+  );
+}
+
+function BatchSettingSheet({
+  groups,
+  onClose,
+  onApply,
+}: {
+  groups: SpecGroup[];
+  onClose: () => void;
+  onApply: (
+    selected: Record<string, Set<string>>,
+    payload: { price?: string; costPrice?: string; stock?: string; stockUnlimited?: boolean },
+  ) => void;
+}) {
+  const [selected, setSelected] = useState<Record<string, Set<string>>>(() => {
+    const init: Record<string, Set<string>> = {};
+    for (const g of groups) init[g.id] = new Set();
+    return init;
+  });
+  const [price, setPrice] = useState("");
+  const [costPrice, setCostPrice] = useState("");
+  const [stock, setStock] = useState("");
+  const [unlimited, setUnlimited] = useState(false);
+
+  const toggle = (gid: string, vid: string) => {
+    setSelected((prev) => {
+      const set = new Set(prev[gid]);
+      if (set.has(vid)) set.delete(vid);
+      else set.add(vid);
+      return { ...prev, [gid]: set };
+    });
+  };
+  const toggleAll = (gid: string) => {
+    const g = groups.find((x) => x.id === gid);
+    if (!g) return;
+    setSelected((prev) => {
+      const set = prev[gid];
+      const all = g.values.length > 0 && set.size === g.values.length;
+      const next = new Set<string>();
+      if (!all) g.values.forEach((v) => next.add(v.id));
+      return { ...prev, [gid]: next };
+    });
+  };
+
+  const allSelected = useMemo(() => {
+    const r: Record<string, boolean> = {};
+    for (const g of groups) {
+      r[g.id] = g.values.length > 0 && selected[g.id]?.size === g.values.length;
+    }
+    return r;
+  }, [groups, selected]);
+
+  const handleConfirm = () => {
+    for (const g of groups) {
+      if (!selected[g.id] || selected[g.id].size === 0) {
+        toast.error(`请选择「${g.name}」`);
+        return;
+      }
+    }
+    if (!price && !costPrice && !stock && !unlimited) {
+      toast.error("请填写要批量设置的值");
+      return;
+    }
+    onApply(selected, { price, costPrice, stock, stockUnlimited: unlimited });
+  };
+
+  const chipCls = (active: boolean) =>
+    `rounded-md px-3 py-1.5 text-[12px] transition ${
+      active
+        ? "border border-[#07c160] bg-[#e8f7ee] text-[#07c160]"
+        : "border border-transparent bg-[#f4f5f7] text-[#1a1a1a]"
+    }`;
+
+  return (
+    <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black/40" onClick={onClose}>
+      <div
+        className="flex max-h-[85%] flex-col rounded-t-2xl bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#f0f1f2] px-4 py-3">
+          <div className="text-[15px] font-semibold">批量设置</div>
+          <button onClick={onClose}>
+            <X className="h-4 w-4 text-[#969799]" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className="mb-2 text-[14px] font-semibold">
+            选择规格 <span className="text-[12px] font-normal text-[#969799]">(可多选)</span>
+          </div>
+          <div className="space-y-3">
+            {groups.map((g) => (
+              <div key={g.id} className="flex gap-3">
+                <div className="w-10 shrink-0 pt-1.5 text-[13px] text-[#646566]">{g.name}</div>
+                <div className="flex flex-1 flex-wrap gap-2">
+                  <button
+                    onClick={() => toggleAll(g.id)}
+                    className={chipCls(allSelected[g.id])}
+                  >
+                    全部
+                  </button>
+                  {g.values.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => toggle(g.id, v.id)}
+                      className={chipCls(selected[g.id]?.has(v.id) ?? false)}
+                    >
+                      {v.label || "—"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mb-3 mt-5 border-t border-[#f0f1f2]" />
+          <div className="mb-3 text-[14px] font-semibold">对已选规格批量设置</div>
+          <div className="space-y-3">
+            <Row label="价格">
+              <div className="flex flex-1 items-center rounded-md border border-[#ebedf0] px-2">
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="请输入价格"
+                  className="h-9 flex-1 bg-transparent text-[13px] outline-none"
+                />
+                <span className="text-[12px] text-[#969799]">元</span>
+              </div>
+            </Row>
+            <Row label="成本价">
+              <div className="flex flex-1 items-center rounded-md border border-[#ebedf0] px-2">
+                <input
+                  value={costPrice}
+                  onChange={(e) => setCostPrice(e.target.value)}
+                  placeholder="请输入成本价"
+                  className="h-9 flex-1 bg-transparent text-[13px] outline-none"
+                />
+                <span className="text-[12px] text-[#969799]">元</span>
+              </div>
+            </Row>
+            <Row label="库存">
+              <input
+                value={unlimited ? "" : stock}
+                disabled={unlimited}
+                onChange={(e) => setStock(e.target.value)}
+                placeholder="请输入库存"
+                className="h-9 flex-1 rounded-md border border-[#ebedf0] bg-white px-2 text-[13px] outline-none focus:border-[#07c160] disabled:bg-[#f7f8fa]"
+              />
+              <label className="ml-2 flex shrink-0 items-center gap-1 text-[12px] text-[#646566]">
+                <input
+                  type="radio"
+                  checked={unlimited}
+                  onClick={() => setUnlimited(!unlimited)}
+                  onChange={() => {}}
+                  className="h-3 w-3 accent-[#07c160]"
+                />
+                不限
+              </label>
+            </Row>
+            <Row label="图片">
+              <button
+                onClick={() => toast.info("规格图：即将上线")}
+                className="grid h-12 w-12 place-items-center rounded-md border border-dashed border-[#c8c9cc] text-[#c8c9cc]"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </Row>
+          </div>
+        </div>
+
+        <button
+          onClick={handleConfirm}
+          className="m-0 h-12 w-full bg-[#07c160] text-[15px] font-medium text-white active:bg-[#06ad56]"
+        >
+          确定
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center">
+      <div className="w-12 shrink-0 text-[13px] text-[#646566]">{label}</div>
+      {children}
     </div>
   );
 }
