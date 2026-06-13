@@ -574,8 +574,10 @@ function ChatPane({
                 ))
               )}
             </div>
+            </div>
           </PopoverContent>
         </Popover>
+        <ExportToKttDialog projectId={projectId} />
         </div>
       </div>
 
