@@ -15,6 +15,8 @@ import {
   Loader2,
   ClipboardList,
   X,
+  Square,
+  SkipForward,
 } from "lucide-react";
 import tuanbaoAvatar from "@/assets/tuanbao-avatar.png.asset.json";
 import { useImageAttachments } from "@/lib/use-image-attachments";
