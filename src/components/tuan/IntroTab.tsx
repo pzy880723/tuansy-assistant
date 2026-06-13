@@ -13,6 +13,8 @@ import {
   Plus,
   Sparkles,
   Play,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
