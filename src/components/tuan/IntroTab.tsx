@@ -1113,4 +1113,76 @@ function BlockGhost({ block }: { block: IntroBlock }) {
   );
 }
 
+const ENRICH_PRESETS = ["更生动", "更短一点", "更专业", "加入痛点"];
+
+function EnrichPopover({ onSend }: { onSend: (prompt: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+
+  const submit = (prompt: string) => {
+    const v = prompt.trim();
+    if (!v) return;
+    onSend(v);
+    setText("");
+    setOpen(false);
+    toast.success("已发给团宝");
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title="让团宝单独丰富这一段"
+          className="flex items-center gap-0.5 rounded-md border border-[#ff8a3d] bg-[#ff8a3d]/10 px-1.5 py-0.5 text-[11px] text-[#d96b1f] hover:bg-[#ff8a3d]/20"
+        >
+          <Wand2 className="h-3 w-3" />
+          AI 丰富
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-3">
+        <div className="mb-2 text-[12px] font-medium text-foreground">
+          让团宝只改这一段
+        </div>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {ENRICH_PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => submit(p)}
+              className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground hover:border-[#ff8a3d] hover:text-[#d96b1f]"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={2}
+          placeholder="其他要求…（例如：加一句产地）"
+          className="w-full resize-none rounded-md border bg-background px-2 py-1.5 text-[12px] outline-none focus:border-[#ff8a3d]/60"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit(text);
+            }
+          }}
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => submit(text)}
+            disabled={!text.trim()}
+            className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-[#ff9a4d] to-[#d96b1f] px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:brightness-110 disabled:opacity-40"
+          >
+            <Send className="h-3 w-3" /> 发给团宝
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
 
