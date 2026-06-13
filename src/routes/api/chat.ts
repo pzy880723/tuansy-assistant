@@ -380,8 +380,33 @@ ${logicPromptBlock}
                   : [];
                 const { blocksAppend, blocksReplaceAt, ...fields } = input;
                 const patch: Record<string, unknown> = { ...fields };
+                const skippedLocked: number[] = [];
                 if (Array.isArray(input.blocks)) {
-                  patch.blocks = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                  // Preserve locked blocks at their original indexes; fill the
+                  // rest from the model-provided array, in order.
+                  const lockedAt = new Map<number, Record<string, unknown>>();
+                  currentBlocks.forEach((b, idx) => {
+                    if (b && (b as { locked?: boolean }).locked) lockedAt.set(idx, b);
+                  });
+                  const incoming = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                  const total = Math.max(
+                    currentBlocks.length,
+                    incoming.length + lockedAt.size,
+                  );
+                  const merged: Array<Record<string, unknown>> = [];
+                  let cursor = 0;
+                  for (let i = 0; i < total; i++) {
+                    if (lockedAt.has(i)) {
+                      merged.push(lockedAt.get(i)!);
+                    } else if (cursor < incoming.length) {
+                      merged.push(incoming[cursor++] as Record<string, unknown>);
+                    }
+                  }
+                  while (cursor < incoming.length) {
+                    merged.push(incoming[cursor++] as Record<string, unknown>);
+                  }
+                  patch.blocks = merged;
+                  if (lockedAt.size > 0) skippedLocked.push(...lockedAt.keys());
                 } else {
                   let nextBlocks = currentBlocks;
                   if (blocksAppend?.length) {
@@ -392,6 +417,11 @@ ${logicPromptBlock}
                   }
                   for (const replacement of blocksReplaceAt ?? []) {
                     if (replacement.index < nextBlocks.length) {
+                      const existing = nextBlocks[replacement.index] as { locked?: boolean };
+                      if (existing?.locked) {
+                        skippedLocked.push(replacement.index);
+                        continue;
+                      }
                       nextBlocks[replacement.index] = {
                         id: genBlockId(),
                         ...replacement.block,
