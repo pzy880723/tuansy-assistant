@@ -11,6 +11,7 @@ export type IntroData = {
   cover_url?: string | null;
   leader_name?: string;
   leader_avatar?: string | null;
+  leader_bg_url?: string | null;
 };
 
 /** Stable human-readable label for a block, e.g. 段落2 / 大图1 / 九宫格1 / 视频1.

@@ -39,6 +39,9 @@ import { CopyLogicSection } from "@/components/copy-logic/CopyLogicSection";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getProject, updateProject } from "@/lib/projects.functions";
+import { uploadAiGeneratedImage } from "@/lib/image-gen.functions";
+import { readImageStream } from "@/lib/stream-image";
+import { fillLeaderDefaults } from "@/lib/leader-defaults";
 import { listCopyLogics } from "@/lib/copy-logics.functions";
 import {
   Select,
@@ -102,6 +105,7 @@ function ProjectEditor() {
         <ResizablePanel defaultSize="62%" minSize="25%">
           <PreviewPane
             projectId={id}
+            availableImages={(data?.images ?? []).map((i) => i.url).filter(Boolean) as string[]}
             project={
               data?.project
                 ? {
@@ -115,6 +119,7 @@ function ProjectEditor() {
             }
           />
         </ResizablePanel>
+
       </ResizablePanelGroup>
     </div>
   );
@@ -1095,6 +1100,7 @@ type Tab = "intro" | "product" | "settings";
 function PreviewPane({
   projectId,
   project,
+  availableImages,
 }: {
   projectId: string;
   project:
@@ -1106,9 +1112,12 @@ function PreviewPane({
         settings?: SettingsData;
       }
     | undefined;
+  availableImages?: string[];
 }) {
   const [tab, setTab] = useState<Tab>("intro");
   const update = useServerFn(updateProject);
+  const uploadAiGen = useServerFn(uploadAiGeneratedImage);
+
 
   const incomingIntro: IntroData = project?.intro ?? { title: "", description: "", blocks: [] };
   const incomingSkus: SkuItem[] =
@@ -1279,6 +1288,63 @@ function PreviewPane({
     }
   };
 
+  // ===== Auto-fill leader name / avatar / background =====
+  const [bgGenerating, setBgGenerating] = useState(false);
+  const autofillRef = useRef(false);
+  const bgGenRef = useRef(false);
+
+  const generateLeaderBackground = async () => {
+    if (bgGenRef.current) return;
+    bgGenRef.current = true;
+    setBgGenerating(true);
+    try {
+      const promptParts = [
+        project?.product?.title || project?.intro?.title,
+        (project?.product?.tags ?? []).join("、"),
+        "团购海报横幅背景，干净简洁，温馨明亮，留白多，无文字",
+      ].filter(Boolean);
+      const prompt = promptParts.join("，") || "温馨明亮的电商团购横幅背景";
+      const token = readAuthToken();
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "x-tuan-session": token } : {}),
+        },
+        body: JSON.stringify({ prompt, projectId }),
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "生图失败"));
+      const finalB64 = await readImageStream(res);
+      const { url } = await uploadAiGen({ data: { b64: finalB64, projectId } });
+      setIntro({ ...latestRef.current.intro, leader_bg_url: url });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "生成背景图失败");
+    } finally {
+      setBgGenerating(false);
+      bgGenRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (autofillRef.current) return;
+    if (!project) return;
+    autofillRef.current = true;
+    const filled = fillLeaderDefaults(intro, projectId);
+    const nameChanged = filled.leader_name !== intro.leader_name;
+    const avatarChanged = filled.leader_avatar !== intro.leader_avatar;
+    if (nameChanged || avatarChanged) {
+      setIntro(filled);
+    }
+    if (!filled.leader_bg_url) {
+      if (availableImages && availableImages.length > 0) {
+        setIntro({ ...filled, leader_bg_url: availableImages[0] });
+      } else {
+        void generateLeaderBackground();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
+
   // Bottom sheet state
   const [sheet, setSheet] = useState<{
     open: boolean;
@@ -1301,8 +1367,16 @@ function PreviewPane({
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
           {tab === "intro" && (
-            <IntroTab intro={intro} onChange={setIntro} projectId={projectId} />
+            <IntroTab
+              intro={intro}
+              onChange={setIntro}
+              projectId={projectId}
+              availableImages={availableImages}
+              onRegenerateBackground={generateLeaderBackground}
+              backgroundGenerating={bgGenerating}
+            />
           )}
+
           {tab === "product" && (
             <ProductTab
               skus={skus}

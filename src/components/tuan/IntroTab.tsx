@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Image as ImageIcon,
   LayoutGrid,
@@ -17,16 +18,60 @@ import {
   Unlock,
   Wand2,
   Send,
+  Loader2,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
 import { type IntroBlock, type IntroData, blockMentionToken } from "./types";
 import { AIGenerateImageDialog } from "./AIGenerateImageDialog";
+import { uploadProductImage } from "@/lib/projects.functions";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+// Shared compression helpers (same approach as use-image-attachments).
+async function leaderCompressImage(file: File): Promise<{ blob: Blob; mimeType: string }> {
+  if (!file.type.startsWith("image/")) return { blob: file, mimeType: file.type };
+  if (file.size < 400 * 1024 || file.type === "image/gif" || file.type === "image/svg+xml") {
+    return { blob: file, mimeType: file.type };
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const MAX = 1600;
+    const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { blob: file, mimeType: file.type };
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const out = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
+    );
+    if (!out) return { blob: file, mimeType: file.type };
+    return { blob: out, mimeType: "image/jpeg" };
+  } catch {
+    return { blob: file, mimeType: file.type };
+  }
+}
+function leaderBlobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const idx = result.indexOf(",");
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 
 type ToolType = "image_lg" | "image_sm" | "video" | "text";
 
@@ -129,6 +174,9 @@ export function IntroTab({
   onChange,
   projectId,
   onAskAI,
+  availableImages,
+  onRegenerateBackground,
+  backgroundGenerating,
 }: {
   intro: IntroData;
   onChange: (next: IntroData) => void;
@@ -136,9 +184,54 @@ export function IntroTab({
   /** Send a natural-language instruction to 团宝 on behalf of the user.
    *  Used by the per-block "AI 丰富" popover. */
   onAskAI?: (text: string) => void;
+  /** URLs of already-uploaded product images, for the "从已上传图选" picker. */
+  availableImages?: string[];
+  /** Trigger an AI regeneration of the leader background image. */
+  onRegenerateBackground?: () => void;
+  backgroundGenerating?: boolean;
 }) {
   const blocks = intro.blocks ?? [];
   const setBlocks = (next: IntroBlock[]) => onChange({ ...intro, blocks: next });
+
+  // Leader avatar upload
+  const leaderAvatarRef = useRef<HTMLInputElement | null>(null);
+  const leaderBgRef = useRef<HTMLInputElement | null>(null);
+  const [bgPopOpen, setBgPopOpen] = useState(false);
+  const uploadLeaderImage = useServerFn(uploadProductImage);
+  const onPickLeaderAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const { blob, mimeType } = await leaderCompressImage(file);
+      const base64 = await leaderBlobToBase64(blob);
+      const res = await uploadLeaderImage({
+        data: { projectId, filename: file.name, mimeType, dataBase64: base64 },
+      });
+      onChange({ ...intro, leader_avatar: res.url });
+      toast.success("头像已更新");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "上传失败");
+    }
+  };
+  const onPickLeaderBg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const { blob, mimeType } = await leaderCompressImage(file);
+      const base64 = await leaderBlobToBase64(blob);
+      const res = await uploadLeaderImage({
+        data: { projectId, filename: file.name, mimeType, dataBase64: base64 },
+      });
+      onChange({ ...intro, leader_bg_url: res.url });
+      setBgPopOpen(false);
+      toast.success("背景图已更新");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "上传失败");
+    }
+  };
+
 
   // AI generate-image dialog state
   const [aiOpen, setAiOpen] = useState(false);
@@ -507,25 +600,108 @@ export function IntroTab({
         onChange={onPickImageSm}
       />
       <input ref={fileVidRef} type="file" accept="video/*" className="hidden" onChange={onPickVideo} />
+      <input
+        ref={leaderAvatarRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onPickLeaderAvatar}
+      />
+      <input
+        ref={leaderBgRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onPickLeaderBg}
+      />
 
       {/* Leader / cover card */}
-      <div className="relative h-[130px] overflow-hidden rounded-xl bg-gradient-to-br from-[#3a3a3a] via-[#2b2b2b] to-[#1a1a1a]">
-        <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_30%,#fff_1px,transparent_1px),radial-gradient(circle_at_70%_60%,#fff_1px,transparent_1px)] [background-size:60px_60px]" />
-        <button
-          onClick={() => toast.info("设置背景图：即将上线")}
-          className="absolute right-3 top-3 rounded-md border border-white/60 bg-black/20 px-2 py-1 text-[11px] text-white backdrop-blur"
-        >
-          设置背景图
-        </button>
+      <div
+        className="relative h-[130px] overflow-hidden rounded-xl bg-gradient-to-br from-[#3a3a3a] via-[#2b2b2b] to-[#1a1a1a] bg-cover bg-center"
+        style={
+          intro.leader_bg_url
+            ? { backgroundImage: `url(${JSON.stringify(intro.leader_bg_url).slice(1, -1)})` }
+            : undefined
+        }
+      >
+        {!intro.leader_bg_url && (
+          <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_30%,#fff_1px,transparent_1px),radial-gradient(circle_at_70%_60%,#fff_1px,transparent_1px)] [background-size:60px_60px]" />
+        )}
+        {intro.leader_bg_url && <div className="absolute inset-0 bg-black/25" />}
+        {backgroundGenerating && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-[11px] text-white">
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" /> 正在生成背景图…
+          </div>
+        )}
+
+        <Popover open={bgPopOpen} onOpenChange={setBgPopOpen}>
+          <PopoverTrigger asChild>
+            <button className="absolute right-3 top-3 rounded-md border border-white/60 bg-black/20 px-2 py-1 text-[11px] text-white backdrop-blur">
+              设置背景图
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-2">
+            <div className="space-y-1 text-[12px]">
+              <button
+                onClick={() => {
+                  setBgPopOpen(false);
+                  onRegenerateBackground?.();
+                }}
+                disabled={!onRegenerateBackground || backgroundGenerating}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:opacity-40"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-[#07c160]" /> AI 重新生成
+              </button>
+              <button
+                onClick={() => {
+                  setBgPopOpen(false);
+                  leaderBgRef.current?.click();
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+              >
+                <Upload className="h-3.5 w-3.5" /> 上传新图
+              </button>
+              {availableImages && availableImages.length > 0 && (
+                <div>
+                  <div className="px-2 pb-1 pt-2 text-[11px] text-muted-foreground">
+                    从已上传图片中选择
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 px-1">
+                    {availableImages.slice(0, 12).map((url) => (
+                      <button
+                        key={url}
+                        onClick={() => {
+                          onChange({ ...intro, leader_bg_url: url });
+                          setBgPopOpen(false);
+                        }}
+                        className="aspect-square overflow-hidden rounded border hover:ring-2 hover:ring-[#07c160]"
+                      >
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+
         <div className="absolute bottom-3 left-3 flex items-end gap-2">
-          <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-md bg-white text-[10px] text-[#969799]">
+          <button
+            onClick={() => leaderAvatarRef.current?.click()}
+            className="group relative grid h-12 w-12 place-items-center overflow-hidden rounded-md bg-white text-[10px] text-[#969799]"
+            title="点击更换头像"
+          >
             {intro.leader_avatar ? (
               <img src={intro.leader_avatar} alt="头像" className="h-full w-full object-cover" />
             ) : (
               "头像"
             )}
-          </div>
-          <div className="max-w-[180px] truncate text-[14px] font-medium text-white">
+            <span className="absolute inset-0 hidden items-center justify-center bg-black/40 text-white group-hover:flex">
+              <Camera className="h-4 w-4" />
+            </span>
+          </button>
+          <div className="max-w-[180px] truncate text-[14px] font-medium text-white drop-shadow">
             <InlineText
               value={intro.leader_name ?? ""}
               onChange={(v) => onChange({ ...intro, leader_name: v })}
@@ -535,6 +711,7 @@ export function IntroTab({
           </div>
         </div>
       </div>
+
 
       {/* Intro card */}
       <div
