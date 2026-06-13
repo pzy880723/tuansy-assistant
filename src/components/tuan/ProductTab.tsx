@@ -1,6 +1,7 @@
 import { Plus, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn, SettingRow } from "./primitives";
+import { ProductEntryCard } from "./IntroTab";
 import type { SkuItem, SettingsData } from "./types";
 import { SETTING_DEFAULTS } from "./types";
 
