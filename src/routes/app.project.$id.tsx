@@ -369,6 +369,9 @@ function ChatPane({
   }, [messages, regenerate, status]);
 
 
+  const cleanSuggestion = (s: string) =>
+    s.replace(/[回复吧啦哦喔呢啊。！!.\s]+$/u, "").trim();
+
   const suggestions: string[] = (() => {
     if (isLoading) return [];
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -378,7 +381,8 @@ function ChatPane({
         (p) => p.type === "tool-suggest_next",
       ) as { output?: { suggestions?: string[] } } | undefined;
       const list = part?.output?.suggestions;
-      if (Array.isArray(list) && list.length) return list.slice(0, 4);
+      if (Array.isArray(list) && list.length)
+        return list.slice(0, 4).map(cleanSuggestion).filter((s) => s.length >= 2);
       return [];
     }
     return [];
@@ -965,17 +969,53 @@ function ToolCard({ part }: { part: ToolPart }) {
     return parts;
   })();
   const introAction = introActionParts.length ? introActionParts.join("；") : "更新介绍文案";
-  const label =
-    name === "update_intro"
-      ? `✍️ ${introAction}`
-      : name === "update_product"
-        ? "更新商品信息"
-        : name === "update_skus"
-          ? "更新 SKU"
-          : name;
-  const isRunning = part.state === "input-streaming" || part.state === "input-available";
-  const hasOutput = part.state === "output-available";
-  const failed = part.state === "output-error" || !!part.errorText;
+  const isRunningState = part.state === "input-streaming" || part.state === "input-available";
+  const hasOutputState = part.state === "output-available";
+  const failedState = part.state === "output-error" || !!part.errorText;
+  const imgOutput = part.output as { ok?: boolean; urls?: string[]; count?: number } | undefined;
+  const imgCount = imgOutput?.urls?.length ?? imgOutput?.count ?? 0;
+  const TOOL_LABELS: Record<string, { running: string; done: string; failed: string }> = {
+    update_intro: {
+      running: "正在阅读上下文，改写介绍文案…",
+      done: `✍️ ${introAction}`,
+      failed: "介绍更新失败",
+    },
+    generate_product_images: {
+      running: "正在分析需求并生成商品图片…",
+      done: imgCount > 0 ? `🖼️ 已生成 ${imgCount} 张商品图片并插入预览` : "🖼️ 商品图片已生成",
+      failed: "商品图片生成失败",
+    },
+    update_product: {
+      running: "正在更新商品信息…",
+      done: "🛒 已更新商品信息",
+      failed: "商品信息更新失败",
+    },
+    update_skus: {
+      running: "正在调整 SKU…",
+      done: "📦 已更新 SKU",
+      failed: "SKU 更新失败",
+    },
+    remember_preference: {
+      running: "正在记录你的偏好到文案逻辑…",
+      done: "🧠 已记住你的偏好",
+      failed: "记忆失败",
+    },
+    suggest_next: {
+      running: "正在思考下一步建议…",
+      done: "💡 已给出下一步建议",
+      failed: "建议生成失败",
+    },
+  };
+  const fallbackZh = `正在执行：${name}`;
+  const toolMeta = TOOL_LABELS[name];
+  const label = failedState
+    ? toolMeta?.failed ?? "操作失败"
+    : hasOutputState
+      ? toolMeta?.done ?? "已完成"
+      : toolMeta?.running ?? fallbackZh;
+  const isRunning = isRunningState;
+  const hasOutput = hasOutputState;
+  const failed = failedState;
   const readableDetails = (() => {
     if (name !== "update_intro") return [];
     const details: Array<{ label: string; value: string }> = [];
@@ -1017,10 +1057,15 @@ function ToolCard({ part }: { part: ToolPart }) {
         </span>
         <span className="font-medium">{label}</span>
         <span className="ml-auto text-[10px] text-muted-foreground">
-          {failed ? "失败" : hasOutput ? "已应用" : isRunning ? "执行中" : ""}
+          {failed ? "失败" : hasOutput ? "已应用" : isRunning ? "分析中…" : ""}
         </span>
       </summary>
       <div className="space-y-3 border-t bg-muted/30 px-3 py-3 text-[11px]">
+        {isRunning && (
+          <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
+            正在阅读上下文 → 生成内容 → 写入右侧预览…
+          </div>
+        )}
         {readableDetails.map((detail) => (
           <div key={`${detail.label}-${detail.value.slice(0, 20)}`}>
             <div className="mb-1 font-semibold text-muted-foreground">{detail.label}</div>
