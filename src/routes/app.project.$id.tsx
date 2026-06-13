@@ -596,16 +596,7 @@ function ChatPane({
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}
         />
-        <div className="flex min-h-[132px] items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="上传图片"
-            title="添加图片（也可直接拖入或粘贴）"
-          >
-            <ImagePlus className="h-4 w-4" />
-          </button>
+        <div className="flex flex-col gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
           <textarea
             ref={inputRef}
             value={input}
@@ -619,39 +610,51 @@ function ChatPane({
             }}
             rows={4}
             placeholder={"告诉团宝你想怎么改，或拖/粘贴图片进来\n(Enter 发送，Shift+Enter 换行)"}
-            className="max-h-[14rem] min-h-[112px] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            className="max-h-[14rem] min-h-[112px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             disabled={isLoading}
           />
-
-          <button
-            type="button"
-            onClick={togglePlan}
-            title="开启后团宝会先反问澄清，再动笔"
-            className={
-              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition " +
-              (planMode
-                ? "border-transparent bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_4px_14px_-4px_oklch(0.7_0.19_45/0.55)]"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
-            }
-          >
-            <span
-              className={
-                "h-1.5 w-1.5 rounded-full " + (planMode ? "bg-white" : "bg-muted-foreground/60")
-              }
-            />
-            <ClipboardList className="h-3.5 w-3.5" />
-            {planMode ? "计划 已开" : "计划"}
-          </button>
-          <Button
-            size="sm"
-            onClick={send}
-            disabled={(!input.trim() && img.getReadyFiles().length === 0) || isLoading}
-            className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
-          >
-            {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-          </Button>
-
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="上传图片"
+              title="添加图片（也可直接拖入或粘贴）"
+            >
+              <ImagePlus className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={togglePlan}
+                title="开启后团宝会先反问澄清，再动笔"
+                className={
+                  "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition " +
+                  (planMode
+                    ? "border-transparent bg-gradient-to-r from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_4px_14px_-4px_oklch(0.7_0.19_45/0.55)]"
+                    : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
+                }
+              >
+                <span
+                  className={
+                    "h-1.5 w-1.5 rounded-full " + (planMode ? "bg-white" : "bg-muted-foreground/60")
+                  }
+                />
+                <ClipboardList className="h-3.5 w-3.5" />
+                {planMode ? "计划 已开" : "计划"}
+              </button>
+              <Button
+                size="sm"
+                onClick={send}
+                disabled={(!input.trim() && img.getReadyFiles().length === 0) || isLoading}
+                className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
+              >
+                {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+          </div>
         </div>
+
       </div>
       {img.dragActive && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-background/90 text-sm font-medium text-primary">
