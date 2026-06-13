@@ -598,6 +598,52 @@ function ChatPane({
       </div>
 
       <div className="border-t p-3">
+        {queue.length > 0 && (
+          <div className="mb-2 rounded-lg border border-[oklch(0.85_0.08_55)] bg-[oklch(0.98_0.03_60)] px-2 py-1.5">
+            <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[oklch(0.45_0.15_40)]">
+              <ClipboardList className="h-3 w-3" /> 排队中 ({queue.length})
+            </div>
+            <div className="flex flex-col gap-1">
+              {queue.map((m, i) => {
+                const preview = m.text
+                  ? m.text.length > 30
+                    ? m.text.slice(0, 30) + "…"
+                    : m.text
+                  : `${m.files.length} 张图片`;
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-1.5 rounded-md bg-background/70 px-2 py-1 text-[11px]"
+                  >
+                    <span className="text-muted-foreground">{i + 1}.</span>
+                    <span className="flex-1 truncate text-foreground">
+                      {preview}
+                      {m.files.length > 0 && m.text ? (
+                        <span className="ml-1 text-muted-foreground">📎{m.files.length}</span>
+                      ) : null}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => jumpQueue(m.id)}
+                      title="立即插队（打断当前回合）"
+                      className="inline-flex h-5 items-center gap-0.5 rounded px-1.5 text-[10px] text-primary hover:bg-primary/10"
+                    >
+                      <SkipForward className="h-3 w-3" /> 插队
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFromQueue(m.id)}
+                      title="从队列移除"
+                      className="grid h-5 w-5 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {suggestions.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {suggestions.map((s) => (
