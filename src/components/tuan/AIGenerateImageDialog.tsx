@@ -256,6 +256,31 @@ export function AIGenerateImageDialog({
             </div>
 
             <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[#646566]">图片比例</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { key: "square", label: "方形 1:1" },
+                  { key: "portrait", label: "竖图 3:4" },
+                  { key: "landscape", label: "横图 4:3" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setAspect(opt.key)}
+                    className={cn(
+                      "rounded-md border px-2 py-1.5 text-[12px] transition",
+                      aspect === opt.key
+                        ? "border-[#07c160] bg-[#07c160]/10 text-[#07c160]"
+                        : "border-[#dcdee0] bg-white text-[#646566] hover:border-[#07c160]/60",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-xs font-medium text-[#646566]">生成数量（1–9 张）</label>
               <div className="flex items-center gap-2">
                 <button
