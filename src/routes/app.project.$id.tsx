@@ -50,7 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import { readAuthToken } from "@/lib/use-current-user";
 import { PhoneShell as TuanPhoneShell } from "@/components/tuan/PhoneShell";
-import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
+import { IntroTab } from "@/components/tuan/IntroTab";
 import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
