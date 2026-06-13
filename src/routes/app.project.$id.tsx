@@ -223,7 +223,7 @@ function ChatPane({
     }),
   ).current;
 
-  const { messages, sendMessage, setMessages, regenerate, status, error } = useChat({
+  const { messages, sendMessage, setMessages, regenerate, status, error, stop } = useChat({
     id: projectId,
     messages: initial,
     transport,
