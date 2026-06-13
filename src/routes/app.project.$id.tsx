@@ -936,15 +936,35 @@ function Questionnaire({
 function ToolCard({ part }: { part: ToolPart }) {
   const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
   const introInput = part.input as
-    | { title?: string; blocksAppend?: Array<{ type?: string; text?: string }>; blocksReplaceAt?: unknown[] }
+    | {
+        title?: string;
+        description?: string;
+        blocksAppend?: Array<{ type?: string; text?: string; url?: string }>;
+        blocksReplaceAt?: Array<{ index?: number; block?: { type?: string; text?: string; url?: string } }>;
+      }
     | undefined;
-  const introAction = introInput?.blocksAppend?.[0]?.text
-    ? `写入新段落：${introInput.blocksAppend[0].text.slice(0, 14)}${introInput.blocksAppend[0].text.length > 14 ? "…" : ""}`
-    : introInput?.title
-      ? "构思并写入标题"
-      : introInput?.blocksReplaceAt
-        ? "把图片放到对应段落"
-        : "更新介绍文案";
+  const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
+  const blockTypeName = (t?: string) =>
+    t === "image_lg" ? "一张大图" : t === "image_sm" ? "一组九宫格图片" : t === "text" ? "一段文字" : "一个内容模块";
+  const introActionParts: string[] = (() => {
+    if (name !== "update_intro") return [];
+    const parts: string[] = [];
+    if (introInput?.title) parts.push(`标题改为「${truncate(introInput.title, 18)}」`);
+    if (introInput?.blocksAppend?.length) {
+      const first = introInput.blocksAppend[0];
+      const extra = introInput.blocksAppend.length > 1 ? `等 ${introInput.blocksAppend.length} 个模块` : "";
+      if (first?.text) parts.push(`新增段落「${truncate(first.text, 20)}」${extra}`);
+      else parts.push(`新增${blockTypeName(first?.type)}${extra}`);
+    }
+    if (introInput?.blocksReplaceAt?.length) {
+      const first = introInput.blocksReplaceAt[0];
+      const extra = introInput.blocksReplaceAt.length > 1 ? `等 ${introInput.blocksReplaceAt.length} 处` : "";
+      if (first?.block?.text) parts.push(`替换第 ${(first.index ?? 0) + 1} 块为「${truncate(first.block.text, 20)}」${extra}`);
+      else parts.push(`替换 ${introInput.blocksReplaceAt.length} 个内容块的图片或样式`);
+    }
+    return parts;
+  })();
+  const introAction = introActionParts.length ? introActionParts.join("；") : "更新介绍文案";
   const label =
     name === "update_intro"
       ? `✍️ ${introAction}`
@@ -960,16 +980,17 @@ function ToolCard({ part }: { part: ToolPart }) {
     if (name !== "update_intro") return [];
     const details: Array<{ label: string; value: string }> = [];
     if (introInput?.title) details.push({ label: "标题", value: introInput.title });
-    const description = (part.input as { description?: string } | undefined)?.description;
-    if (description) details.push({ label: "摘要", value: description });
-    const appended = introInput?.blocksAppend?.[0];
-    if (appended?.text) details.push({ label: "本次写入", value: appended.text });
-    else if (appended?.type) {
-      details.push({ label: "本次写入", value: appended.type === "image_lg" ? "一张大图" : appended.type === "image_sm" ? "一组九宫格图片" : "一个内容模块" });
-    }
-    if (introInput?.blocksReplaceAt?.length) {
-      details.push({ label: "图片安排", value: `已将图片放入 ${introInput.blocksReplaceAt.length} 个对应内容位置` });
-    }
+    if (introInput?.description) details.push({ label: "摘要", value: introInput.description });
+    introInput?.blocksAppend?.forEach((b, i) => {
+      const prefix = (introInput.blocksAppend?.length ?? 0) > 1 ? `新增内容 ${i + 1}` : "本次新增";
+      if (b?.text) details.push({ label: prefix, value: b.text });
+      else details.push({ label: prefix, value: blockTypeName(b?.type) });
+    });
+    introInput?.blocksReplaceAt?.forEach((r, i) => {
+      const pos = typeof r?.index === "number" ? `第 ${r.index + 1} 块` : `位置 ${i + 1}`;
+      if (r?.block?.text) details.push({ label: `替换 ${pos}`, value: r.block.text });
+      else details.push({ label: `替换 ${pos}`, value: blockTypeName(r?.block?.type) });
+    });
     const output = part.output as { ok?: boolean; blockCount?: number; error?: string } | undefined;
     if (output?.ok && typeof output.blockCount === "number") {
       details.push({ label: "应用结果", value: `右侧预览现有 ${output.blockCount} 个内容模块` });
@@ -977,6 +998,7 @@ function ToolCard({ part }: { part: ToolPart }) {
     if (output?.error) details.push({ label: "失败原因", value: output.error });
     return details;
   })();
+
 
   return (
     <details className="group max-w-[95%] overflow-hidden rounded-xl border bg-background/70">
