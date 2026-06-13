@@ -218,6 +218,11 @@ export function IntroTab({
     setBlocks(blocks.filter((b) => b.id !== id));
     if (editingId === id) setEditingId(null);
   };
+  const toggleLock = (id: string) => {
+    setBlocks(
+      blocks.map((b) => (b.id === id ? ({ ...b, locked: !b.locked } as IntroBlock) : b)),
+    );
+  };
   const removeSmallImage = (blockId: string, idx: number) => {
     setBlocks(
       blocks.map((b) =>
