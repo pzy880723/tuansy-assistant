@@ -182,18 +182,38 @@ export const uploadProductImage = createServerFn({ method: "POST" })
 
 
 
+function pickFirstImagesFromIntro(intro: unknown, n = 3): string[] {
+  const out: string[] = [];
+  const blocks = (intro as { blocks?: Array<Record<string, unknown>> } | null)?.blocks;
+  if (!Array.isArray(blocks)) return out;
+  for (const b of blocks) {
+    if (out.length >= n) break;
+    if (b?.type === "image_lg") {
+      const url = typeof b.url === "string" ? b.url : "";
+      if (url) out.push(url);
+    } else if (b?.type === "image_sm") {
+      const urls = Array.isArray(b.urls) ? (b.urls as unknown[]) : [];
+      for (const u of urls) {
+        if (out.length >= n) break;
+        if (typeof u === "string" && u) out.push(u);
+      }
+    }
+  }
+  return out;
+}
+
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {
   const userId = await requireUserId();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: projects, error } = await supabaseAdmin
     .from("projects")
-    .select("id, name, status, cover_image_url, product, updated_at, created_at")
+    .select("id, name, status, cover_image_url, product, intro, updated_at, created_at")
     .eq("owner_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
   const ids = (projects ?? []).map((p) => p.id);
-  let imagesByProject: Record<string, string[]> = {};
+  const imagesByProject: Record<string, string[]> = {};
   if (ids.length > 0) {
     const { data: imgs } = await supabaseAdmin
       .from("project_images")
@@ -206,16 +226,26 @@ export const listProjects = createServerFn({ method: "GET" }).handler(async () =
     }
   }
 
-  const enriched = (projects ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    status: p.status,
-    cover_image_url: p.cover_image_url,
-    product_name: (p.product as { name?: string } | null)?.name ?? "",
-    updated_at: p.updated_at,
-    created_at: p.created_at,
-    images: imagesByProject[p.id] ?? [],
-  }));
+  const enriched = (projects ?? []).map((p) => {
+    const images = pickFirstImagesFromIntro(p.intro, 3);
+    if (images.length < 3) {
+      for (const u of imagesByProject[p.id] ?? []) {
+        if (images.length >= 3) break;
+        if (!images.includes(u)) images.push(u);
+      }
+    }
+    if (images.length === 0 && p.cover_image_url) images.push(p.cover_image_url);
+    return {
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      cover_image_url: p.cover_image_url,
+      product_name: (p.product as { name?: string } | null)?.name ?? "",
+      updated_at: p.updated_at,
+      created_at: p.created_at,
+      images,
+    };
+  });
 
   return { projects: enriched };
 });
