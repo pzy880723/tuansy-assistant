@@ -102,6 +102,7 @@ function ProjectEditor() {
         <ResizablePanel defaultSize="62%" minSize="25%">
           <PreviewPane
             projectId={id}
+            availableImages={(data?.images ?? []).map((i) => i.url).filter(Boolean) as string[]}
             project={
               data?.project
                 ? {
@@ -115,6 +116,7 @@ function ProjectEditor() {
             }
           />
         </ResizablePanel>
+
       </ResizablePanelGroup>
     </div>
   );
