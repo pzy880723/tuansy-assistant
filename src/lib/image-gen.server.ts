@@ -9,10 +9,14 @@ const GEMINI_MODEL = "google/gemini-2.5-flash-image";
 const REALISM_SUFFIX =
   "Ultra-realistic professional product photography, natural lighting, true-to-life materials and textures, sharp focus, shallow depth of field, photo-realistic, DSLR shot, no cartoon, no illustration, no 3D render, no plastic look, no oversaturation.";
 
+export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
+
 export type GenerateOneInput = {
   prompt: string;
   /** Reference image URLs (https) the model should take inspiration from. */
   referenceImages?: string[];
+  /** OpenAI image size; ignored by Gemini (Gemini takes ratio from reference). */
+  size?: ImageSize;
 };
 
 type GatewayError = Error & { status?: number; code?: string };
@@ -43,7 +47,11 @@ function withRealism(prompt: string): string {
   return `${prompt}\n\n${REALISM_SUFFIX}`;
 }
 
-async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> {
+async function callOpenAIImage(
+  apiKey: string,
+  prompt: string,
+  size: ImageSize = "1024x1024",
+): Promise<string> {
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: gatewayHeaders(apiKey),
@@ -51,7 +59,7 @@ async function callOpenAIImage(apiKey: string, prompt: string): Promise<string> 
       model: OPENAI_MODEL,
       prompt: withRealism(prompt),
       quality: "low",
-      size: "1024x1024",
+      size,
       n: 1,
     }),
   });
@@ -98,7 +106,7 @@ async function callGeminiImage(
 /** Opens a single-image streaming generation request and returns the upstream SSE response. */
 export async function createImageGenerationStream(
   apiKey: string,
-  { prompt, referenceImages }: GenerateOneInput,
+  { prompt, referenceImages, size }: GenerateOneInput,
 ): Promise<Response> {
   const refs = referenceImages ?? [];
   const hasReferences = refs.length > 0;
@@ -121,7 +129,7 @@ export async function createImageGenerationStream(
         model: OPENAI_MODEL,
         prompt: withRealism(prompt),
         quality: "low",
-        size: "1024x1024",
+        size: size ?? "1024x1024",
         n: 1,
         stream: true,
         partial_images: 1,
@@ -137,12 +145,12 @@ export async function createImageGenerationStream(
 /** Calls the Gateway once and returns the base64 PNG payload (no data: prefix). */
 export async function generateOneImage(
   apiKey: string,
-  { prompt, referenceImages }: GenerateOneInput,
+  { prompt, referenceImages, size }: GenerateOneInput,
 ): Promise<string> {
   if (referenceImages && referenceImages.length > 0) {
     return callGeminiImage(apiKey, prompt, referenceImages);
   }
-  return callOpenAIImage(apiKey, prompt);
+  return callOpenAIImage(apiKey, prompt, size);
 }
 
 /** Generates N images in parallel, returns array of base64 payloads. */

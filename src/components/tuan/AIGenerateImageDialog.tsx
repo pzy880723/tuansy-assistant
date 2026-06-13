@@ -64,9 +64,15 @@ export function AIGenerateImageDialog({
   const [slots, setSlots] = useState<Slot[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [saveMode, setSaveMode] = useState<"lg" | "sm">("lg");
+  const [aspect, setAspect] = useState<"square" | "portrait" | "landscape">("portrait");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { attachments, addFiles, remove, clear } = useImageAttachments({ projectId });
   const uploadGenerated = useServerFn(uploadAiGeneratedImage);
+
+  const aspectSize: "1024x1024" | "1024x1536" | "1536x1024" =
+    aspect === "square" ? "1024x1024" : aspect === "portrait" ? "1024x1536" : "1536x1024";
+  const aspectClass =
+    aspect === "square" ? "aspect-square" : aspect === "portrait" ? "aspect-[3/4]" : "aspect-[4/3]";
 
   useEffect(() => {
     if (open) {
@@ -77,6 +83,7 @@ export function AIGenerateImageDialog({
       setSlots([]);
       setDragId(null);
       setSaveMode("lg");
+      setAspect("portrait");
       clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,6 +115,7 @@ export function AIGenerateImageDialog({
           referenceImages: referenceUrls.length > 0 ? referenceUrls : undefined,
           projectId,
           variant,
+          size: aspectSize,
         }),
       });
       if (!res.ok) {
@@ -248,6 +256,31 @@ export function AIGenerateImageDialog({
             </div>
 
             <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[#646566]">图片比例</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { key: "square", label: "方形 1:1" },
+                  { key: "portrait", label: "竖图 3:4" },
+                  { key: "landscape", label: "横图 4:3" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setAspect(opt.key)}
+                    className={cn(
+                      "rounded-md border px-2 py-1.5 text-[12px] transition",
+                      aspect === opt.key
+                        ? "border-[#07c160] bg-[#07c160]/10 text-[#07c160]"
+                        : "border-[#dcdee0] bg-white text-[#646566] hover:border-[#07c160]/60",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-xs font-medium text-[#646566]">生成数量（1–9 张）</label>
               <div className="flex items-center gap-2">
                 <button
@@ -369,7 +402,8 @@ export function AIGenerateImageDialog({
                       setDragId(null);
                     }}
                     className={cn(
-                      "group relative aspect-[16/10] overflow-hidden rounded-lg border bg-[#fafbfc] transition",
+                      "group relative overflow-hidden rounded-lg border bg-[#fafbfc] transition",
+                      aspectClass,
                       slot.status === "done"
                         ? "border-[#ebedf0] hover:border-[#07c160]/60"
                         : "border-transparent",

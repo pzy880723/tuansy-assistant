@@ -6,6 +6,7 @@ const BodySchema = z.object({
   referenceImages: z.array(z.string().url()).max(3).optional(),
   projectId: z.string().uuid(),
   variant: z.string().max(200).optional(),
+  size: z.enum(["1024x1024", "1024x1536", "1536x1024"]).optional(),
 });
 
 export const Route = createFileRoute("/api/generate-image")({
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/api/generate-image")({
             : body.prompt;
           const upstream = await createImageGenerationStream(
             key,
-            { prompt: finalPrompt, referenceImages: body.referenceImages },
+            { prompt: finalPrompt, referenceImages: body.referenceImages, size: body.size },
           );
           if (!upstream.ok || !upstream.body) {
             return new Response(await upstream.text().catch(() => "生图失败"), {
