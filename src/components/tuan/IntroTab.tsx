@@ -918,6 +918,9 @@ function BlockCard({
               生图
             </button>
           )}
+          {onEnrich && !anyDragging && !locked && (
+            <EnrichPopover onSend={onEnrich} />
+          )}
           <button
             type="button"
             onClick={onToggleLock}
