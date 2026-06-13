@@ -596,7 +596,7 @@ function ChatPane({
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}
         />
-        <div className="flex items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
+        <div className="flex min-h-[132px] items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15">
           <button
             type="button"
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -617,11 +617,12 @@ function ChatPane({
                 send();
               }
             }}
-            rows={3}
-            placeholder="告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送，Shift+Enter 换行)"
-            className="max-h-[9rem] min-h-[72px] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            rows={4}
+            placeholder={"告诉团宝你想怎么改，或拖/粘贴图片进来\n(Enter 发送，Shift+Enter 换行)"}
+            className="max-h-[14rem] min-h-[112px] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             disabled={isLoading}
           />
+
           <button
             type="button"
             onClick={togglePlan}
