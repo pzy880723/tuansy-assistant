@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "团宝快团团助手",
+  "version": "0.1.0",
+  "description": "把团宝项目一键填入快团团 PC 后台。",
+  "permissions": ["storage", "activeTab", "scripting", "clipboardWrite"],
+  "host_permissions": [
+    "https://ktt.pinduoduo.com/*",
+    "https://*.kuaituantuan.com/*",
+    "https://*.lovable.app/*",
+    "https://*.lovableproject.com/*"
+  ],
+  "action": { "default_popup": "popup.html", "default_icon": "icons/icon128.png" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://ktt.pinduoduo.com/groups/*",
+        "https://*.kuaituantuan.com/groups/*"
+      ],
+      "js": ["fillers.js", "selectors.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": { "48": "icons/icon128.png", "128": "icons/icon128.png" }
+}
