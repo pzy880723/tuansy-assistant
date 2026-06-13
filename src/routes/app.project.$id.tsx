@@ -306,21 +306,25 @@ function ChatPane({
     return off;
   }, [projectId, setMessages]);
 
-  const sendText = (text: string) => {
-    const value = text.trim();
-    const files = img.getReadyFiles();
-    if (!value && files.length === 0) return;
-    if (isLoading) return;
-    if (img.uploading) {
-      toast.error("图片还在上传，稍等一下");
-      return;
-    }
+  type QueuedMsg = {
+    id: string;
+    text: string;
+    files: Array<{ url: string; mimeType: string }>;
+    planMode: boolean;
+  };
+  const [queue, setQueue] = useState<QueuedMsg[]>([]);
+  const jumpRef = useRef<QueuedMsg | null>(null);
+
+  const dispatch = (msg: QueuedMsg) => {
     const snap = projectRef.current;
     if (snap) {
       const entry: HistoryEntry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         ts: Date.now(),
-        label: value.length > 40 ? value.slice(0, 40) + "…" : value || `${files.length} 张图片`,
+        label:
+          msg.text.length > 40
+            ? msg.text.slice(0, 40) + "…"
+            : msg.text || `${msg.files.length} 张图片`,
         snapshot: {
           name: snap.name,
           product: snap.product,
@@ -332,21 +336,42 @@ function ChatPane({
       };
       setHistory((h) => [entry, ...h].slice(0, 30));
     }
-    const payload = planMode
-      ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${value}`
-      : value;
+    const payload = msg.planMode
+      ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${msg.text}`
+      : msg.text;
 
-    if (files.length > 0) {
+    if (msg.files.length > 0) {
       const parts: Array<
         { type: "text"; text: string } | { type: "file"; mediaType: string; url: string }
       > = [];
       if (payload) parts.push({ type: "text", text: payload });
-      for (const f of files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
+      for (const f of msg.files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
       void sendMessage({ role: "user", parts });
     } else {
       void sendMessage({ text: payload });
     }
+  };
 
+  const sendText = (text: string) => {
+    const value = text.trim();
+    const files = img.getReadyFiles();
+    if (!value && files.length === 0) return;
+    if (img.uploading) {
+      toast.error("图片还在上传，稍等一下");
+      return;
+    }
+    const msg: QueuedMsg = {
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      text: value,
+      files,
+      planMode,
+    };
+    if (isLoading) {
+      setQueue((q) => [...q, msg]);
+      toast("已加入队列，团宝忙完会自动处理");
+    } else {
+      dispatch(msg);
+    }
     if (planMode) setPlanMode(false);
     setInput("");
     img.clear();
@@ -364,16 +389,46 @@ function ChatPane({
     });
   };
 
+  // Consume the queue (or pending jump) once the agent goes idle.
+  useEffect(() => {
+    if (status !== "ready") return;
+    if (jumpRef.current) {
+      const j = jumpRef.current;
+      jumpRef.current = null;
+      dispatch(j);
+      return;
+    }
+    if (queue.length === 0) return;
+    const [next, ...rest] = queue;
+    setQueue(rest);
+    dispatch(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, queue]);
+
+  const removeFromQueue = (id: string) => {
+    setQueue((q) => q.filter((m) => m.id !== id));
+  };
+
+  const jumpQueue = (id: string) => {
+    const target = queue.find((m) => m.id === id);
+    if (!target) return;
+    setQueue((q) => q.filter((m) => m.id !== id));
+    jumpRef.current = target;
+    if (isLoading) stop();
+    else dispatch(target);
+  };
+
   // A seeded home-page prompt is already the first visible user message. Resume from it once.
   const bootedRef = useRef(false);
   useEffect(() => {
     if (bootedRef.current) return;
     if (status !== "ready") return;
+    if (queue.length > 0 || jumpRef.current) return;
     const last = messages.at(-1);
     if (!last || last.role !== "user" || !last.id.startsWith("seed-")) return;
     bootedRef.current = true;
     void regenerate({ messageId: last.id });
-  }, [messages, regenerate, status]);
+  }, [messages, regenerate, status, queue.length]);
 
 
   const cleanSuggestion = (s: string) =>
