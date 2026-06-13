@@ -1097,6 +1097,7 @@ type Tab = "intro" | "product" | "settings";
 function PreviewPane({
   projectId,
   project,
+  availableImages,
 }: {
   projectId: string;
   project:
@@ -1108,9 +1109,12 @@ function PreviewPane({
         settings?: SettingsData;
       }
     | undefined;
+  availableImages?: string[];
 }) {
   const [tab, setTab] = useState<Tab>("intro");
   const update = useServerFn(updateProject);
+  const uploadAiGen = useServerFn(uploadAiGeneratedImage);
+
 
   const incomingIntro: IntroData = project?.intro ?? { title: "", description: "", blocks: [] };
   const incomingSkus: SkuItem[] =
