@@ -25,6 +25,7 @@ import { Route as AdminPresetsRouteImport } from './routes/admin.presets'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AppProjectIdRouteImport } from './routes/app.project.$id'
+import { Route as ApiPublicExportProjectRouteImport } from './routes/api/public/export-project'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -106,6 +107,11 @@ const AppProjectIdRoute = AppProjectIdRouteImport.update({
   path: '/project/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicExportProjectRoute = ApiPublicExportProjectRouteImport.update({
+  id: '/api/public/export-project',
+  path: '/api/public/export-project',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/m/inbox': typeof MInboxRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
 }
 export interface FileRoutesByTo {
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/m/inbox': typeof MInboxRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
+  '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
 }
 export interface FileRoutesById {
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/m/inbox': typeof MInboxRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/m/inbox'
     | '/admin/'
     | '/app/'
+    | '/api/public/export-project'
     | '/app/project/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/m/inbox'
     | '/admin'
     | '/app'
+    | '/api/public/export-project'
     | '/app/project/$id'
   id:
     | '__root__'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/m/inbox'
     | '/admin/'
     | '/app/'
+    | '/api/public/export-project'
     | '/app/project/$id'
   fileRoutesById: FileRoutesById
 }
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   MInboxRoute: typeof MInboxRoute
+  ApiPublicExportProjectRoute: typeof ApiPublicExportProjectRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -341,6 +354,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/export-project': {
+      id: '/api/public/export-project'
+      path: '/api/public/export-project'
+      fullPath: '/api/public/export-project'
+      preLoaderRoute: typeof ApiPublicExportProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -384,17 +404,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   MInboxRoute: MInboxRoute,
+  ApiPublicExportProjectRoute: ApiPublicExportProjectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

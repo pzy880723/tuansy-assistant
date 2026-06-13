@@ -60,6 +60,7 @@ import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
 import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
+import { ExportToKttDialog } from "@/components/tuan/ExportToKttDialog";
 import { emitManualEdit, onManualEdit, type ManualEditPayload } from "@/lib/edit-log-bus";
 import { emitChatAsk, onChatAsk } from "@/lib/chat-ask-bus";
 
@@ -576,6 +577,7 @@ function ChatPane({
             </div>
           </PopoverContent>
         </Popover>
+        <ExportToKttDialog projectId={projectId} />
         </div>
       </div>
 
