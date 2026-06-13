@@ -15,6 +15,8 @@ import {
   Loader2,
   ClipboardList,
   X,
+  Square,
+  SkipForward,
 } from "lucide-react";
 import tuanbaoAvatar from "@/assets/tuanbao-avatar.png.asset.json";
 import { useImageAttachments } from "@/lib/use-image-attachments";
@@ -221,7 +223,7 @@ function ChatPane({
     }),
   ).current;
 
-  const { messages, sendMessage, setMessages, regenerate, status, error } = useChat({
+  const { messages, sendMessage, setMessages, regenerate, status, error, stop } = useChat({
     id: projectId,
     messages: initial,
     transport,
@@ -304,21 +306,25 @@ function ChatPane({
     return off;
   }, [projectId, setMessages]);
 
-  const sendText = (text: string) => {
-    const value = text.trim();
-    const files = img.getReadyFiles();
-    if (!value && files.length === 0) return;
-    if (isLoading) return;
-    if (img.uploading) {
-      toast.error("图片还在上传，稍等一下");
-      return;
-    }
+  type QueuedMsg = {
+    id: string;
+    text: string;
+    files: Array<{ url: string; mimeType: string }>;
+    planMode: boolean;
+  };
+  const [queue, setQueue] = useState<QueuedMsg[]>([]);
+  const jumpRef = useRef<QueuedMsg | null>(null);
+
+  const dispatch = (msg: QueuedMsg) => {
     const snap = projectRef.current;
     if (snap) {
       const entry: HistoryEntry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         ts: Date.now(),
-        label: value.length > 40 ? value.slice(0, 40) + "…" : value || `${files.length} 张图片`,
+        label:
+          msg.text.length > 40
+            ? msg.text.slice(0, 40) + "…"
+            : msg.text || `${msg.files.length} 张图片`,
         snapshot: {
           name: snap.name,
           product: snap.product,
@@ -330,21 +336,42 @@ function ChatPane({
       };
       setHistory((h) => [entry, ...h].slice(0, 30));
     }
-    const payload = planMode
-      ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${value}`
-      : value;
+    const payload = msg.planMode
+      ? `【计划模式】先不要直接动手撰写或调用 update_* 工具。针对下面的需求，给我抛出 3 到 5 个最该先确认的澄清问题（用一、二、三编号），等我回答后再动笔：\n${msg.text}`
+      : msg.text;
 
-    if (files.length > 0) {
+    if (msg.files.length > 0) {
       const parts: Array<
         { type: "text"; text: string } | { type: "file"; mediaType: string; url: string }
       > = [];
       if (payload) parts.push({ type: "text", text: payload });
-      for (const f of files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
+      for (const f of msg.files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
       void sendMessage({ role: "user", parts });
     } else {
       void sendMessage({ text: payload });
     }
+  };
 
+  const sendText = (text: string) => {
+    const value = text.trim();
+    const files = img.getReadyFiles();
+    if (!value && files.length === 0) return;
+    if (img.uploading) {
+      toast.error("图片还在上传，稍等一下");
+      return;
+    }
+    const msg: QueuedMsg = {
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      text: value,
+      files,
+      planMode,
+    };
+    if (isLoading) {
+      setQueue((q) => [...q, msg]);
+      toast("已加入队列，团宝忙完会自动处理");
+    } else {
+      dispatch(msg);
+    }
     if (planMode) setPlanMode(false);
     setInput("");
     img.clear();
@@ -362,16 +389,46 @@ function ChatPane({
     });
   };
 
+  // Consume the queue (or pending jump) once the agent goes idle.
+  useEffect(() => {
+    if (status !== "ready") return;
+    if (jumpRef.current) {
+      const j = jumpRef.current;
+      jumpRef.current = null;
+      dispatch(j);
+      return;
+    }
+    if (queue.length === 0) return;
+    const [next, ...rest] = queue;
+    setQueue(rest);
+    dispatch(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, queue]);
+
+  const removeFromQueue = (id: string) => {
+    setQueue((q) => q.filter((m) => m.id !== id));
+  };
+
+  const jumpQueue = (id: string) => {
+    const target = queue.find((m) => m.id === id);
+    if (!target) return;
+    setQueue((q) => q.filter((m) => m.id !== id));
+    jumpRef.current = target;
+    if (isLoading) stop();
+    else dispatch(target);
+  };
+
   // A seeded home-page prompt is already the first visible user message. Resume from it once.
   const bootedRef = useRef(false);
   useEffect(() => {
     if (bootedRef.current) return;
     if (status !== "ready") return;
+    if (queue.length > 0 || jumpRef.current) return;
     const last = messages.at(-1);
     if (!last || last.role !== "user" || !last.id.startsWith("seed-")) return;
     bootedRef.current = true;
     void regenerate({ messageId: last.id });
-  }, [messages, regenerate, status]);
+  }, [messages, regenerate, status, queue.length]);
 
 
   const cleanSuggestion = (s: string) =>
@@ -530,7 +587,7 @@ function ChatPane({
         ))}
         {status === "submitted" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想…
+            <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想… <span className="text-muted-foreground/70">（可点右下方停止）</span>
           </div>
         )}
         {error && (
@@ -541,6 +598,52 @@ function ChatPane({
       </div>
 
       <div className="border-t p-3">
+        {queue.length > 0 && (
+          <div className="mb-2 rounded-lg border border-[oklch(0.85_0.08_55)] bg-[oklch(0.98_0.03_60)] px-2 py-1.5">
+            <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[oklch(0.45_0.15_40)]">
+              <ClipboardList className="h-3 w-3" /> 排队中 ({queue.length})
+            </div>
+            <div className="flex flex-col gap-1">
+              {queue.map((m, i) => {
+                const preview = m.text
+                  ? m.text.length > 30
+                    ? m.text.slice(0, 30) + "…"
+                    : m.text
+                  : `${m.files.length} 张图片`;
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-1.5 rounded-md bg-background/70 px-2 py-1 text-[11px]"
+                  >
+                    <span className="text-muted-foreground">{i + 1}.</span>
+                    <span className="flex-1 truncate text-foreground">
+                      {preview}
+                      {m.files.length > 0 && m.text ? (
+                        <span className="ml-1 text-muted-foreground">📎{m.files.length}</span>
+                      ) : null}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => jumpQueue(m.id)}
+                      title="立即插队（打断当前回合）"
+                      className="inline-flex h-5 items-center gap-0.5 rounded px-1.5 text-[10px] text-primary hover:bg-primary/10"
+                    >
+                      <SkipForward className="h-3 w-3" /> 插队
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFromQueue(m.id)}
+                      title="从队列移除"
+                      className="grid h-5 w-5 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {suggestions.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {suggestions.map((s) => (
@@ -609,9 +712,12 @@ function ChatPane({
               }
             }}
             rows={2}
-            placeholder={"告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送，Shift+Enter 换行)"}
+            placeholder={
+              isLoading
+                ? "团宝正在处理上一条，回车可加入队列…"
+                : "告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送，Shift+Enter 换行)"
+            }
             className="max-h-[24rem] min-h-[44px] w-full resize-y overflow-y-auto bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
-            disabled={isLoading}
           />
           <div className="flex items-center justify-between gap-2">
             <button
@@ -643,14 +749,26 @@ function ChatPane({
                 <ClipboardList className="h-3.5 w-3.5" />
                 {planMode ? "计划 已开" : "计划"}
               </button>
-              <Button
-                size="sm"
-                onClick={send}
-                disabled={(!input.trim() && img.getReadyFiles().length === 0) || isLoading}
-                className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
-              >
-                {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              </Button>
+              {isLoading ? (
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => stop()}
+                  title="停止团宝"
+                  className="h-8 rounded-lg bg-foreground text-background hover:bg-foreground/85"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={send}
+                  disabled={!input.trim() && img.getReadyFiles().length === 0}
+                  className="h-8 rounded-lg bg-gradient-to-br from-[oklch(0.72_0.2_45)] to-[oklch(0.62_0.22_35)] text-white hover:brightness-110"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>

@@ -215,6 +215,7 @@ export const Route = createFileRoute("/api/chat")({
         const isSeededStart = body.messages.length === 1 && body.messages[0]?.role === "user";
         const result = streamText({
           model,
+          abortSignal: request.signal,
           stopWhen: stepCountIs(50),
           system: `你是「团宝」，一只圆滚滚的橙色礼盒小精灵，是快团团团长的开团搭子。说话像真人助理一样自然、利落、有温度，不端架子、不寒暄。
 

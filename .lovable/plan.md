@@ -1,56 +1,101 @@
-## 现状问题
+## 目标
 
-1. **不该自动丢右边**：聊天里的 `generate_product_images` 工具一次性做完两件事——生图 + 直接 append 到 `intro.blocks`。所以图片绕过用户预览，自己就跑到右边模块去了。
-2. **位置乱放**：即使将来允许自动插入，现在的实现是 **无脑 append 到最后一块**，团宝嘴上说的"我帮你放到 XX 下面"和实际位置无关——它根本没传位置参数，也没读 blocks。
-3. **还是方图**：聊天工具调 `generateImagesBatch(key, { prompt, referenceImages }, count)`，没传 `size`，落到 `image-gen.server.ts` 的默认值 `1024x1024`。前几次只改了 Dialog 入口，没改聊天入口。
+团宝在想/在写时：
+1. 发送按钮变成「停止」按钮，点一下立刻打断
+2. 输入框依然可用，回车进入排队（不阻塞）
+3. 团宝结束当前回合后，自动从队列里取下一条发出去
+4. 队列里的消息可单独「立即插队」——打断当前回合并马上发这条
 
-## 改动方案
+## 改动文件
 
-### 1. 拆成两个工具：先生图、再插入
+仅前端，集中在 `src/routes/app.project.$id.tsx`，外加服务端一行 `abortSignal` 接入 `src/routes/api/chat.ts`。
 
-`src/routes/api/chat.ts`
+## 1. 服务端：把 abort 信号透传给模型
 
-**`generate_product_images`（改）**：只生图、只回 URL，不再写 `intro.blocks`。新增 `aspect` 入参（`square|portrait|landscape`，默认 `portrait`），映射到 `1024x1024 / 1024x1536 / 1536x1024` 传给 `generateImagesBatch`。返回 `{ ok, urls, aspect, count }`。
+`src/routes/api/chat.ts` 第 216 行的 `streamText({...})` 增加一行：
 
-**`insert_generated_images`（新增）**：把上一步的 URL 放到指定位置。入参：
-- `urls: string[]`（1-9）
-- `groupAsGrid: boolean`（≥2 张时是否合并成九宫格 `image_sm`；否则每张一个 `image_lg`）
-- `anchor: { mode: "after_block" | "before_block" | "replace_block" | "end", blockId?: string }`
-- `reason: string`（≤40 字，告诉用户为什么放这里，例如"放在『卖点·新鲜直采』下面，承接产地描述"）
+```ts
+abortSignal: request.signal,
+```
 
-handler 读取 `intro.blocks`，按 `anchor` 计算插入下标，写回 `projects.intro`。`blockId` 找不到时报错而不是兜底到末尾——避免"假装放对了"。
+否则点停止只是前端断流，后端会继续烧 token。
 
-### 2. System Prompt 增加铁律
+## 2. 前端：解构 stop、加队列状态
 
-`src/routes/api/chat.ts`（system prompt 段）追加：
+在 `useChat` 解构里加 `stop`：
 
-- 调用 `generate_product_images` 后，**默认不要**立刻调 `insert_generated_images`。把生成的图作为预览发回用户，附一句"放哪里你说，或者我建议放在 XX 下面，确认就插。"
-- **只有**当用户消息里出现明确授权（"你来放/帮我放/自己丢进去/合适位置/你决定"等）时，才允许直接调 `insert_generated_images`。
-- 调用 `insert_generated_images` 前，**必须**先看 `intro.blocks` 的文字内容，按语义选锚点（如：场景图放在描述场景的段落下面、细节图放在材质/工艺段落下面、九宫格食用方法图放在"怎么吃"段落下面）。`reason` 字段必须写明依据，禁止说空话。
-- 团宝口头说"我放到了 X 下面"必须和 `anchor.blockId` 真实对应，禁止口是心非。
+```ts
+const { messages, sendMessage, setMessages, regenerate, status, error, stop } = useChat({...});
+```
 
-### 3. 聊天里的图片预览卡片
+新增队列 state：
 
-`src/routes/app.project.$id.tsx` 的 `ToolCard`：
+```ts
+type QueuedMsg = { id: string; text: string; files: ReadyFile[]; planMode: boolean };
+const [queue, setQueue] = useState<QueuedMsg[]>([]);
+const queueRef = useRef(queue);
+useEffect(() => { queueRef.current = queue; }, [queue]);
+```
 
-- `generate_product_images` 完成时（`hasOutput && output.ok`），渲染缩略图网格（`output.urls.map`，按 `output.aspect` 给容器配 `aspect-square / aspect-[3/4] / aspect-[4/3]`，避免方块占位），点击可放大。
-- 文案改为"已生成 N 张图，预览确认后告诉我放到哪个模块"。
-- 不再显示"已生成并插入预览"——这句话本身就是误导。
-- `insert_generated_images` 新增一条 label：成功显示 `📌 已插入到「<目标模块标签>」<位置>`，失败显示 `❌ 想放到「…」但没找到该模块`。
+## 3. sendText 行为分叉
 
-### 4. 单图生图入口的 size
+改造 `sendText(text)`：
+- 校验空内容、上传中维持原样
+- 若 `isLoading`：把这条 push 进 `queue`，清空输入框/附件，toast「已加入队列」，**不调用** `sendMessage`
+- 若空闲：保持现有行为（写 history snapshot + sendMessage）
 
-`src/lib/image-gen.server.ts` 的 `generateImagesBatch` 已支持 `size`，但当前签名没透出来。把 `GenerateOneInput.size` 真正用上即可（已在前轮加好），聊天工具传 `aspect` 转换后的 size 即可。无需再改服务端。
+新增内部函数 `dispatch(msg: QueuedMsg)`：把现在 sendText 里"组装 parts → sendMessage → 写 history"那一段抽出来复用，给队列消费用。
+
+## 4. 队列自动消费
+
+新增 effect：当 `status === "ready"` 且队列非空时，shift 出队首调用 `dispatch`：
+
+```ts
+useEffect(() => {
+  if (status !== "ready") return;
+  if (queue.length === 0) return;
+  const [next, ...rest] = queue;
+  setQueue(rest);
+  dispatch(next);
+}, [status, queue]);
+```
+
+注意：bootedRef 的 seed 自动 regenerate 逻辑保持原状，但加一句 `if (queue.length > 0) return;`，避免冲突。
+
+## 5. 停止按钮 / 发送按钮切换
+
+输入框右下角原来的「发送」按钮根据 `isLoading` 切换：
+
+- 空闲：原样（橙色 Send）
+- `submitted` / `streaming`：变成方形 Stop 图标（`Square` from lucide-react），点击 `stop()`；样式保持高对比但用次要色，提示「停止团宝」
+
+textarea 的 `disabled={isLoading}` 去掉，改为始终可输入；placeholder 在 `isLoading` 时切到「团宝在写，回车可加入队列…」。Enter 行为不变（调 `send`，由 sendText 内部决定是排队还是立刻发）。
+
+## 6. 队列 UI（输入框上方）
+
+`isLoading` 或 `queue.length > 0` 时，在输入框上方（建议放在 suggestions 上面）渲染一条小条：
+
+```
+排队中 (N)
+[1] 把价格改成 39.9…    [插队] [×]
+[2] 加一个试吃装…        [插队] [×]
+```
+
+- 每行：序号、文字预览（截断 30 字，若有图加 📎N）、「插队」按钮（`SkipForward` 图标）、「移除」按钮（X）
+- 「插队」：从队列移除该项 → 调 `stop()` → 把该项暂存到 `pendingJumpRef`，并在 status 回到 ready 的 effect 里优先 dispatch 它（先于队列正常消费）
+- 「移除」：从队列里删掉
+
+## 7. 验收
+
+1. 团宝在想/写时，发送键变成方形停止键，点了立刻停（前端停 + 后端 streamText 接到 abort）
+2. 在想/写时输入新内容回车：被加到下方队列条，输入框清空，团宝继续当前回合
+3. 当前回合完成后，队列首条自动发出去，UI 队列条少一行
+4. 队列里点「插队」：当前回合被打断，被点的那条立刻发出去，其余排队条保留顺序
+5. 队列里点「×」：该条消失，不发送
+6. 没有图片附件丢失：排队时附件随消息一起入队列（捕获当时的 `getReadyFiles()` 快照，并清空 `img`）
 
 ## 不动的部分
 
-- Dialog（`AIGenerateImageDialog.tsx`）继续走 `/api/generate-image`，行为不变。
-- `image_lg` 渲染本来就是 `h-auto w-full`，自然比例没问题。
-- `intro.blocks` 数据结构不变。
-
-## 验收
-
-1. 在聊天里说"给我配 3 张草莓园场景图"——图片只在聊天里出现，右边模块不动。
-2. 用户回复"放到痛点共鸣下面"——团宝调 `insert_generated_images`，右边在该模块后面出现九宫格，团宝复述位置准确。
-3. 用户说"你帮我自己放合适位置"——团宝读完 blocks 后才插入，并解释为什么放那。
-4. 聊天里生成的竖图在右边模块里也是 3:4，不是被压成正方形。
+- 计划模式逻辑、history 快照、seed 自动 regenerate、suggestions、错误展示
+- 服务端除了一行 `abortSignal` 不动
+- `intro/skus/settings` 数据流不变
