@@ -50,7 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import { readAuthToken } from "@/lib/use-current-user";
 import { PhoneShell as TuanPhoneShell } from "@/components/tuan/PhoneShell";
-import { IntroTab, ProductEntryCard } from "@/components/tuan/IntroTab";
+import { IntroTab } from "@/components/tuan/IntroTab";
 import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
@@ -1233,12 +1233,7 @@ function PreviewPane({
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
           {tab === "intro" && (
-            <div className="space-y-2">
-              <IntroTab intro={intro} onChange={setIntro} projectId={projectId} />
-              <div className="px-2 pb-3">
-                <ProductEntryCard count={skus.length} />
-              </div>
-            </div>
+            <IntroTab intro={intro} onChange={setIntro} projectId={projectId} />
           )}
           {tab === "product" && (
             <ProductTab

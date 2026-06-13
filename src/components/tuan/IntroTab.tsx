@@ -13,6 +13,8 @@ import {
   Plus,
   Sparkles,
   Play,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
@@ -215,6 +217,11 @@ export function IntroTab({
   const removeBlock = (id: string) => {
     setBlocks(blocks.filter((b) => b.id !== id));
     if (editingId === id) setEditingId(null);
+  };
+  const toggleLock = (id: string) => {
+    setBlocks(
+      blocks.map((b) => (b.id === id ? ({ ...b, locked: !b.locked } as IntroBlock) : b)),
+    );
   };
   const removeSmallImage = (blockId: string, idx: number) => {
     setBlocks(
@@ -580,6 +587,7 @@ export function IntroTab({
                 anyDragging={!!drag}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
+                onToggleLock={() => toggleLock(b.id)}
                 onUploadReplace={() => {
                   if (b.type === "image_lg") pickFile("image_lg", b.id);
                   else if (b.type === "image_sm") pickFile("image_sm", b.id);
@@ -806,6 +814,7 @@ function BlockCard({
   anyDragging,
   onMove,
   onRemove,
+  onToggleLock,
   onUploadReplace,
   onStartEditText,
   onChangeText,
@@ -824,6 +833,7 @@ function BlockCard({
   anyDragging: boolean;
   onMove: (dir: "up" | "down" | "top") => void;
   onRemove: () => void;
+  onToggleLock: () => void;
   onUploadReplace: () => void;
   onStartEditText: () => void;
   onChangeText: (v: string) => void;
@@ -833,6 +843,7 @@ function BlockCard({
   onAIGenerate?: () => void;
 }) {
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
+  const locked = !!block.locked;
 
   return (
     <div
@@ -842,10 +853,20 @@ function BlockCard({
         transition: "transform 220ms cubic-bezier(.2,.8,.2,1)",
         visibility: isDragging ? "hidden" : undefined,
       }}
-      className="border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0"
+      className={
+        "border-b border-[#f0f1f2] pb-3 last:border-b-0 last:pb-0 " +
+        (locked ? "rounded-md ring-1 ring-amber-400/60 bg-amber-50/40 px-2" : "")
+      }
     >
       <div className="mb-1.5 flex items-center justify-between">
-        <BlockLabel type={block.type} />
+        <div className="flex items-center gap-1.5">
+          <BlockLabel type={block.type} />
+          {locked && (
+            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+              已锁定
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -860,14 +881,34 @@ function BlockCard({
           {onAIGenerate && !anyDragging && (
             <button
               type="button"
-              onClick={onAIGenerate}
-              title="根据文字 AI 生图"
-              className="flex items-center gap-0.5 rounded-md border border-[#07c160] bg-[#07c160]/10 px-1.5 py-0.5 text-[11px] text-[#07c160] hover:bg-[#07c160]/20"
+              onClick={locked ? () => toast.info("已锁定，先解锁再让团宝改") : onAIGenerate}
+              title={locked ? "已锁定 — 先解锁" : "根据文字 AI 生图"}
+              disabled={locked}
+              className={
+                "flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[11px] " +
+                (locked
+                  ? "border-[#dcdee0] bg-[#f4f5f7] text-[#c8c9cc] cursor-not-allowed"
+                  : "border-[#07c160] bg-[#07c160]/10 text-[#07c160] hover:bg-[#07c160]/20")
+              }
             >
               <Sparkles className="h-3 w-3" />
               生图
             </button>
           )}
+          <button
+            type="button"
+            onClick={onToggleLock}
+            title={locked ? "解锁 — 团宝可以修改" : "锁定 — 团宝不会改这段"}
+            className={
+              "flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[11px] " +
+              (locked
+                ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                : "border-[#dcdee0] bg-white text-[#646566] hover:border-amber-400 hover:text-amber-700")
+            }
+          >
+            {locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+            {locked ? "锁定中" : "锁定"}
+          </button>
           <MiniBtn onClick={() => onMove("up")} disabled={isFirst}>上移</MiniBtn>
           <MiniBtn onClick={() => onMove("down")} disabled={isLast}>下移</MiniBtn>
           <MiniBtn onClick={() => onMove("top")} disabled={isFirst}>置顶</MiniBtn>

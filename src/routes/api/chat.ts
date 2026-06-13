@@ -292,6 +292,12 @@ ${logicPromptBlock}
   4) 占位用完后还有多余图，按语义补到最相关段落后；判断不出归属时调 ask_questions 让用户选。
   5) 没有启用文案逻辑时，沿用旧的"文字-图交替穿插"重排逻辑。
 
+【锁定模块规则 — 必须遵守】
+- intro.blocks 里若某段带有 locked:true，那是用户钉死的内容。你绝对不能替换、重写、合并、删除或重新排序这一段，也不能用 blocksReplaceAt 覆盖该索引（服务端会拒绝并返回 skippedLocked）。
+- 你可以在锁定段前后用 blocksAppend 新增内容，也可以照常修改其他未锁定的段落。
+- 用户明确说"改这段被锁定的内容"时，先回一句"这段被你锁定了，先在右侧解锁再让我改"，不要硬改。
+- 整体重排（传 blocks 字段）时，请尽量保持 locked 段相对位置；服务端也会把它们钉回原位置。
+
 【候选采纳规则 — 极其重要】
 - 当你在聊天里给出 ≥2 个标题候选或段落候选时，必须在同一回复内立刻调用一次 update_intro，把你最推荐的那一条先写进右侧预览（标题候选 → title，段落候选 → blocksAppend 或 blocksReplaceAt）。不允许"全在聊天里，预览空空"。
 - 当用户用任何方式表示采纳（"放进去 / 应用 / 用第 X 个 / 就这个 / 换成 X / 用这个"），必须在本次回复就调对应工具写入对应内容；禁止只用文字回"已经选好了 / 已应用"而不调工具。
@@ -380,8 +386,33 @@ ${logicPromptBlock}
                   : [];
                 const { blocksAppend, blocksReplaceAt, ...fields } = input;
                 const patch: Record<string, unknown> = { ...fields };
+                const skippedLocked: number[] = [];
                 if (Array.isArray(input.blocks)) {
-                  patch.blocks = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                  // Preserve locked blocks at their original indexes; fill the
+                  // rest from the model-provided array, in order.
+                  const lockedAt = new Map<number, Record<string, unknown>>();
+                  currentBlocks.forEach((b, idx) => {
+                    if (b && (b as { locked?: boolean }).locked) lockedAt.set(idx, b);
+                  });
+                  const incoming = input.blocks.map((b) => ({ id: genBlockId(), ...b }));
+                  const total = Math.max(
+                    currentBlocks.length,
+                    incoming.length + lockedAt.size,
+                  );
+                  const merged: Array<Record<string, unknown>> = [];
+                  let cursor = 0;
+                  for (let i = 0; i < total; i++) {
+                    if (lockedAt.has(i)) {
+                      merged.push(lockedAt.get(i)!);
+                    } else if (cursor < incoming.length) {
+                      merged.push(incoming[cursor++] as Record<string, unknown>);
+                    }
+                  }
+                  while (cursor < incoming.length) {
+                    merged.push(incoming[cursor++] as Record<string, unknown>);
+                  }
+                  patch.blocks = merged;
+                  if (lockedAt.size > 0) skippedLocked.push(...lockedAt.keys());
                 } else {
                   let nextBlocks = currentBlocks;
                   if (blocksAppend?.length) {
@@ -392,6 +423,11 @@ ${logicPromptBlock}
                   }
                   for (const replacement of blocksReplaceAt ?? []) {
                     if (replacement.index < nextBlocks.length) {
+                      const existing = nextBlocks[replacement.index] as { locked?: boolean };
+                      if (existing?.locked) {
+                        skippedLocked.push(replacement.index);
+                        continue;
+                      }
                       nextBlocks[replacement.index] = {
                         id: genBlockId(),
                         ...replacement.block,
@@ -419,6 +455,7 @@ ${logicPromptBlock}
                   blockCount: Array.isArray(next.blocks) ? next.blocks.length : currentBlocks.length,
                   intro: next,
                   change,
+                  ...(skippedLocked.length ? { skippedLocked } : {}),
                 };
               },
             }),
