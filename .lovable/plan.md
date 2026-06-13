@@ -1,36 +1,56 @@
-## 问题
-右侧"大图"模块本身已经按图片自然比例渲染（`<img class="block h-auto w-full">`），但 AI 生图永远返回 **1024×1024 正方形**（`src/lib/image-gen.server.ts` 写死 `size: "1024x1024"`）。所以无论模块怎么自适应，生成出来的图都是方的——竖图素材塞进去要么被拉伸，要么留白/留黑。
+## 现状问题
 
-修复点：让"生图"环节就能产出非正方形图片，模块自然显示对应比例。
+1. **不该自动丢右边**：聊天里的 `generate_product_images` 工具一次性做完两件事——生图 + 直接 append 到 `intro.blocks`。所以图片绕过用户预览，自己就跑到右边模块去了。
+2. **位置乱放**：即使将来允许自动插入，现在的实现是 **无脑 append 到最后一块**，团宝嘴上说的"我帮你放到 XX 下面"和实际位置无关——它根本没传位置参数，也没读 blocks。
+3. **还是方图**：聊天工具调 `generateImagesBatch(key, { prompt, referenceImages }, count)`，没传 `size`，落到 `image-gen.server.ts` 的默认值 `1024x1024`。前几次只改了 Dialog 入口，没改聊天入口。
 
-## 改动
+## 改动方案
 
-### 1. 服务端支持多比例
-`src/lib/image-gen.server.ts`
-- `GenerateOneInput` 新增 `size?: "1024x1024" | "1024x1536" | "1536x1024"`（gpt-image-2 三档官方尺寸）。
-- `createImageGenerationStream` 与 `callOpenAIImage` 用传入的 size，缺省 `1024x1024`。
-- Gemini 分支保持不动（参考图模式由参考图自身决定比例）。
+### 1. 拆成两个工具：先生图、再插入
 
-`src/routes/api/generate-image.ts`
-- 请求 schema 加入 `size` 字段（同枚举），透传给 `createImageGenerationStream`。
+`src/routes/api/chat.ts`
 
-### 2. 对话框里选比例
-`src/components/tuan/AIGenerateImageDialog.tsx`
-- 新增 `aspect` 状态：`"square" | "portrait" | "landscape"`，默认 `portrait`（团购大图常用 3:4）。
-- 表单顶部加一行三选一按钮：`方形 1:1` / `竖图 3:4` / `横图 4:3`。
-- `runOneGeneration` POST body 多带 `size`（square→`1024x1024`、portrait→`1024x1536`、landscape→`1536x1024`）。
-- 重置逻辑（`useEffect` open）把 `aspect` 复位为 `portrait`。
-- 缩略图槽位用 `aspect-[var]` 渲染对应比例占位，避免加载中是方的、加载完突然变形。
+**`generate_product_images`（改）**：只生图、只回 URL，不再写 `intro.blocks`。新增 `aspect` 入参（`square|portrait|landscape`，默认 `portrait`），映射到 `1024x1024 / 1024x1536 / 1536x1024` 传给 `generateImagesBatch`。返回 `{ ok, urls, aspect, count }`。
 
-### 3. 单图直接生图入口
-`src/components/tuan/IntroTab.tsx` 的"生图"按钮如果直接调 `/api/generate-image`（非通过 Dialog），同样默认带 `size: "1024x1536"`。若该入口走的是 Dialog，则无需改。
+**`insert_generated_images`（新增）**：把上一步的 URL 放到指定位置。入参：
+- `urls: string[]`（1-9）
+- `groupAsGrid: boolean`（≥2 张时是否合并成九宫格 `image_sm`；否则每张一个 `image_lg`）
+- `anchor: { mode: "after_block" | "before_block" | "replace_block" | "end", blockId?: string }`
+- `reason: string`（≤40 字，告诉用户为什么放这里，例如"放在『卖点·新鲜直采』下面，承接产地描述"）
+
+handler 读取 `intro.blocks`，按 `anchor` 计算插入下标，写回 `projects.intro`。`blockId` 找不到时报错而不是兜底到末尾——避免"假装放对了"。
+
+### 2. System Prompt 增加铁律
+
+`src/routes/api/chat.ts`（system prompt 段）追加：
+
+- 调用 `generate_product_images` 后，**默认不要**立刻调 `insert_generated_images`。把生成的图作为预览发回用户，附一句"放哪里你说，或者我建议放在 XX 下面，确认就插。"
+- **只有**当用户消息里出现明确授权（"你来放/帮我放/自己丢进去/合适位置/你决定"等）时，才允许直接调 `insert_generated_images`。
+- 调用 `insert_generated_images` 前，**必须**先看 `intro.blocks` 的文字内容，按语义选锚点（如：场景图放在描述场景的段落下面、细节图放在材质/工艺段落下面、九宫格食用方法图放在"怎么吃"段落下面）。`reason` 字段必须写明依据，禁止说空话。
+- 团宝口头说"我放到了 X 下面"必须和 `anchor.blockId` 真实对应，禁止口是心非。
+
+### 3. 聊天里的图片预览卡片
+
+`src/routes/app.project.$id.tsx` 的 `ToolCard`：
+
+- `generate_product_images` 完成时（`hasOutput && output.ok`），渲染缩略图网格（`output.urls.map`，按 `output.aspect` 给容器配 `aspect-square / aspect-[3/4] / aspect-[4/3]`，避免方块占位），点击可放大。
+- 文案改为"已生成 N 张图，预览确认后告诉我放到哪个模块"。
+- 不再显示"已生成并插入预览"——这句话本身就是误导。
+- `insert_generated_images` 新增一条 label：成功显示 `📌 已插入到「<目标模块标签>」<位置>`，失败显示 `❌ 想放到「…」但没找到该模块`。
+
+### 4. 单图生图入口的 size
+
+`src/lib/image-gen.server.ts` 的 `generateImagesBatch` 已支持 `size`，但当前签名没透出来。把 `GenerateOneInput.size` 真正用上即可（已在前轮加好），聊天工具传 `aspect` 转换后的 size 即可。无需再改服务端。
 
 ## 不动的部分
-- 模块渲染（`BlockCard` 中 image_lg）已是自然比例，不动。
-- 九宫格 image_sm 每格仍是 `aspect-square + object-cover`（九宫格本来就要求方形小图，与本次诉求无关）。
-- 数据结构 `IntroBlock` 不变，不存比例字段——比例由图片本身决定。
+
+- Dialog（`AIGenerateImageDialog.tsx`）继续走 `/api/generate-image`，行为不变。
+- `image_lg` 渲染本来就是 `h-auto w-full`，自然比例没问题。
+- `intro.blocks` 数据结构不变。
 
 ## 验收
-- 在对话框选"竖图"，生成的图与模块都是 3:4，无变形无留白。
-- 切到"横图"重新生成，模块自动变扁。
-- 老的方图记录仍可正常显示，模块跟着方形撑开。
+
+1. 在聊天里说"给我配 3 张草莓园场景图"——图片只在聊天里出现，右边模块不动。
+2. 用户回复"放到痛点共鸣下面"——团宝调 `insert_generated_images`，右边在该模块后面出现九宫格，团宝复述位置准确。
+3. 用户说"你帮我自己放合适位置"——团宝读完 blocks 后才插入，并解释为什么放那。
+4. 聊天里生成的竖图在右边模块里也是 3:4，不是被压成正方形。
