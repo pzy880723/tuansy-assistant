@@ -129,6 +129,9 @@ export function IntroTab({
   onChange,
   projectId,
   onAskAI,
+  availableImages,
+  onRegenerateBackground,
+  backgroundGenerating,
 }: {
   intro: IntroData;
   onChange: (next: IntroData) => void;
@@ -136,9 +139,54 @@ export function IntroTab({
   /** Send a natural-language instruction to 团宝 on behalf of the user.
    *  Used by the per-block "AI 丰富" popover. */
   onAskAI?: (text: string) => void;
+  /** URLs of already-uploaded product images, for the "从已上传图选" picker. */
+  availableImages?: string[];
+  /** Trigger an AI regeneration of the leader background image. */
+  onRegenerateBackground?: () => void;
+  backgroundGenerating?: boolean;
 }) {
   const blocks = intro.blocks ?? [];
   const setBlocks = (next: IntroBlock[]) => onChange({ ...intro, blocks: next });
+
+  // Leader avatar upload
+  const leaderAvatarRef = useRef<HTMLInputElement | null>(null);
+  const leaderBgRef = useRef<HTMLInputElement | null>(null);
+  const [bgPopOpen, setBgPopOpen] = useState(false);
+  const uploadLeaderImage = useServerFn(uploadProductImage);
+  const onPickLeaderAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const { blob, mimeType } = await leaderCompressImage(file);
+      const base64 = await leaderBlobToBase64(blob);
+      const res = await uploadLeaderImage({
+        data: { projectId, filename: file.name, mimeType, dataBase64: base64 },
+      });
+      onChange({ ...intro, leader_avatar: res.url });
+      toast.success("头像已更新");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "上传失败");
+    }
+  };
+  const onPickLeaderBg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const { blob, mimeType } = await leaderCompressImage(file);
+      const base64 = await leaderBlobToBase64(blob);
+      const res = await uploadLeaderImage({
+        data: { projectId, filename: file.name, mimeType, dataBase64: base64 },
+      });
+      onChange({ ...intro, leader_bg_url: res.url });
+      setBgPopOpen(false);
+      toast.success("背景图已更新");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "上传失败");
+    }
+  };
+
 
   // AI generate-image dialog state
   const [aiOpen, setAiOpen] = useState(false);
