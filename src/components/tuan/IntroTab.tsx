@@ -841,6 +841,7 @@ function BlockCard({
   onRemoveSmallImage,
   onPointerDownDrag,
   onAIGenerate,
+  onEnrich,
 }: {
   refCb: (el: HTMLDivElement | null) => void;
   block: IntroBlock;
@@ -860,6 +861,9 @@ function BlockCard({
   onRemoveSmallImage: (idx: number) => void;
   onPointerDownDrag: (e: React.PointerEvent) => void;
   onAIGenerate?: () => void;
+  /** Per-block "AI 丰富" — receives the user's enrichment prompt;
+   *  parent assembles the @mention token. */
+  onEnrich?: (prompt: string) => void;
 }) {
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
   const locked = !!block.locked;
