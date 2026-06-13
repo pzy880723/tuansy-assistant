@@ -1057,7 +1057,7 @@ function ToolCard({ part }: { part: ToolPart }) {
         </span>
         <span className="font-medium">{label}</span>
         <span className="ml-auto text-[10px] text-muted-foreground">
-          {failed ? "失败" : hasOutput ? "已应用" : isRunning ? "执行中" : ""}
+          {failed ? "失败" : hasOutput ? "已应用" : isRunning ? "分析中…" : ""}
         </span>
       </summary>
       <div className="space-y-3 border-t bg-muted/30 px-3 py-3 text-[11px]">
