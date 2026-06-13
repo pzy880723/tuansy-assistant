@@ -613,6 +613,147 @@ ${logicPromptBlock}
                 }
               },
             }),
+            remember_preference: tool({
+              description:
+                "把用户的长期偏好/风格规则记录到当前启用的文案逻辑里，下次生成自动遵守。仅记长期偏好，不记一次性指令。",
+              inputSchema: z.object({
+                note: z
+                  .string()
+                  .min(2)
+                  .max(160)
+                  .describe("用户偏好的一句话概括，≤80 字，写成可直接执行的规则"),
+                scope: z
+                  .enum(["global", "module"])
+                  .describe("global=整体偏好；module=指向某个模块的偏好"),
+                moduleLabel: z
+                  .string()
+                  .max(40)
+                  .optional()
+                  .describe("scope=module 时必填，对应模块的 label，例如『痛点共鸣』"),
+              }),
+              execute: async ({ note, scope, moduleLabel }) => {
+                if (!activeLogic) {
+                  return { ok: false, error: "当前没有启用文案逻辑，无法记忆" };
+                }
+                const fromPreset =
+                  !forkedDuringRequest &&
+                  !!body.copyLogicId &&
+                  body.copyLogicId.startsWith(presetPrefix);
+
+                const mergeDescription = (desc: string | null): string => {
+                  const base = (desc ?? "").trim();
+                  const header = "【用户偏好（团宝记录）】";
+                  const line = `- ${note.trim()}`;
+                  if (base.includes(header)) {
+                    const idx = base.indexOf(header);
+                    const before = base.slice(0, idx).trim();
+                    const after = base.slice(idx + header.length);
+                    const items = new Set(
+                      after
+                        .split("\n")
+                        .map((s) => s.trim())
+                        .filter((s) => s.startsWith("-")),
+                    );
+                    items.add(line);
+                    return `${before ? `${before}\n\n` : ""}${header}\n${[...items].join("\n")}`.trim();
+                  }
+                  return `${base ? `${base}\n\n` : ""}${header}\n${line}`.trim();
+                };
+
+                const mergeModule = (
+                  mods: NonNullable<LogicRow["modules"]>,
+                ): NonNullable<LogicRow["modules"]> => {
+                  if (!moduleLabel) return mods;
+                  let matched = false;
+                  const next = mods.map((m) => {
+                    if (m.label !== moduleLabel) return m;
+                    matched = true;
+                    const existing = (m.guidance ?? "").trim();
+                    const line = `- ${note.trim()}`;
+                    if (existing.split("\n").map((s) => s.trim()).includes(line)) return m;
+                    return { ...m, guidance: existing ? `${existing}\n${line}` : line };
+                  });
+                  return matched ? next : mods;
+                };
+
+                if (fromPreset) {
+                  // Fork the preset into a user-owned copy_logics row, then
+                  // write the preference there. Keep the original preset clean.
+                  const baseName = activeLogic.name.replace(/（标准）$/, "");
+                  const forkedName = `${baseName}（我的偏好）`;
+                  const baseModules = activeLogic.modules ?? [];
+                  const nextDescription =
+                    scope === "global"
+                      ? mergeDescription(activeLogic.description)
+                      : (activeLogic.description ?? "");
+                  const nextModules =
+                    scope === "module" ? mergeModule(baseModules) : baseModules;
+                  const { data: inserted, error: insertError } = await supabaseAdmin
+                    .from("copy_logics")
+                    .insert({
+                      user_id: userId,
+                      name: forkedName,
+                      description: nextDescription,
+                      modules: nextModules as never,
+                      formatting: (activeLogic.formatting ?? {}) as never,
+                      is_active: true,
+                    })
+                    .select("id")
+                    .single();
+                  if (insertError || !inserted) {
+                    return {
+                      ok: false,
+                      error: insertError?.message ?? "复制预设逻辑失败",
+                    };
+                  }
+                  // Update in-memory activeLogic so subsequent calls in this
+                  // request write to the fork, not re-fork.
+                  activeLogic = {
+                    id: inserted.id,
+                    name: forkedName,
+                    description: nextDescription,
+                    modules: nextModules,
+                    formatting: activeLogic.formatting,
+                    is_active: true,
+                  };
+                  forkedDuringRequest = true;
+                  return {
+                    ok: true,
+                    note: note.trim(),
+                    scope,
+                    logicId: inserted.id,
+                    logicName: forkedName,
+                    forkedFromPreset: true,
+                  };
+                }
+
+                const patch: Record<string, unknown> = {};
+                if (scope === "global") {
+                  patch.description = mergeDescription(activeLogic.description);
+                  activeLogic = { ...activeLogic, description: patch.description as string };
+                } else if (moduleLabel && activeLogic.modules) {
+                  const nextModules = mergeModule(activeLogic.modules);
+                  patch.modules = nextModules;
+                  activeLogic = { ...activeLogic, modules: nextModules };
+                } else {
+                  return { ok: false, error: "scope=module 时必须传 moduleLabel" };
+                }
+                const { error: updateError } = await supabaseAdmin
+                  .from("copy_logics")
+                  .update(patch)
+                  .eq("id", activeLogic.id)
+                  .eq("user_id", userId);
+                if (updateError) return { ok: false, error: updateError.message };
+                return {
+                  ok: true,
+                  note: note.trim(),
+                  scope,
+                  logicId: activeLogic.id,
+                  logicName: activeLogic.name,
+                  forkedFromPreset: false,
+                };
+              },
+            }),
             suggest_next: tool({
               description:
                 "在回复末尾给出 2 到 4 条用户下一步可能想做的快速操作建议，每条不超过 18 个汉字。每次回复都要调用一次。",
