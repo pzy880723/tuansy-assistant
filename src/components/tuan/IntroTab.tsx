@@ -587,6 +587,7 @@ export function IntroTab({
                 anyDragging={!!drag}
                 onMove={(dir) => moveBlock(b.id, dir)}
                 onRemove={() => removeBlock(b.id)}
+                onToggleLock={() => toggleLock(b.id)}
                 onUploadReplace={() => {
                   if (b.type === "image_lg") pickFile("image_lg", b.id);
                   else if (b.type === "image_sm") pickFile("image_sm", b.id);
