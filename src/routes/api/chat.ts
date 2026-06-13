@@ -449,6 +449,7 @@ ${logicPromptBlock}
                   blockCount: Array.isArray(next.blocks) ? next.blocks.length : currentBlocks.length,
                   intro: next,
                   change,
+                  ...(skippedLocked.length ? { skippedLocked } : {}),
                 };
               },
             }),
