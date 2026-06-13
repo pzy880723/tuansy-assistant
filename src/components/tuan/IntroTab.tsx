@@ -614,6 +614,14 @@ export function IntroTab({
                     ? () => openAIForBlock(b.id, b.text)
                     : undefined
                 }
+                onEnrich={
+                  onAskAI && b.type === "text"
+                    ? (prompt) => {
+                        const token = blockMentionToken(blocks, i);
+                        onAskAI(`${token} ${prompt}`.trim());
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>
