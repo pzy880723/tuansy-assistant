@@ -145,12 +145,12 @@ export async function createImageGenerationStream(
 /** Calls the Gateway once and returns the base64 PNG payload (no data: prefix). */
 export async function generateOneImage(
   apiKey: string,
-  { prompt, referenceImages }: GenerateOneInput,
+  { prompt, referenceImages, size }: GenerateOneInput,
 ): Promise<string> {
   if (referenceImages && referenceImages.length > 0) {
     return callGeminiImage(apiKey, prompt, referenceImages);
   }
-  return callOpenAIImage(apiKey, prompt);
+  return callOpenAIImage(apiKey, prompt, size);
 }
 
 /** Generates N images in parallel, returns array of base64 payloads. */
