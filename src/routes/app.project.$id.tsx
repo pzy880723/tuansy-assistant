@@ -1107,18 +1107,48 @@ function ToolCard({ part }: { part: ToolPart }) {
             </div>
           </div>
         ))}
-        {name !== "update_intro" && part.output != null && (
+        {name === "generate_product_images" && hasOutput && imgOutput?.ok && (imgOutput.urls?.length ?? 0) > 0 && (
+          <div
+            className={cn(
+              "grid gap-2",
+              (imgOutput.urls?.length ?? 0) === 1
+                ? "grid-cols-1"
+                : (imgOutput.urls?.length ?? 0) === 2
+                  ? "grid-cols-2"
+                  : "grid-cols-3",
+            )}
+          >
+            {imgOutput.urls!.map((u, i) => (
+              <a
+                key={i}
+                href={u}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  "block overflow-hidden rounded-lg border bg-background",
+                  imgOutput.aspect === "landscape"
+                    ? "aspect-[4/3]"
+                    : imgOutput.aspect === "square"
+                      ? "aspect-square"
+                      : "aspect-[3/4]",
+                )}
+              >
+                <img src={u} alt="" className="h-full w-full object-cover" />
+              </a>
+            ))}
+          </div>
+        )}
+        {name === "insert_generated_images" && hasOutput && insertOutput?.ok && insertOutput?.reason && (
+          <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
+            放置依据：{insertOutput.reason}
+          </div>
+        )}
+        {name !== "update_intro" && name !== "generate_product_images" && name !== "insert_generated_images" && part.output != null && (
           <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
             {failed ? "执行失败，请重试" : "已完成并应用到右侧预览"}
           </div>
         )}
-        {part.errorText && (
-          <div className="text-destructive">{part.errorText}</div>
-        )}
-      </div>
-    </details>
-  );
-}
+
 
 /* ============== RIGHT: 快团团 Mock Preview ============== */
 
