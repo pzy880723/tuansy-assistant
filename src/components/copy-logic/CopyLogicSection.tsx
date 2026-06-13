@@ -109,7 +109,7 @@ export function CopyLogicSection({ embedded = false }: { embedded?: boolean }) {
         <div>
           <div className="text-sm font-semibold">文案编辑逻辑</div>
           <div className="text-[11px] text-muted-foreground">
-            可同时启用多条，团宝会按商品品类自动挑一条来写。修改即时自动保存。
+            可同时启用多条，团宝会按商品品类自动挑一条来写。修改即时自动保存，团宝下一条回复就会用最新版。
           </div>
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
