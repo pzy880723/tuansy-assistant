@@ -17,6 +17,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as MInboxRouteImport } from './routes/m.inbox'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -64,6 +65,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const MInboxRoute = MInboxRouteImport.update({
+  id: '/m/inbox',
+  path: '/m/inbox',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   id: '/api/generate-image',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/m/inbox': typeof MInboxRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/app/project/$id': typeof AppProjectIdRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/m/inbox': typeof MInboxRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
   '/app/project/$id': typeof AppProjectIdRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/m/inbox': typeof MInboxRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/app/project/$id': typeof AppProjectIdRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/m/inbox'
     | '/admin/'
     | '/app/'
     | '/app/project/$id'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/m/inbox'
     | '/admin'
     | '/app'
     | '/app/project/$id'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/m/inbox'
     | '/admin/'
     | '/app/'
     | '/app/project/$id'
@@ -212,6 +224,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  MInboxRoute: typeof MInboxRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/m/inbox': {
+      id: '/m/inbox'
+      path: '/m/inbox'
+      fullPath: '/m/inbox'
+      preLoaderRoute: typeof MInboxRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
       id: '/api/generate-image'
@@ -363,6 +383,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  MInboxRoute: MInboxRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
