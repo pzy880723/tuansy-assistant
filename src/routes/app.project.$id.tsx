@@ -1387,6 +1387,7 @@ function PreviewPane({
               onChange={setSkus}
               settings={settings}
               onOpenSetting={openSetting}
+              projectId={projectId}
             />
           )}
           {tab === "settings" && (
