@@ -587,7 +587,7 @@ function ChatPane({
         ))}
         {status === "submitted" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想…
+            <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想… <span className="text-muted-foreground/70">（可点右下方停止）</span>
           </div>
         )}
         {error && (
