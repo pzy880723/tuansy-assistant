@@ -814,6 +814,7 @@ function BlockCard({
   anyDragging,
   onMove,
   onRemove,
+  onToggleLock,
   onUploadReplace,
   onStartEditText,
   onChangeText,
@@ -832,6 +833,7 @@ function BlockCard({
   anyDragging: boolean;
   onMove: (dir: "up" | "down" | "top") => void;
   onRemove: () => void;
+  onToggleLock: () => void;
   onUploadReplace: () => void;
   onStartEditText: () => void;
   onChangeText: (v: string) => void;
@@ -841,6 +843,7 @@ function BlockCard({
   onAIGenerate?: () => void;
 }) {
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
+  const locked = !!block.locked;
 
   return (
     <div
