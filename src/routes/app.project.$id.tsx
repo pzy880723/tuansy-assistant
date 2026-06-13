@@ -1147,7 +1147,15 @@ function ToolCard({ part }: { part: ToolPart }) {
           <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
             {failed ? "执行失败，请重试" : "已完成并应用到右侧预览"}
           </div>
+        {part.errorText && (
+          <div className="text-destructive">{part.errorText}</div>
         )}
+      </div>
+    </details>
+  );
+}
+
+
 
 
 /* ============== RIGHT: 快团团 Mock Preview ============== */
