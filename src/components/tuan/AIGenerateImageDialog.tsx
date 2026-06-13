@@ -402,7 +402,8 @@ export function AIGenerateImageDialog({
                       setDragId(null);
                     }}
                     className={cn(
-                      "group relative aspect-[16/10] overflow-hidden rounded-lg border bg-[#fafbfc] transition",
+                      "group relative overflow-hidden rounded-lg border bg-[#fafbfc] transition",
+                      aspectClass,
                       slot.status === "done"
                         ? "border-[#ebedf0] hover:border-[#07c160]/60"
                         : "border-transparent",
