@@ -15,11 +15,18 @@ import {
   Play,
   Lock,
   Unlock,
+  Wand2,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
-import type { IntroBlock, IntroData } from "./types";
+import { type IntroBlock, type IntroData, blockMentionToken } from "./types";
 import { AIGenerateImageDialog } from "./AIGenerateImageDialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 type ToolType = "image_lg" | "image_sm" | "video" | "text";
 
