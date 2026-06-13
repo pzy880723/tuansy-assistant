@@ -35,6 +35,7 @@ export function ProductTab({
 
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
+      <ProductEntryCard count={skus.length} />
       {/* Product cards */}
       <div className="rounded-xl bg-white p-3">
         {skus.length === 0 && (
