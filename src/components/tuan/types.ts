@@ -13,6 +13,42 @@ export type IntroData = {
   leader_avatar?: string | null;
 };
 
+/** Stable human-readable label for a block, e.g. 段落2 / 大图1 / 九宫格1 / 视频1.
+ *  Numbering is per-type, in document order. */
+export function blockLabel(blocks: IntroBlock[], idx: number): string {
+  const b = blocks[idx];
+  if (!b) return `#${idx + 1}`;
+  const name =
+    b.type === "text"
+      ? "段落"
+      : b.type === "image_lg"
+        ? "大图"
+        : b.type === "image_sm"
+          ? "九宫格"
+          : "视频";
+  let n = 0;
+  for (let i = 0; i <= idx; i++) if (blocks[i]?.type === b.type) n++;
+  return `${name}${n}`;
+}
+
+export function blockShortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+/** "@[段落2#a1b2c3d4]" — the canonical mention token format. */
+export function blockMentionToken(blocks: IntroBlock[], idx: number): string {
+  const b = blocks[idx];
+  if (!b) return "";
+  return `@[${blockLabel(blocks, idx)}#${blockShortId(b.id)}]`;
+}
+
+export function blockPreview(b: IntroBlock): string {
+  if (b.type === "text") return b.text.replace(/\s+/g, " ").slice(0, 28);
+  if (b.type === "image_lg") return b.url ? "大图（已上传）" : "大图（未上传）";
+  if (b.type === "image_sm") return `九宫格 · ${b.urls.length} 张`;
+  return b.url ? "视频（已上传）" : "视频（未上传）";
+}
+
 export type SkuItem = {
   name: string;
   price: string;
