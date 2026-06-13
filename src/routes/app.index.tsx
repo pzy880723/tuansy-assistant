@@ -145,8 +145,11 @@ function AppIndex() {
         />
       </div>
 
+      {/* 手机收料台入口 + 未读总数 */}
+      <MobileInboxBanner total={counts?.total ?? 0} unassigned={counts?.unassigned ?? 0} />
+
       {/* Existing projects */}
-      <section className="mt-16">
+      <section className="mt-12">
         <div className="mb-5 flex items-end justify-between">
           <h2 className="text-lg font-semibold">最近项目</h2>
           {!isLoading && !isError && projects.length > 0 && (
@@ -169,6 +172,7 @@ function AppIndex() {
               <ProjectCard
                 key={p.id}
                 project={p}
+                pendingCount={counts?.byProject?.[p.id] ?? 0}
                 onEdit={() => setEditProject(p)}
                 onDelete={() => delMut.mutate(p.id)}
               />
