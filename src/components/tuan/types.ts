@@ -1,8 +1,8 @@
 export type IntroBlock =
-  | { id: string; type: "text"; text: string }
-  | { id: string; type: "image_lg"; url?: string | null }
-  | { id: string; type: "image_sm"; urls: string[] }
-  | { id: string; type: "video"; url?: string | null };
+  | { id: string; type: "text"; text: string; locked?: boolean }
+  | { id: string; type: "image_lg"; url?: string | null; locked?: boolean }
+  | { id: string; type: "image_sm"; urls: string[]; locked?: boolean }
+  | { id: string; type: "video"; url?: string | null; locked?: boolean };
 
 export type IntroData = {
   title?: string;
