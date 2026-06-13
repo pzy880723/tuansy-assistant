@@ -1061,12 +1061,8 @@ function BlockCard({
       <div className="mb-1.5 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <BlockLabel type={block.type} />
-          {locked && (
-            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-              已锁定
-            </span>
-          )}
         </div>
+
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -1110,7 +1106,7 @@ function BlockCard({
             }
           >
             {locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
-            {locked ? "锁定中" : "锁定"}
+            {locked ? "已锁定" : "锁定"}
           </button>
           <MiniBtn onClick={() => onMove("up")} disabled={isFirst}>上移</MiniBtn>
           <MiniBtn onClick={() => onMove("down")} disabled={isLast}>下移</MiniBtn>
