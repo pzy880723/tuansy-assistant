@@ -211,6 +211,66 @@ export const listCustomers = createServerFn({ method: "POST" })
     return { customers: Array.from(map.values()) };
   });
 
+export const getCustomerDetail = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ phone: z.string().min(3).max(20) }).parse(d))
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: orders } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_no, buyer_name, address, status, payment_status, total_cents, items_count, created_at, tracking_no, shipping_carrier, group_order_id")
+      .eq("owner_id", userId)
+      .eq("buyer_phone", data.phone)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    return { phone: data.phone, orders: orders ?? [] };
+  });
+
+const BulkShipInput = z.object({
+  rows: z
+    .array(
+      z.object({
+        orderNo: z.string().min(4).max(32),
+        trackingNo: z.string().min(3).max(60),
+        carrier: z.string().max(40).optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
+export const bulkUploadTracking = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => BulkShipInput.parse(d))
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+    let success = 0;
+    const failures: Array<{ orderNo: string; reason: string }> = [];
+    for (const row of data.rows) {
+      const { data: existing } = await supabaseAdmin
+        .from("orders")
+        .select("id, status")
+        .eq("owner_id", userId)
+        .eq("order_no", row.orderNo)
+        .maybeSingle();
+      if (!existing) {
+        failures.push({ orderNo: row.orderNo, reason: "订单不存在" });
+        continue;
+      }
+      const patch: Record<string, unknown> = {
+        tracking_no: row.trackingNo,
+        status: "shipped",
+        shipped_at: now,
+      };
+      if (row.carrier) patch.shipping_carrier = row.carrier;
+      const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", existing.id).eq("owner_id", userId);
+      if (error) failures.push({ orderNo: row.orderNo, reason: error.message });
+      else success++;
+    }
+    return { success, failed: failures.length, failures };
+  });
+
 export const dashboardSummary = createServerFn({ method: "POST" })
   .inputValidator(() => ({}))
   .handler(async () => {
