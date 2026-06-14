@@ -81,32 +81,36 @@ function BuyPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] pb-24 text-[15px]">
-      {/* Cover */}
-      <div className="relative aspect-square w-full max-w-md mx-auto bg-white">
-        {group.cover_image_url ? (
-          <img src={group.cover_image_url} alt={group.title} className="h-full w-full object-cover" />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-muted-foreground">团宝速购</div>
-        )}
-      </div>
-
-      <div className="mx-auto max-w-md bg-white">
-        <div className="px-4 pt-3">
-          <div className="flex items-baseline gap-2">
+      <div className="mx-auto max-w-md space-y-2 pt-2">
+        {/* Title card */}
+        <section className="bg-white px-4 py-4">
+          <h1 className="text-xl font-semibold leading-snug">{group.title}</h1>
+          <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-red-500">¥{lowest.toFixed(2)}</span>
             <span className="text-xs text-muted-foreground">起</span>
             <span className="ml-auto text-xs text-muted-foreground">已售 {group.items_sold ?? 0}</span>
           </div>
-          <h1 className="mt-2 text-lg font-semibold leading-snug">{group.title}</h1>
           {intro.description && (
-            <p className="mt-1 text-xs text-muted-foreground">{intro.description}</p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{intro.description}</p>
           )}
-        </div>
+        </section>
 
-        {/* Intro blocks */}
-        <div className="mt-4 space-y-3 px-4 pb-6">
-          {(intro.blocks ?? []).map((b) => <BlockView key={b.id} block={b} />)}
-        </div>
+        {/* Intro blocks (body) */}
+        {(intro.blocks?.length ?? 0) > 0 && (
+          <section className="space-y-3 bg-white px-4 py-4">
+            {(intro.blocks ?? []).map((b) => <BlockView key={b.id} block={b} />)}
+          </section>
+        )}
+
+        {/* SKU list */}
+        {skus.length > 0 && (
+          <section className="bg-white px-4 py-4">
+            <div className="mb-3 text-sm font-semibold">商品规格</div>
+            <div className="space-y-3">
+              {skus.map((s, i) => <SkuCard key={i} sku={s} />)}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Fixed bottom CTA */}
@@ -121,6 +125,66 @@ function BuyPage() {
       </div>
 
       {open && <OrderSheet slug={group.slug} skus={skus} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+function SkuCard({ sku }: { sku: Sku }) {
+  const img = sku.image || sku.images?.[0] || null;
+  const priceLabel = useMemo(() => {
+    if (sku.variants?.length) {
+      const ps = sku.variants.map((v) => parseFloat(v.price)).filter((n) => n > 0);
+      if (ps.length === 0) return sku.price ?? "";
+      const min = Math.min(...ps), max = Math.max(...ps);
+      return min === max ? `¥${min.toFixed(2)}` : `¥${min.toFixed(2)}–¥${max.toFixed(2)}`;
+    }
+    const m = String(sku.price ?? "").match(/[\d.]+/);
+    return m ? `¥${parseFloat(m[0]).toFixed(2)}` : (sku.price ?? "");
+  }, [sku]);
+  const totalStock = useMemo(() => {
+    if (sku.variants?.length) {
+      let sum = 0;
+      for (const v of sku.variants) {
+        const n = parseInt(v.stock, 10);
+        if (Number.isFinite(n)) sum += n;
+      }
+      return sum;
+    }
+    return null;
+  }, [sku]);
+  return (
+    <div className="flex gap-3 rounded-lg border border-border/60 p-2.5">
+      <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-md bg-muted text-muted-foreground">
+        {img ? <img src={img} alt={sku.name} className="h-full w-full object-cover" /> : <span className="text-[10px]">无图</span>}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{sku.name}</div>
+        {sku.description && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{sku.description}</div>}
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-sm font-semibold text-red-500">{priceLabel}</span>
+          {totalStock != null && <span className="text-[11px] text-muted-foreground">库存 {totalStock}</span>}
+        </div>
+        {sku.variants?.length ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {sku.variants.slice(0, 6).map((v, vi) => {
+              const labels = (sku.specGroups ?? []).map((g, gi) => {
+                const vid = v.optionValueIds?.[gi];
+                return g.values.find((vv) => vv.id === vid)?.label;
+              }).filter(Boolean).join(" / ");
+              return (
+                <span key={v.id ?? vi} className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
+                  {labels || `规格 ${vi + 1}`}
+                </span>
+              );
+            })}
+            {sku.variants.length > 6 && (
+              <span className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
+                +{sku.variants.length - 6}
+              </span>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
