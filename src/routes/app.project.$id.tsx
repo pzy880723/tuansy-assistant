@@ -258,11 +258,39 @@ function ChatPane({
   const img = useImageAttachments({ projectId });
   const isLoading = status === "submitted" || status === "streaming";
 
+  // Hydrate from server once chat history loads (server wins over localStorage cache).
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    if (!chatData) return;
+    hydratedRef.current = true;
+    try {
+      const serverMsgs = JSON.parse(chatData.messagesJson) as UIMessage[];
+      if (Array.isArray(serverMsgs) && serverMsgs.length > 0) {
+        setMessages(serverMsgs);
+      }
+    } catch {
+      // ignore
+    }
+  }, [chatData, setMessages]);
+
+  // Persist locally (instant) and to server (debounced) on every change after hydration.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(storageKey, JSON.stringify(messages));
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, storageKey]);
+    if (!hydratedRef.current) return;
+    if (status === "streaming" || status === "submitted") return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void saveChatFn({ data: { id: projectId, messagesJson: JSON.stringify(messages) } }).catch(
+        () => {/* silent — localStorage still holds it */},
+      );
+    }, 600);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [messages, storageKey, status, saveChatFn, projectId]);
 
   useEffect(() => {
     if (status !== "streaming") return;
