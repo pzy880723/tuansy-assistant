@@ -76,7 +76,7 @@ export function AssistantPanel({ compact = false }: { compact?: boolean }) {
               ].map((s) => (
                 <button
                   key={s}
-                  onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                  onClick={() => quickSend(s)}
                   className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-left text-[11px] hover:bg-muted"
                 >
                   {s}
