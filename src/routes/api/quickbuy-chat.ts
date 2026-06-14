@@ -124,7 +124,7 @@ export const Route = createFileRoute("/api/quickbuy-chat")({
                 if (!existing) { failures.push({ orderNo: r.orderNo, reason: "订单不存在" }); continue; }
                 const patch: Partial<Record<string, string | number | null>> = { tracking_no: r.trackingNo, status: "shipped", shipped_at: now };
                 if (r.carrier) patch.shipping_carrier = r.carrier;
-                const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", existing.id).eq("owner_id", userId);
+                const { error } = await supabaseAdmin.from("orders").update(patch as never).eq("id", existing.id).eq("owner_id", userId);
                 if (error) failures.push({ orderNo: r.orderNo, reason: error.message });
                 else success++;
               }
@@ -158,7 +158,7 @@ export const Route = createFileRoute("/api/quickbuy-chat")({
                 case "cancel": patch.status = "cancelled"; patch.cancelled_at = now; break;
                 case "reopen": patch.status = "pending"; patch.cancelled_at = null; break;
               }
-              const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", existing.id).eq("owner_id", userId);
+              const { error } = await supabaseAdmin.from("orders").update(patch as never).eq("id", existing.id).eq("owner_id", userId);
               if (error) return { error: error.message };
               return { ok: true, orderNo, action };
             },
