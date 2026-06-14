@@ -400,6 +400,15 @@ function ChatPane({
     setMessages([...messagesRef.current, cardMsg]);
   }, [chatData, inboxItems, setMessages]);
 
+  // 清理"陈旧"卡片：另一台设备已处理时本地仍残留
+  useEffect(() => {
+    if (!pendingInbox) return;
+    if (inboxItems.length > 0) return;
+    if (!messagesRef.current.some((m) => m.id.startsWith("inbox-card-"))) return;
+    setMessages(messagesRef.current.filter((m) => !m.id.startsWith("inbox-card-")));
+  }, [pendingInbox, inboxItems.length, setMessages]);
+
+
   const removeInboxCard = () => {
     setMessages(messagesRef.current.filter((m) => !m.id.startsWith("inbox-card-")));
   };
