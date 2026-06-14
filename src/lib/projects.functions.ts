@@ -176,6 +176,35 @@ export const uploadProductImage = createServerFn({ method: "POST" })
       .createSignedUrl(path, 60 * 60 * 24 * 365);
     if (signErr || !signed?.signedUrl) throw new Error(signErr?.message ?? "签发链接失败");
 
+    // 若有项目，立刻入素材库（手动上传来源）
+    if (data.projectId) {
+      const { data: maxRow } = await supabaseAdmin
+        .from("project_images")
+        .select("sort_order")
+        .eq("project_id", data.projectId)
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextOrder = (maxRow?.sort_order ?? -1) + 1;
+      await supabaseAdmin.from("project_images").insert({
+        project_id: data.projectId,
+        owner_id: userId,
+        url: signed.signedUrl,
+        sort_order: nextOrder,
+        role: "product",
+        source: "manual",
+      } as never);
+    }
+
+    return { url: signed.signedUrl, path };
+  });
+
+
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("product-images")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signErr || !signed?.signedUrl) throw new Error(signErr?.message ?? "签发链接失败");
+
     return { url: signed.signedUrl, path };
   });
 
