@@ -60,6 +60,9 @@ import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
 import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
+import { DragImageGhost } from "@/components/tuan/DragImageGhost";
+import { DraggableChatImage } from "@/components/tuan/DraggableChatImage";
+import { ImageLightbox } from "@/components/tuan/ImageLightbox";
 
 import { emitManualEdit, onManualEdit, type ManualEditPayload } from "@/lib/edit-log-bus";
 import { emitChatAsk, onChatAsk } from "@/lib/chat-ask-bus";
