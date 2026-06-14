@@ -1,11 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Users, BookTemplate, FileText, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Users, BookTemplate, FileText, MessageSquare, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { to: "/admin/dashboard", label: "仪表盘", icon: LayoutDashboard },
   { to: "/admin/users", label: "用户管理", icon: Users },
   { to: "/admin/presets", label: "预设文案逻辑", icon: BookTemplate },
+  { to: "/admin/sms", label: "短信发送日志", icon: MessageSquare },
   { to: "/admin/audit", label: "审计日志", icon: FileText },
 ] as const;
 
