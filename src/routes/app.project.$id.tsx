@@ -1108,6 +1108,7 @@ function Questionnaire({
 
 
 function ToolCard({ part }: { part: ToolPart }) {
+  const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({ open: false, index: 0 });
   const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
   const introInput = part.input as
     | {
