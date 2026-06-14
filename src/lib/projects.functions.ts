@@ -197,6 +197,9 @@ export const uploadProductImage = createServerFn({ method: "POST" })
     }
 
     return { url: signed.signedUrl, path };
+  });
+
+
 
 
 
