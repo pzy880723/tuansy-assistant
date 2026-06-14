@@ -28,10 +28,43 @@
 
   chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
     if (msg?.type === "fill") {
-      fillAll(msg.payload).then(sendResponse);
+      fillAll(msg.payload).then((res) => {
+        if (res?.ok) showToast("已自动填入: " + res.steps.join("、"));
+        sendResponse(res);
+      });
       return true;
     }
   });
+
+  // Auto-fill on load when a sync is pending (kicked off from Tuanbao app).
+  (async () => {
+    try {
+      const { autoFillPending, lastPayload, autoFillAt } =
+        await chrome.storage.local.get(["autoFillPending", "lastPayload", "autoFillAt"]);
+      // Stale flag protection: ignore older than 5 min.
+      if (!autoFillPending || !lastPayload) return;
+      if (autoFillAt && Date.now() - autoFillAt > 5 * 60 * 1000) {
+        await chrome.storage.local.remove(["autoFillPending"]);
+        return;
+      }
+      // Wait a bit for KTT SPA to render its form.
+      await new Promise((r) => setTimeout(r, 1500));
+      const res = await fillAll(lastPayload);
+      await chrome.storage.local.remove(["autoFillPending"]);
+      if (res?.ok) showToast("已自动填入: " + res.steps.join("、"));
+    } catch (e) {
+      console.warn("[团宝] 自动填入失败", e);
+    }
+  })();
+
+  function showToast(text) {
+    const el = document.createElement("div");
+    el.style.cssText =
+      "position:fixed;right:18px;bottom:72px;z-index:2147483647;background:#111827;color:#fff;padding:10px 14px;border-radius:10px;font:500 12px/1.4 -apple-system,'PingFang SC',sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:320px;";
+    el.textContent = text;
+    document.documentElement.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
 
   async function fillAll(payload) {
     const steps = [];
