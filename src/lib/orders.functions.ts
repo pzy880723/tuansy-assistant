@@ -82,40 +82,40 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const userId = await requireUserId();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const patch: Record<string, unknown> = {};
+    const patch: OrdersUpdatePatch = {};
     const now = new Date().toISOString();
     switch (data.action) {
       case "mark_paid":
-        patch.payment_status = "paid" satisfies PaymentStatus;
+        patch.payment_status = "paid";
         patch.paid_at = now;
-        patch.status = "paid" satisfies OrderStatus;
+        patch.status = "paid";
         break;
       case "mark_unpaid":
-        patch.payment_status = "unpaid" satisfies PaymentStatus;
+        patch.payment_status = "unpaid";
         patch.paid_at = null;
         break;
       case "ship":
         if (!data.trackingNo) throw new Error("请填写运单号");
-        patch.status = "shipped" satisfies OrderStatus;
+        patch.status = "shipped";
         patch.shipped_at = now;
         patch.tracking_no = data.trackingNo;
         if (data.shippingCarrier) patch.shipping_carrier = data.shippingCarrier;
         break;
       case "complete":
-        patch.status = "completed" satisfies OrderStatus;
+        patch.status = "completed";
         patch.completed_at = now;
         break;
       case "refund":
-        patch.status = "refunded" satisfies OrderStatus;
-        patch.payment_status = "refunded" satisfies PaymentStatus;
+        patch.status = "refunded";
+        patch.payment_status = "refunded";
         patch.refunded_at = now;
         break;
       case "cancel":
-        patch.status = "cancelled" satisfies OrderStatus;
+        patch.status = "cancelled";
         patch.cancelled_at = now;
         break;
       case "reopen":
-        patch.status = "pending" satisfies OrderStatus;
+        patch.status = "pending";
         patch.cancelled_at = null;
         break;
     }
