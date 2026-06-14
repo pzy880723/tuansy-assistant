@@ -25,7 +25,9 @@ import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
 import { type IntroBlock, type IntroData, blockMentionToken } from "./types";
 import { AIGenerateImageDialog } from "./AIGenerateImageDialog";
+import { ImageLightbox } from "./ImageLightbox";
 import { uploadProductImage } from "@/lib/projects.functions";
+import { imageDragBus, useImageDrag } from "@/lib/drag-image-bus";
 import {
   Popover,
   PopoverContent,
@@ -237,6 +239,15 @@ export function IntroTab({
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const aiTargetIdRef = useRef<string | null>(null);
+
+  // Lightbox state (for preview-side images)
+  const [lightbox, setLightbox] = useState<{ open: boolean; urls: string[]; index: number }>({
+    open: false,
+    urls: [],
+    index: 0,
+  });
+  const openPreviewImage = (urls: string[], index: number) =>
+    setLightbox({ open: true, urls, index });
 
   // hidden file inputs
   const fileLgRef = useRef<HTMLInputElement | null>(null);
@@ -587,6 +598,84 @@ export function IntroTab({
 
   const draggedBlock = drag ? blocks.find((b) => b.id === drag.id) : null;
 
+  // ============= Cross-pane image drag (from chat) =============
+  // Subscribe to incoming chat-image drags; show drop indicator and accept drop.
+  const incomingDrag = useImageDrag();
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+  const [incomingDropIdx, setIncomingDropIdx] = useState<number | null>(null);
+
+  // Helper: find block index where pointer Y lands (inserts BEFORE this index).
+  const computeIncomingDropIndex = (y: number): number => {
+    const list = blocksRef.current;
+    for (let i = 0; i < list.length; i++) {
+      const el = blockRefs.current.get(list[i].id);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (y < r.top + r.height / 2) return i;
+    }
+    return list.length;
+  };
+
+  // Register the drop handler once; commit insertion when chat releases.
+  useEffect(() => {
+    const off = imageDragBus.registerDropHandler((x, y, url) => {
+      const c = containerRef.current;
+      if (!c) return false;
+      const r = c.getBoundingClientRect();
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false;
+      const idx = computeIncomingDropIndex(y);
+      const next = blocksRef.current.slice();
+      next.splice(idx, 0, { id: genId(), type: "image_lg", url });
+      setBlocks(next);
+      toast.success("已插入大图");
+      setIncomingDropIdx(null);
+      return true;
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track pointer position to show insertion-line indicator.
+  useEffect(() => {
+    if (!incomingDrag) {
+      setIncomingDropIdx(null);
+      return;
+    }
+    const c = containerRef.current;
+    if (!c) return;
+    const r = c.getBoundingClientRect();
+    const inside =
+      incomingDrag.x >= r.left &&
+      incomingDrag.x <= r.right &&
+      incomingDrag.y >= r.top &&
+      incomingDrag.y <= r.bottom;
+    setIncomingDropIdx(inside ? computeIncomingDropIndex(incomingDrag.y) : null);
+  }, [incomingDrag]);
+
+  // Position of the insertion line in viewport coords (rendered via portal).
+  const incomingLineRect = (() => {
+    if (incomingDropIdx == null) return null;
+    const c = containerRef.current;
+    if (!c) return null;
+    const list = blocksRef.current;
+    if (list.length === 0) {
+      const r = c.getBoundingClientRect();
+      return { left: r.left + 12, width: r.width - 24, top: r.top + r.height / 2 };
+    }
+    if (incomingDropIdx >= list.length) {
+      const lastEl = blockRefs.current.get(list[list.length - 1].id);
+      if (!lastEl) return null;
+      const r = lastEl.getBoundingClientRect();
+      return { left: r.left, width: r.width, top: r.bottom + 2 };
+    }
+    const el = blockRefs.current.get(list[incomingDropIdx].id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { left: r.left, width: r.width, top: r.top - 2 };
+  })();
+
+
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
       {/* hidden file inputs */}
@@ -716,13 +805,21 @@ export function IntroTab({
       {/* Intro card */}
       <div
         ref={containerRef}
-        className="relative rounded-xl bg-white p-3"
+        className={
+          "relative rounded-xl bg-white p-3 transition " +
+          (incomingDrag && !drag ? "ring-2 ring-[#07c160]/70 ring-offset-2 ring-offset-[#f4f5f7]" : "")
+        }
         style={
           drag
             ? { filter: "blur(2px) saturate(0.85)", pointerEvents: "none", transition: "filter 160ms" }
             : { transition: "filter 160ms" }
         }
       >
+        {incomingDrag && !drag && (
+          <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-full bg-[#07c160] px-2.5 py-1 text-[11px] font-medium text-white shadow-lg">
+            松手插入到此处
+          </div>
+        )}
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
@@ -799,6 +896,7 @@ export function IntroTab({
                       }
                     : undefined
                 }
+                onPreviewImage={openPreviewImage}
               />
             ))}
           </div>
@@ -990,6 +1088,33 @@ export function IntroTab({
           onComplete={handleAIComplete}
         />
       )}
+
+      <ImageLightbox
+        open={lightbox.open}
+        urls={lightbox.urls}
+        index={lightbox.index}
+        onIndexChange={(i) => setLightbox((s) => ({ ...s, index: i }))}
+        onOpenChange={(v) => setLightbox((s) => ({ ...s, open: v }))}
+      />
+
+      {/* Cross-pane drop insertion-line indicator (rendered via portal) */}
+      {incomingLineRect &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[250]"
+            style={{
+              left: incomingLineRect.left,
+              top: incomingLineRect.top,
+              width: incomingLineRect.width,
+              height: 3,
+              background: "#07c160",
+              borderRadius: 2,
+              boxShadow: "0 0 0 2px rgba(7,193,96,0.25)",
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1019,6 +1144,7 @@ function BlockCard({
   onPointerDownDrag,
   onAIGenerate,
   onEnrich,
+  onPreviewImage,
 }: {
   refCb: (el: HTMLDivElement | null) => void;
   block: IntroBlock;
@@ -1041,6 +1167,7 @@ function BlockCard({
   /** Per-block "AI 丰富" — receives the user's enrichment prompt;
    *  parent assembles the @mention token. */
   onEnrich?: (prompt: string) => void;
+  onPreviewImage?: (urls: string[], index: number) => void;
 }) {
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
   const locked = !!block.locked;
@@ -1139,9 +1266,17 @@ function BlockCard({
       {block.type === "image_lg" && (
         block.url ? (
           <div className="relative w-full overflow-hidden rounded-md bg-[#fafbfc]">
-            <img src={block.url} alt="" className="block h-auto w-full" />
+            <img
+              src={block.url}
+              alt=""
+              onClick={() => onPreviewImage?.([block.url!], 0)}
+              className="block h-auto w-full cursor-zoom-in"
+            />
             <button
-              onClick={onUploadReplace}
+              onClick={(e) => {
+                e.stopPropagation();
+                onUploadReplace();
+              }}
               className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-black/50 px-2 py-1 text-[11px] text-white backdrop-blur hover:bg-black/65"
             >
               <Upload className="h-3 w-3" />
@@ -1162,9 +1297,17 @@ function BlockCard({
         <div className="grid grid-cols-3 gap-1">
           {block.urls.map((u, i) => (
             <div key={i} className="relative aspect-square overflow-hidden rounded-md bg-[#fafbfc]">
-              <img src={u} alt="" className="h-full w-full object-cover" />
+              <img
+                src={u}
+                alt=""
+                onClick={() => onPreviewImage?.(block.urls, i)}
+                className="h-full w-full object-cover cursor-zoom-in"
+              />
               <button
-                onClick={() => onRemoveSmallImage(i)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveSmallImage(i);
+                }}
                 className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
               >
                 <X className="h-2.5 w-2.5" />

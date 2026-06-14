@@ -60,6 +60,9 @@ import { ProductTab } from "@/components/tuan/ProductTab";
 import { SettingsTab } from "@/components/tuan/SettingsTab";
 import { SettingSheet } from "@/components/tuan/primitives";
 import type { IntroData, SkuItem, SettingsData } from "@/components/tuan/types";
+import { DragImageGhost } from "@/components/tuan/DragImageGhost";
+import { DraggableChatImage } from "@/components/tuan/DraggableChatImage";
+import { ImageLightbox } from "@/components/tuan/ImageLightbox";
 
 import { emitManualEdit, onManualEdit, type ManualEditPayload } from "@/lib/edit-log-bus";
 import { emitChatAsk, onChatAsk } from "@/lib/chat-ask-bus";
@@ -99,6 +102,7 @@ function ProjectEditor() {
 
   return (
     <div className="flex h-[calc(100vh-2.75rem)] flex-col">
+      <DragImageGhost />
       {/* Split layout — header is provided by the app TopBar in /app layout */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
         <ResizablePanel defaultSize="38%" minSize="20%" maxSize="75%">
