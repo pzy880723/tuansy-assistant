@@ -1108,6 +1108,7 @@ function Questionnaire({
 
 
 function ToolCard({ part }: { part: ToolPart }) {
+  const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({ open: false, index: 0 });
   const name = part.type.replace(/^tool-/, "") || part.toolName || "tool";
   const introInput = part.input as
     | {
@@ -1269,35 +1270,43 @@ function ToolCard({ part }: { part: ToolPart }) {
           </div>
         ))}
         {name === "generate_product_images" && hasOutput && imgOutput?.ok && (imgOutput.urls?.length ?? 0) > 0 && (
-          <div
-            className={cn(
-              "grid gap-2",
-              (imgOutput.urls?.length ?? 0) === 1
-                ? "grid-cols-1"
-                : (imgOutput.urls?.length ?? 0) === 2
-                  ? "grid-cols-2"
-                  : "grid-cols-3",
-            )}
-          >
-            {imgOutput.urls!.map((u, i) => (
-              <a
-                key={i}
-                href={u}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(
-                  "block overflow-hidden rounded-lg border bg-background",
-                  imgOutput.aspect === "landscape"
-                    ? "aspect-[4/3]"
-                    : imgOutput.aspect === "square"
-                      ? "aspect-square"
-                      : "aspect-[3/4]",
-                )}
-              >
-                <img src={u} alt="" className="h-full w-full object-cover" />
-              </a>
-            ))}
-          </div>
+          <>
+            <div
+              className={cn(
+                "grid gap-2",
+                (imgOutput.urls?.length ?? 0) === 1
+                  ? "grid-cols-1"
+                  : (imgOutput.urls?.length ?? 0) === 2
+                    ? "grid-cols-2"
+                    : "grid-cols-3",
+              )}
+            >
+              {imgOutput.urls!.map((u, i) => (
+                <DraggableChatImage
+                  key={i}
+                  url={u}
+                  onPreview={() => setLightbox({ open: true, index: i })}
+                  className={cn(
+                    "block overflow-hidden rounded-lg border bg-background cursor-zoom-in select-none",
+                    imgOutput.aspect === "landscape"
+                      ? "aspect-[4/3]"
+                      : imgOutput.aspect === "square"
+                        ? "aspect-square"
+                        : "aspect-[3/4]",
+                  )}
+                  imgClassName="h-full w-full object-cover pointer-events-none"
+                />
+              ))}
+            </div>
+            <ImageLightbox
+              open={lightbox.open}
+              urls={imgOutput.urls!}
+              index={lightbox.index}
+              onIndexChange={(i) => setLightbox({ open: true, index: i })}
+              onOpenChange={(v) => setLightbox((s) => ({ ...s, open: v }))}
+            />
+            <div className="text-[11px] text-muted-foreground">提示：点击放大，按住拖到右侧预览即可插入大图模块。</div>
+          </>
         )}
         {name === "insert_generated_images" && hasOutput && insertOutput?.ok && insertOutput?.reason && (
           <div className="rounded-lg bg-background px-3 py-2 text-muted-foreground">
