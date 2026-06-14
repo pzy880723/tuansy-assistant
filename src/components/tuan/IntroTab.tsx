@@ -1266,9 +1266,17 @@ function BlockCard({
       {block.type === "image_lg" && (
         block.url ? (
           <div className="relative w-full overflow-hidden rounded-md bg-[#fafbfc]">
-            <img src={block.url} alt="" className="block h-auto w-full" />
+            <img
+              src={block.url}
+              alt=""
+              onClick={() => onPreviewImage?.([block.url!], 0)}
+              className="block h-auto w-full cursor-zoom-in"
+            />
             <button
-              onClick={onUploadReplace}
+              onClick={(e) => {
+                e.stopPropagation();
+                onUploadReplace();
+              }}
               className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-black/50 px-2 py-1 text-[11px] text-white backdrop-blur hover:bg-black/65"
             >
               <Upload className="h-3 w-3" />
@@ -1289,9 +1297,17 @@ function BlockCard({
         <div className="grid grid-cols-3 gap-1">
           {block.urls.map((u, i) => (
             <div key={i} className="relative aspect-square overflow-hidden rounded-md bg-[#fafbfc]">
-              <img src={u} alt="" className="h-full w-full object-cover" />
+              <img
+                src={u}
+                alt=""
+                onClick={() => onPreviewImage?.(block.urls, i)}
+                className="h-full w-full object-cover cursor-zoom-in"
+              />
               <button
-                onClick={() => onRemoveSmallImage(i)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveSmallImage(i);
+                }}
                 className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
               >
                 <X className="h-2.5 w-2.5" />
