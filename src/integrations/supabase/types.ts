@@ -666,36 +666,51 @@ export type Database = {
           code_hash: string
           consumed_at: string | null
           created_at: string
+          delivered_at: string | null
+          delivery_code: string | null
+          delivery_message: string | null
+          delivery_status: string
           error_message: string | null
           expires_at: string
           id: string
           phone: string
           provider: string
           provider_request_id: string | null
+          report_received_at: string | null
         }
         Insert: {
           attempts?: number
           code_hash: string
           consumed_at?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_code?: string | null
+          delivery_message?: string | null
+          delivery_status?: string
           error_message?: string | null
           expires_at: string
           id?: string
           phone: string
           provider?: string
           provider_request_id?: string | null
+          report_received_at?: string | null
         }
         Update: {
           attempts?: number
           code_hash?: string
           consumed_at?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_code?: string | null
+          delivery_message?: string | null
+          delivery_status?: string
           error_message?: string | null
           expires_at?: string
           id?: string
           phone?: string
           provider?: string
           provider_request_id?: string | null
+          report_received_at?: string | null
         }
         Relationships: []
       }
