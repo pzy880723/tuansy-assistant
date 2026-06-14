@@ -1,83 +1,86 @@
-## 团宝速购布局改造：AI 助手并入侧栏 + 可缩放/隐藏
+## 团宝速购侧栏与 AI 助手修复 + 体验优化
 
-### 一、整体思路
+### 一、Bug 根因（必须修）
 
-把「AI 助手」从一个独立路由页面，提升为团宝速购工作台的**第二种交互模式**，与「传统菜单模式」通过左上角一个切换器随时切换。两种模式共享同一个左侧栏容器，并支持折叠成图标条、完全隐藏。
+AI 助手收不到回复是因为 `/api/quickbuy-chat` 返回 **401 未授权**（preview 日志多次出现 `POST /api/quickbuy-chat → 401`）。
 
-```text
-┌─ 顶栏：团宝速购 logo │ 返回团宝助手 │ 用户菜单 ─────────────┐
-├──────────────┬──────────────────────────────────────────┤
-│ [≡] [AI|菜单]│                                          │
-│              │                                          │
-│  侧栏内容    │            主内容区 <Outlet/>             │
-│  (随模式变)  │                                          │
-│              │                                          │
-└──────────────┴──────────────────────────────────────────┘
+原因：Lovable 预览页跑在 iframe 内属于「跨站上下文」，`SameSite=Lax` 的 `tuan_uid` cookie 不会被发出。项目其他 fetch 调用都通过 `x-tuan-session` header 兜底（见 `src/start.ts`、`src/routes/app.project.$id.tsx#244`、`AIGenerateImageDialog.tsx#111`），但我新写的 `AssistantPanel` 里 `DefaultChatTransport({ api: "/api/quickbuy-chat" })` 没附带这个 header。
+
+修复：
+
+```ts
+import { readAuthToken } from "@/lib/use-current-user";
+
+const transport = new DefaultChatTransport({
+  api: "/api/quickbuy-chat",
+  headers: () => {
+    const t = readAuthToken();
+    return t ? { "x-tuan-session": t } : {};
+  },
+});
 ```
 
-### 二、侧栏的三种状态
+（headers 用函数形式，确保每次请求都读最新 token）
 
-1. **展开（默认 256px）**：完整显示模式切换器 + 内容
-2. **图标折叠（64px）**：只显示图标，hover 出 tooltip
-3. **完全隐藏（0px）**：通过顶栏的「≡」按钮唤回
+### 二、侧栏改动
 
-折叠/隐藏状态写入 `localStorage`（`quickbuy.sidebar.mode` = `expanded|icon|hidden`），刷新保留。
+**1. 去掉「完全隐藏」状态**
 
-### 三、侧栏两种「模式」
+- `SidebarSize` 类型从 `"expanded" | "icon" | "hidden"` 改为 `"expanded" | "icon"`
+- 顶栏左侧那颗 `PanelLeftClose / PanelLeftOpen` 按钮 → 删除
+- localStorage key `quickbuy.sidebar.size` 旧值 `"hidden"` 兼容性处理：读到 `"hidden"` 时回退到 `"expanded"`
 
-顶部一个分段切换器（Tabs 风格的两个 chip）：
+**2. 侧栏可左右拖拽改宽**
 
-```text
-┌─────────────────────┐
-│  🤖 AI 助手 │ 📋 菜单 │   ← 切换器（写入 localStorage）
-├─────────────────────┤
-│                     │
-│   下方内容随模式变   │
-│                     │
-└─────────────────────┘
+在侧栏右边缘加一根 4px 宽的拖拽条（hover 时高亮）：
+- 仅在 `expanded` 状态生效（icon 状态固定 56px）
+- 宽度范围 240–520px，写入 `localStorage` 键 `quickbuy.sidebar.width`
+- 拖拽时给 `<body>` 加 `cursor: col-resize` + `user-select: none`，结束清除
+- 用 inline style 控制宽度（`style={{ width }}`），避免 Tailwind 任意值类带来的 JIT 问题
+- 拖拽到 < 200px 时自动 snap 回 240px（防止用户拖没）
+
+```tsx
+// 简化逻辑
+<aside style={{ width: size === "icon" ? 56 : width }} className="relative ...">
+  {/* 内容 */}
+  {size === "expanded" && (
+    <div
+      onPointerDown={startDrag}
+      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-emerald-400/40"
+    />
+  )}
+</aside>
 ```
 
-- **菜单模式**（默认）：原有 5 个菜单项 —— 工作台 / 我的开团 / 订单管理 / 客户 / 资金分润
-- **AI 助手模式**：把 `/quickbuy/assistant` 的聊天界面直接搬到侧栏内（紧凑版），主区继续显示当前菜单页（如订单管理），用户可以一边聊一边看数据；当侧栏折叠成图标时显示一个🤖图标，点击自动展开。
+### 三、AssistantPanel 预设点击 → 自动发送
 
-切换 AI 模式后路由不跳转，仍停留在原页面 —— 这才是「随时和团宝聊」的体验，而不是离开当前数据页。
+当前：点击预设词 → 填入输入框 → 用户还要按发送  
+改为：点击预设词 → 直接 `sendMessage({ text })`，不经过输入框
+
+涉及两处：欢迎页的 3 个示例按钮、底部的 4 个快捷 chip。两处都改为：
+
+```tsx
+const quickSend = (text: string) => {
+  if (status === "submitted" || status === "streaming") return;
+  sendMessage({ text });
+};
+```
+
+（输入框仍保留，用户也可自己输入复杂语句）
 
 ### 四、文件改动
 
-**修改：**
-- `src/routes/quickbuy.tsx`
-  - 重写 `Sidebar`：增加 `mode`（ai|menu）+ `size`（expanded|icon|hidden）状态，localStorage 持久化
-  - 顶栏加「≡」按钮，控制 `size`
-  - 侧栏顶部增加模式切换 chip
-  - 内部根据 mode 渲染 `<MenuList>` 或 `<AssistantPanel>`（紧凑聊天）
-  - 主区 `<Outlet/>` 容器宽度跟随侧栏宽度自适应
-- `src/routes/quickbuy.assistant.tsx`
-  - 保留路由作为「全屏 AI 模式」的兜底（直接访问 URL 仍可用），但在菜单中移除入口
-  - 抽出共享聊天组件供侧栏 panel 复用
-- `src/routes/quickbuy.index.tsx`
-  - 介绍页里「AI 助手」入口的文案改为「侧栏可切换」的说明
+- **修改** `src/components/quickbuy/AssistantPanel.tsx`
+  - transport 加 `x-tuan-session` header（修 401）
+  - 预设/示例改为一键发送
+- **修改** `src/routes/quickbuy.tsx`
+  - 删除 hidden 状态、顶栏的隐藏按钮、相关 useEffect 分支
+  - `Sidebar` 增加拖拽条 + 宽度 state + localStorage
+  - 把 `width` 类换成 inline style
+- 不动：`src/routes/api/quickbuy-chat.ts`、聊天工具逻辑、`/quickbuy/assistant` 路由
 
-**新增：**
-- `src/components/quickbuy/AssistantPanel.tsx` — 聊天 UI 抽离（消息列表 + 输入框），紧凑模式适配 240–280px 宽度；复用现有 `/api/quickbuy-chat`
-- `src/components/quickbuy/SidebarShell.tsx`（可选）— 把侧栏逻辑独立出 quickbuy.tsx，降低复杂度
+### 五、不在本次范围
 
-### 五、交互细节
-
-- 折叠成图标条时：菜单模式显示图标列；AI 模式显示一个大🤖按钮 + 未读消息小红点（可选），点击自动展开到 expanded
-- 完全隐藏时：左上角一个浮动「≡」按钮始终可见
-- 移动端（md 以下）：侧栏改为 `Sheet` 抽屉式弹出，逻辑复用
-- 模式切换、宽度切换都使用 `transition-all duration-200` 平滑过渡
-- 聊天 panel 内调用工具产生的 CSV 下载、开团成功提示等保持现有交互不变
-
-### 六、不改动的部分
-
-- `/api/quickbuy-chat` 服务端逻辑、工具集
-- 5 个业务页面 (`home/groups/orders/customers/finance`) 内容
-- 全局顶栏（`/app` 入口的「团宝速购」按钮）
-- 路由结构（不新增/删除路由文件）
-
-### 七、Phase 1 不含
-
-- 聊天历史持久化（仍是单会话内存）
-- 多会话/会话列表
-- 移动端 AI 模式优化（仅保留可用，不做专属布局）
+- 移动端拖拽（移动端侧栏暂时仍 hidden md:flex 不显示）
+- 聊天历史持久化
+- 限制宽度的最大值随窗口动态收紧（先用固定 520px 上限）

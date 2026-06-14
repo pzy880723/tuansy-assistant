@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { readAuthToken } from "@/lib/use-current-user";
 
 const suggestions = [
   "导出本周的订单",
@@ -17,7 +18,13 @@ const suggestions = [
 type AnyPart = { type: string; text?: string; input?: unknown; output?: unknown; result?: unknown };
 
 export function AssistantPanel({ compact = false }: { compact?: boolean }) {
-  const [transport] = useState(() => new DefaultChatTransport({ api: "/api/quickbuy-chat" }));
+  const [transport] = useState(() => new DefaultChatTransport({
+    api: "/api/quickbuy-chat",
+    headers: (): Record<string, string> => {
+      const t = readAuthToken();
+      return t ? { "x-tuan-session": t } : {};
+    },
+  }));
   const { messages, sendMessage, status } = useChat({ transport });
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -35,6 +42,11 @@ export function AssistantPanel({ compact = false }: { compact?: boolean }) {
     sendMessage({ text: t });
     setInput("");
     setTimeout(() => inputRef.current?.focus(), 30);
+  };
+  const quickSend = (text: string) => {
+    if (busy) return;
+    sendMessage({ text });
+    setInput("");
   };
 
   return (
@@ -64,7 +76,7 @@ export function AssistantPanel({ compact = false }: { compact?: boolean }) {
               ].map((s) => (
                 <button
                   key={s}
-                  onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                  onClick={() => quickSend(s)}
                   className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-left text-[11px] hover:bg-muted"
                 >
                   {s}
@@ -103,7 +115,7 @@ export function AssistantPanel({ compact = false }: { compact?: boolean }) {
               <button
                 key={s}
                 type="button"
-                onClick={() => setInput(s)}
+                onClick={() => quickSend(s)}
                 className="rounded-full border bg-background px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
               >
                 {s}

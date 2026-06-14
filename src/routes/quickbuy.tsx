@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Home,
   Rocket,
@@ -10,8 +10,6 @@ import {
   PenLine,
   ExternalLink,
   ShoppingBag,
-  PanelLeftClose,
-  PanelLeftOpen,
   ChevronsLeft,
   ChevronsRight,
   LayoutGrid,
@@ -19,7 +17,6 @@ import {
 import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
 import { useCurrentUser } from "@/lib/use-current-user";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AssistantPanel } from "@/components/quickbuy/AssistantPanel";
 
@@ -28,11 +25,16 @@ export const Route = createFileRoute("/quickbuy")({
   component: QuickBuyLayout,
 });
 
-type SidebarSize = "expanded" | "icon" | "hidden";
+type SidebarSize = "expanded" | "icon";
 type SidebarMode = "menu" | "ai";
 
 const SIZE_KEY = "quickbuy.sidebar.size";
 const MODE_KEY = "quickbuy.sidebar.mode";
+const WIDTH_KEY = "quickbuy.sidebar.width";
+const ICON_WIDTH = 56;
+const DEFAULT_WIDTH = 260;
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 560;
 
 function QuickBuyLayout() {
   const user = useCurrentUser();
@@ -41,16 +43,20 @@ function QuickBuyLayout() {
   const [hydrated, setHydrated] = useState(false);
   const [size, setSize] = useState<SidebarSize>("expanded");
   const [mode, setMode] = useState<SidebarMode>("menu");
+  const [width, setWidth] = useState<number>(DEFAULT_WIDTH);
 
   useEffect(() => {
     setHydrated(true);
-    const s = (localStorage.getItem(SIZE_KEY) as SidebarSize | null);
-    const m = (localStorage.getItem(MODE_KEY) as SidebarMode | null);
-    if (s === "expanded" || s === "icon" || s === "hidden") setSize(s);
+    const s = localStorage.getItem(SIZE_KEY);
+    const m = localStorage.getItem(MODE_KEY);
+    const w = Number(localStorage.getItem(WIDTH_KEY));
+    if (s === "expanded" || s === "icon") setSize(s);
     if (m === "menu" || m === "ai") setMode(m);
+    if (Number.isFinite(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) setWidth(w);
   }, []);
   useEffect(() => { if (hydrated) localStorage.setItem(SIZE_KEY, size); }, [size, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem(MODE_KEY, mode); }, [mode, hydrated]);
+  useEffect(() => { if (hydrated) localStorage.setItem(WIDTH_KEY, String(width)); }, [width, hydrated]);
 
   useEffect(() => {
     if (hydrated && user === null) {
@@ -58,21 +64,12 @@ function QuickBuyLayout() {
     }
   }, [hydrated, user, navigate, pathname]);
 
-  const toggleSize = () => {
-    if (size === "expanded") setSize("hidden");
-    else setSize("expanded");
-  };
-  const cycleCollapse = () => {
-    setSize((s) => (s === "expanded" ? "icon" : "expanded"));
-  };
+  const cycleCollapse = () => setSize((s) => (s === "expanded" ? "icon" : "expanded"));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50/40 via-background to-background">
       <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleSize} title={size === "hidden" ? "显示侧栏" : "隐藏侧栏"}>
-            {size === "hidden" ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
           <Link to="/quickbuy" className="flex shrink-0 items-center gap-2">
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-sm">
               <ShoppingBag className="h-5 w-5" />
@@ -98,8 +95,10 @@ function QuickBuyLayout() {
             pathname={pathname}
             size={size}
             mode={mode}
+            width={width}
             onSize={setSize}
             onMode={setMode}
+            onWidth={setWidth}
             onCycle={cycleCollapse}
           />
           <main className="min-w-0 flex-1"><Outlet /></main>
@@ -125,110 +124,152 @@ function Sidebar({
   pathname,
   size,
   mode,
+  width,
   onSize,
   onMode,
+  onWidth,
   onCycle,
 }: {
   pathname: string;
   size: SidebarSize;
   mode: SidebarMode;
+  width: number;
   onSize: (s: SidebarSize) => void;
   onMode: (m: SidebarMode) => void;
+  onWidth: (w: number) => void;
   onCycle: () => void;
 }) {
-  if (size === "hidden") return null;
-
-  const width = size === "icon" ? "w-14" : "w-64";
   const isIcon = size === "icon";
+  const asideRef = useRef<HTMLElement>(null);
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragRef.current.startW + dx));
+    onWidth(next);
+  }, [onWidth]);
+
+  const stopDrag = useCallback(() => {
+    dragRef.current = null;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", stopDrag);
+  }, [handlePointerMove]);
+
+  const startDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startW: width };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDrag);
+  };
+
+  useEffect(() => () => stopDrag(), [stopDrag]);
 
   return (
     <aside
-      className={cn(
-        "sticky top-20 hidden h-[calc(100vh-6rem)] shrink-0 overflow-hidden rounded-2xl border bg-card transition-all duration-200 md:flex md:flex-col",
-        width,
-      )}
+      ref={asideRef}
+      style={{ width: isIcon ? ICON_WIDTH : width }}
+      className="sticky top-20 hidden h-[calc(100vh-6rem)] shrink-0 overflow-visible rounded-2xl border bg-card md:flex md:flex-col"
     >
-      {/* Header: mode switcher + collapse */}
-      <div className={cn("flex items-center gap-1 border-b p-2", isIcon && "flex-col")}>
-        {isIcon ? (
-          <>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => { onMode(mode === "ai" ? "menu" : "ai"); if (size === "icon") onSize("expanded"); }}
-                    className={cn(
-                      "grid h-9 w-9 place-items-center rounded-lg",
-                      mode === "ai" ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white" : "bg-emerald-500/10 text-emerald-700",
-                    )}
-                  >
-                    {mode === "ai" ? <Bot className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">{mode === "ai" ? "切换到菜单" : "切换到 AI 助手"}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <button onClick={onCycle} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted" title="展开">
-              <ChevronsRight className="h-3.5 w-3.5" />
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-1 items-center gap-0.5 rounded-lg bg-muted p-0.5 text-xs">
-              <button
-                onClick={() => onMode("menu")}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 transition",
-                  mode === "menu" ? "bg-background font-medium text-emerald-700 shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <LayoutGrid className="h-3 w-3" /> 菜单
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+        {/* Header: mode switcher + collapse */}
+        <div className={cn("flex items-center gap-1 border-b p-2", isIcon && "flex-col")}>
+          {isIcon ? (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => { onMode(mode === "ai" ? "menu" : "ai"); onSize("expanded"); }}
+                      className={cn(
+                        "grid h-9 w-9 place-items-center rounded-lg",
+                        mode === "ai" ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white" : "bg-emerald-500/10 text-emerald-700",
+                      )}
+                    >
+                      {mode === "ai" ? <Bot className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{mode === "ai" ? "切换到菜单" : "切换到 AI 助手"}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <button onClick={onCycle} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted" title="展开">
+                <ChevronsRight className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={() => onMode("ai")}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 transition",
-                  mode === "ai" ? "bg-gradient-to-r from-amber-500 to-orange-500 font-medium text-white shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Bot className="h-3 w-3" /> AI
+            </>
+          ) : (
+            <>
+              <div className="flex flex-1 items-center gap-0.5 rounded-lg bg-muted p-0.5 text-xs">
+                <button
+                  onClick={() => onMode("menu")}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 transition",
+                    mode === "menu" ? "bg-background font-medium text-emerald-700 shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <LayoutGrid className="h-3 w-3" /> 菜单
+                </button>
+                <button
+                  onClick={() => onMode("ai")}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 transition",
+                    mode === "ai" ? "bg-gradient-to-r from-amber-500 to-orange-500 font-medium text-white shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Bot className="h-3 w-3" /> AI
+                </button>
+              </div>
+              <button onClick={onCycle} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted" title="折叠">
+                <ChevronsLeft className="h-3.5 w-3.5" />
               </button>
-            </div>
-            <button onClick={onCycle} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted" title="折叠">
-              <ChevronsLeft className="h-3.5 w-3.5" />
+            </>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {mode === "menu" ? (
+            <MenuList pathname={pathname} isIcon={isIcon} />
+          ) : isIcon ? (
+            <button
+              onClick={() => onSize("expanded")}
+              className="m-2 grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow"
+              title="展开 AI 助手"
+            >
+              <Bot className="h-5 w-5" />
             </button>
-          </>
+          ) : (
+            <AssistantPanel compact={width < 320} />
+          )}
+        </div>
+
+        {/* Footer link to assistant app */}
+        {mode === "menu" && !isIcon && (
+          <div className="border-t p-2">
+            <Link
+              to="/app"
+              className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <PenLine className="h-3.5 w-3.5" />
+              去团宝助手写文案
+              <ExternalLink className="ml-auto h-3 w-3" />
+            </Link>
+          </div>
         )}
       </div>
 
-      {/* Body */}
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {mode === "menu" ? (
-          <MenuList pathname={pathname} isIcon={isIcon} />
-        ) : isIcon ? (
-          <button
-            onClick={() => onSize("expanded")}
-            className="m-2 grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow"
-            title="展开 AI 助手"
-          >
-            <Bot className="h-5 w-5" />
-          </button>
-        ) : (
-          <AssistantPanel compact />
-        )}
-      </div>
-
-      {/* Footer link to assistant app */}
-      {mode === "menu" && !isIcon && (
-        <div className="border-t p-2">
-          <Link
-            to="/app"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <PenLine className="h-3.5 w-3.5" />
-            去团宝助手写文案
-            <ExternalLink className="ml-auto h-3 w-3" />
-          </Link>
+      {/* Resize handle (only when expanded) */}
+      {!isIcon && (
+        <div
+          onPointerDown={startDrag}
+          onDoubleClick={() => onWidth(DEFAULT_WIDTH)}
+          title="拖动调整宽度（双击重置）"
+          className="group absolute right-0 top-0 h-full w-1.5 -translate-x-1/2 cursor-col-resize"
+        >
+          <div className="ml-[2px] h-full w-[2px] bg-transparent transition-colors group-hover:bg-emerald-500/40" />
         </div>
       )}
     </aside>
