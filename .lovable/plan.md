@@ -1,98 +1,79 @@
-分三块来做：点击放大、聊天图片拖到右侧预览、让团宝按"模块上下文"理解预览。
+## 目标
+解决两件事：
+1. 项目卡上的红点点进去后没反应——pending 素材没有任何地方接住。
+2. 手机端发来的图/文/链接，应该**进项目时就在左边对话框里弹出**，问："要不要用这些？"，确认后由团宝结合到右边预览。
 
-## 一、点击图片弹大图（Lightbox）
+## 行为
 
-新增轻量复用组件 `ImageLightbox`：全屏遮罩 + 单图 + ESC/点遮罩关闭，含下载按钮。挂到：
+### 进入项目时
+- ChatPane 挂载后调用 `listProjectPendingInbox({ projectId })`。
+- 若 `items.length > 0`，在聊天流末尾**注入一条不会被发到模型的本地系统卡**（`role: "system"`, `id: "inbox-card-<batchTs>"`），渲染成「📥 手机收料台 收到 N 条素材」卡片：
+  - 图片：缩略图九宫格（点击可放大、可拖到右侧——复用现有 `ImageLightbox` / `DraggableChatImage`）。
+  - 文字：折叠预览 + 复制按钮。
+  - 链接:标题 + 域名 + 打开。
+- 卡片底部两个主操作 + 一个次操作：
+  - **「全部使用 →」**（主）
+  - **「只入素材库」**（次）
+  - **「全部忽略」**（淡）
+- 卡片只在进入项目那一次拉取后弹出；处理完（任一按钮点击）后消失，并把这批 ids 调 `markInboxConsumed`。后续手机端再丢素材，下次进项目时再弹。
 
-1. **聊天里 AI 生图气泡**：点任意一张全屏看。
-2. **预览区 IntroTab**：
-   - `image_lg` → 点图放大
-   - `image_sm`（九宫格） → 点任意一张放大，可左右切换该 block 内的图
-   - SKU / 商品 Tab 商品主图也接上
+### 「全部使用」点击后
+- 图片：
+  1. 调新增的 `adoptInboxImagesToProject({ projectId, ids })`：服务端把图片 URL 写入 `project_images`（追加在末尾，order 续号），并 `markInboxConsumed`。
+  2. 同时构造一条**真的用户消息**通过 `sendMessage` 发出：
+     - `parts`: `[{type:"text", text:"我从手机收料台导入了 N 张新图，请你结合这些图把右边预览补充/替换得更合适，记得说明每张图放到了哪个模块。"}, ...imageParts]`
+     - imageParts 用现有 `image-attachments` 的格式（与「+ 上传图片」走同一通道），URL 来自 inbox.payload.urls。
+- 文字/链接：
+  - 文字：拼接成 `用户从手机端发来一段补充资料：\n"""\n{text}\n"""\n请结合到合适的位置。`
+  - 链接：`用户从手机端发来一个参考链接：{title} {url}，请抓核心信息融入文案。`
+  - 一并并入同一条用户消息（多类型时分段）。
+- 走完后由现有 chat 流自动驱动团宝读上下文 + 写入 intro/skus；团宝写完后由 `onFinish` 触发 project query 失效，右侧预览自动刷新。
 
-编辑/拖拽/锁定按钮的点击区不触发放大。
+### 「只入素材库」
+- 仅做 `adoptInboxImagesToProject`（图片入库）+ `markInboxConsumed`，**不发对话**。
+- 对于纯文字/链接条目，仅 `markInboxConsumed`（素材库不存文字）。
 
-## 二、聊天图片拖到右侧预览（新）
+### 「全部忽略」
+- 仅 `markInboxConsumed`。
 
-让聊天里 AI 生成的图（生图气泡里的缩略图）可直接长按/按住拖动，跨到右侧预览区，在 IntroTab 的模块列表中找位置落下，成为一张大图模块（`image_lg`）。
+### 项目卡红点
+- /app 的 `ProjectCard` 红点保持不变；用户点进去后由弹卡完成消化，红点会随 query 失效自动归零（`["inbox-pending-counts"]` 失效）。
 
-### 交互
-- 在聊天图片上按下并开始移动 → 进入"拖图态"，鼠标下方出现 90×90 的图片缩略浮层跟随光标。
-- 拖到右侧 IntroTab 预览区域时，预览区出现绿色淡色高亮边框，提示"松手放到这里"。
-- 拖到具体某个 block 上时，该 block 的上/下边出现一条 2px 绿色插入线（按光标在该 block 的上半还是下半判断插入到该 index 之前还是之后）。
-- 拖到预览空白或末尾区域 → 追加到 blocks 末尾。
-- 松手 → 在目标位置插入一个新的 `image_lg` block（url 用图片地址；服务端图都已是上传好的 https URL，无需再上传）。
-- 拖到聊天区外/空白处 → 取消。
-- 锁定的 block 仍可在其上/下插入，但不能"替换"它（这版只做插入，不做替换占位图）。
+## 技术细节
 
-### 实现方式
-- 不用 HTML5 native `draggable`（跨容器在 portal/iframe 模式下兼容性差），统一用 pointerdown/pointermove/pointerup + 全局浮层，跟现在 IntroTab 内部块拖拽一致的模式。
-- 新建一个全局的 `DragImageBus`（轻量 store / context）：
-  - `startDrag({ url, sourceId })` 由聊天侧调用
-  - `currentDrag` 暴露给 IntroTab 用于显示落点指示
-  - `endDrag(target)` 由 IntroTab 落下时调用，触发回调
-- IntroTab 监听 bus，在拖图态时：注册 hit-test，根据光标位置计算 dropIndex；松手时调用 `onInsertImageBlock(index, url)`，写一个 `{ id, type:"image_lg", url }` 到 `intro.blocks`。
-- 同一根浮层组件 `DragGhost` 渲染在 body Portal，跟随光标。
-- 数据库写入走现有的 `onChange(intro)` 主路径（项目页面已经统一持久化），无需新工具。
+### 新增服务函数（`src/lib/inbox.functions.ts`）
+- `adoptInboxImagesToProject({ projectId, ids })`
+  - `requireUserId` + `assertProjectOwner`。
+  - 读取这批 `inbox_items` 中 `kind = image` 的所有 `payload.urls`。
+  - 查 `project_images` 当前 `max(sort_order)`，逐个 `insert {project_id, url, sort_order}`。
+  - `markInboxConsumed(ids)`（合并所有 ids，不只是图片，方便一次性消化整批）。
+  - 返回 `{ adopted: <number>, urls: string[] }`。
 
-### 涉及文件
-- `src/lib/drag-image-bus.ts`（新建）
-- `src/components/tuan/DragGhost.tsx`（新建，body portal 浮层）
-- 聊天消息里渲染 AI 生图缩略图的位置（如 `src/routes/app.project.$id.tsx` 或聊天消息组件，需在 IntroTab 同屏父组件挂 DragGhost）：图上加 pointerdown 启动拖动
-- `src/components/tuan/IntroTab.tsx`：订阅 bus，渲染落点指示线，hit-test 计算 dropIndex，落下时插入 image_lg
+### 前端：`src/components/tuan/InboxIntakeCard.tsx`（新建）
+- 入参 `{ items, onAdoptAll, onLibraryOnly, onIgnoreAll, busy }`。
+- 渲染分组：图片九宫格、文字、链接；底部 3 个按钮。
+- 复用 `ImageLightbox`，缩略图用 `DraggableChatImage`（顺带支持单独拖到右侧）。
 
-## 三、让团宝按"模块上下文"理解预览（核心）
+### `ChatPane`（`src/routes/app.project.$id.tsx`）
+- 用 `useQuery(["project-inbox-pending", projectId])` 调 `listProjectPendingInbox`，`staleTime: 0`，`refetchOnWindowFocus: false`。
+- 仅在**首次拉到 items 且未在本会话弹过**时调用 `setMessages([...messages, inboxCardMsg])`。本会话用 ref 记 batch key，避免重复注入。
+- 在 `MessageRow` 渲染分支里识别 `id.startsWith("inbox-card-")` 的 system 消息，渲染 `<InboxIntakeCard ...>` 而不是普通气泡。
+- 三个回调里调对应服务函数，成功后：
+  - 失效 `["inbox-pending-counts"]`、`["project-inbox-pending", projectId]`、`["project", projectId]`。
+  - 从 `messages` 里移除这张卡（`setMessages(prev => prev.filter(m => m.id !== cardId))`）。
+- 注入卡用的 system 消息不参与发给模型——`prepareSendMessagesRequest` 已经只发 `useChat` 维护的 messages，所以需要在发给后端前过滤掉 `id.startsWith("inbox-card-")`（在 `prepareSendMessagesRequest` 里 `messages.filter(...)`）。
 
-### 现状问题
-`src/routes/api/chat.ts` 把整个 intro/skus/settings/product 以 JSON.stringify 丢给模型，看不懂"这是第几段、前后是什么、在文案逻辑里承担什么角色"。所以经常：嘴上说"放在『新鲜直采』下面"但实际 append 到末尾；blocksReplaceAt 用错 index；重写已锁定段；新段不接上文。
+### 持久化
+- inbox 卡注入到 messages 后，会被现有的 `saveProjectChat`（之前一步加的云端持久化）一并保存。处理后从 messages 移除，云端也跟着更新——下次跨设备进项目也不会重复弹（即使 batch ids 已 consumed）。
 
-### 改造方案
+## 文件清单
+- 新建：`src/components/tuan/InboxIntakeCard.tsx`
+- 修改：`src/lib/inbox.functions.ts`（新增 `adoptInboxImagesToProject`）
+- 修改：`src/routes/app.project.$id.tsx`（查询 + 注入 + 卡片回调 + 过滤发给模型的消息）
 
-#### 1）服务端预先构造"模块大纲"
-streamText 前把 `intro.blocks` 编译成有序、带角色、带邻居关系的大纲：
-
-```text
-# 介绍模块大纲（共 7 块，从上到下）
-[0] 段落1 · 标题段 · 未锁定 · 逻辑槽位=title
-    内容："🔥再生纤维气球裤..."
-    上一块：（无） / 下一块：[1]
-[1] 段落2 · 痛点段 · 未锁定 · 逻辑槽位=paragraph#痛点共鸣
-    内容："夏天穿牛仔裤腿汗黏..."
-    上一块：[0] / 下一块：[2]
-[2] 图位 · 大图建议占位 · 未锁定 · 逻辑槽位=image_large
-    占位："[图位·大图建议：模特上身正面]"
-    上一块：[1] / 下一块：[3]
-[3] 段落3 · 品质背书 · 🔒已锁定 · 逻辑槽位=paragraph#品牌故事
-```
-
-同时输出：
-- 逻辑槽位 ↔ 实际 block 索引映射
-- 未填充槽位清单
-- 图位占位清单（block index + 期望图类型 + 期望主题）
-
-system prompt 改为以这份大纲为主线，原 JSON 退为附录，新增硬约束：
-- 任何 blocksReplaceAt / insert_generated_images 调用前，必须先在回复里写"我要改的是 [X] 段落X · 角色"，再写参数。
-- 嘴上指定的位置和工具参数的 index/anchor.blockId 必须一致；不一致即视为错误，工具拒绝并把错误吐回模型。
-- 续写时必须显式照顾"上一块结尾 → 当前块开头"的过渡。
-
-#### 2）工具加"语义校验"
-- `update_intro.blocksReplaceAt`：新增可选 `expectLabel`（如 `"段落2"`），不一致直接报错；返回改完后的"前后块摘要"。
-- `insert_generated_images`：新增 `expectRole`（如 `"痛点段后"`），不一致拒绝，错误里附最近 3 个候选 block 的大纲条目。
-- 所有写入工具的 result 改为返回"新大纲"，让多轮调用持续基于最新结构推理。
-
-#### 3）首次撰写绑死逻辑顺序
-服务端在 prompt 里直接给"下一步应当生成的逻辑模块"（按已填充槽位推断），每轮只能产出下一个未填槽位，避免乱序或漏模块；所有槽位填完前禁止改已写好的段落（除非用户明确要求）。
-
-#### 4）@mention 也走大纲
-解析 `@[段落2#a1b2c3d4]` 后从大纲里把"该块 + 上下相邻块的摘要"一起塞回 prompt，让模型改这段时有上下文。
-
-### 涉及文件
-- `src/routes/api/chat.ts`：新增 buildIntroOutline()、改 system prompt、收紧 update_intro / insert_generated_images 校验、tool result 统一回吐新大纲
-- `src/components/tuan/types.ts`：导出 `buildBlockOutline()` 公共工具（前后端共用 label 规则）
-
-### 不动的部分
-- 数据库结构不变（blocks 仍是数组，服务端实时编译大纲）
-- update_skus / update_settings / update_product_meta 工具不动
-- 锁定模块、候选采纳等规则保留，改为基于大纲表达
-
-完成后：模型每次都能说"改的是第 X 块（角色 Y），它前面是 A、后面是 B"，并据此续写或替换；写错位置工具直接拒绝并回带大纲的错误，模型立即纠正。
+## 验证
+1. 手机端发 2 张图 + 1 段文字到任意项目 → /app 卡片红点 3。
+2. 进入该项目 → 对话流末尾立刻弹出收料卡。
+3. 点「全部使用」→ 卡片消失；对话出现"我从手机收料台导入了 2 张新图，并补充一段资料……"；团宝开始工具调用写入；右侧预览随之更新；红点归零。
+4. 重新进入同一项目 → 不再弹卡。
+5. 切到另一台电脑登录同账号进同项目 → 也不再弹卡（已 consumed）。
