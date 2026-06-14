@@ -371,6 +371,8 @@ function ChatPane({
   const listPendingFn = useServerFn(listProjectPendingInbox);
   const adoptInboxFn = useServerFn(adoptInboxImagesToProject);
   const markConsumedFn = useServerFn(markInboxConsumed);
+  const appendPreviewFn = useServerFn(appendImagesToPreview);
+
   const { data: pendingInbox } = useQuery({
     queryKey: ["project-inbox-pending", projectId],
     queryFn: () => listPendingFn({ data: { projectId } }),
