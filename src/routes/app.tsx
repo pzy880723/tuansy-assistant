@@ -9,6 +9,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { SyncToKttButton } from "@/components/tuan/SyncToKttButton";
 import { AssetLibraryButton } from "@/components/tuan/AssetLibrarySheet";
+import { QuickBuyButton } from "@/components/tuan/QuickBuyButton";
 
 import logoHorizontal from "@/assets/logo-horizontal.png.asset.json";
 
@@ -161,9 +162,9 @@ function ProjectInlineHeader({ id }: { id: string }) {
       />
       <SaveBadge state={savingName} />
       <AssetLibraryButton projectId={id} />
+      <QuickBuyButton projectId={id} />
       <SyncToKttButton projectId={id} projectName={name} />
     </>
-
   );
 }
 
