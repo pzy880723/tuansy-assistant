@@ -16,13 +16,48 @@ import {
 
 const LOVABLE_AIG_RUN_ID_HEADER = "X-Lovable-AIG-Run-ID";
 
+const SpecValueSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().describe("规格值显示名，例如 黑色、M、80斤"),
+  image: z.string().nullable().optional().describe("仅第一组规格可挂图，URL"),
+});
+const SpecGroupSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().describe("规格名，例如 颜色、尺码、口味"),
+  hasImage: z.boolean().optional().describe("仅第一组可置 true，表示该组每个值挂图"),
+  values: z.array(SpecValueSchema).min(1),
+});
+const VariantSchema = z.object({
+  id: z.string().optional(),
+  optionValueIds: z
+    .array(z.string())
+    .describe("与 specGroups 同序对应的 SpecValue.id 数组"),
+  price: z.string().describe("团购价，元，保留 1 位小数"),
+  stock: z.string().describe("库存整数字符串；空串=不限"),
+  costPrice: z.string().optional(),
+  image: z.string().nullable().optional(),
+  code: z.string().optional(),
+});
+
 const SkuSchema = z.object({
-  name: z.string().describe("规格名，例如 1 斤装"),
-  price: z.string().describe("价格字符串，元，保留 1 位小数，例如 19.9"),
-  stock: z.string().describe("库存字符串，整数，例如 100"),
-  original_price: z.string().optional().describe("划线价，可选"),
-  image: z.string().optional().describe("规格图 URL，可选"),
-  desc: z.string().optional().describe("规格说明，可选"),
+  name: z.string().describe("商品名称（必填）"),
+  category: z.string().optional().describe("商品品类：女装/男装/食品/美妆/母婴/家居/数码/其他"),
+  description: z.string().optional().describe("商品描述，≤2000 字"),
+  images: z.array(z.string()).max(9).optional().describe("商品图 URL 数组，第 1 张是主图"),
+  videoUrl: z.string().nullable().optional(),
+  tags: z.array(z.string()).max(2).optional(),
+  price: z.string().optional().describe("无多规格时的团购价；有多规格时由 variants 汇总"),
+  stock: z.string().optional().describe("无多规格时的库存；有多规格时由 variants 汇总"),
+  strikePrice: z.string().optional(),
+  costPrice: z.string().optional(),
+  code: z.string().optional().describe("商品编码"),
+  purchaseLimit: z.string().optional().describe("可购数量，例如 不限 或 数字"),
+  isFlashSale: z.boolean().optional(),
+  group: z.string().optional().describe("商品分类，例如 更多好货"),
+  spec: z.string().optional(),
+  image: z.string().nullable().optional(),
+  specGroups: z.array(SpecGroupSchema).max(3).optional(),
+  variants: z.array(VariantSchema).optional(),
 });
 
 const IntroBlockSchema = z.discriminatedUnion("type", [
@@ -35,6 +70,93 @@ const IntroBlockSchema = z.discriminatedUnion("type", [
 
 function genBlockId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+let _suid = 0;
+function suid(prefix: string) {
+  _suid += 1;
+  return `${prefix}_${Date.now().toString(36)}_${_suid}`;
+}
+
+type ServerSpecValue = { id: string; label: string; image?: string | null };
+type ServerSpecGroup = { id: string; name: string; hasImage?: boolean; values: ServerSpecValue[] };
+type ServerVariant = {
+  id: string;
+  optionValueIds: string[];
+  price: string;
+  stock: string;
+  costPrice?: string;
+  image?: string | null;
+  code?: string;
+};
+type ServerSku = Record<string, unknown> & {
+  name: string;
+  price?: string;
+  stock?: string;
+  image?: string | null;
+  spec?: string;
+  images?: string[];
+  specGroups?: ServerSpecGroup[];
+  variants?: ServerVariant[];
+};
+
+function ensureSpecIds(groups: ServerSpecGroup[] | undefined): ServerSpecGroup[] {
+  return (groups ?? []).map((g) => ({
+    ...g,
+    id: g.id || suid("sg"),
+    values: (g.values ?? []).map((v) => ({ ...v, id: v.id || suid("sv") })),
+  }));
+}
+function cartesianValueIds(groups: ServerSpecGroup[]): string[][] {
+  const usable = groups.filter((g) => g.values.length > 0);
+  if (usable.length === 0) return [];
+  let acc: string[][] = [[]];
+  for (const g of usable) {
+    const next: string[][] = [];
+    for (const a of acc) for (const v of g.values) next.push([...a, v.id]);
+    acc = next;
+  }
+  return acc;
+}
+function reconcileVariants(groups: ServerSpecGroup[], prior: ServerVariant[]): ServerVariant[] {
+  const combos = cartesianValueIds(groups);
+  if (combos.length === 0) return [];
+  const key = (ids: string[]) => ids.join("|");
+  const priorMap = new Map(prior.map((v) => [key(v.optionValueIds), v]));
+  return combos.map((ids) => {
+    const found = priorMap.get(key(ids));
+    if (found) return { ...found, optionValueIds: ids };
+    return { id: suid("vr"), optionValueIds: ids, price: "", stock: "" };
+  });
+}
+function syncSkuSummary(p: ServerSku): ServerSku {
+  const groups = p.specGroups ?? [];
+  const variants = p.variants ?? [];
+  const next: ServerSku = { ...p };
+  next.image = (p.images && p.images[0]) ?? p.image ?? null;
+  if (groups.length > 0 && variants.length > 0) {
+    const prices = variants.map((v) => parseFloat(v.price)).filter((n) => !Number.isNaN(n));
+    if (prices.length > 0) {
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      next.price = min === max ? String(min) : `${min}-${max}`;
+    }
+    const hasBlank = variants.some((v) => (v.stock ?? "").trim() === "");
+    next.stock = hasBlank
+      ? "不限"
+      : String(variants.reduce((s, v) => s + (parseInt(v.stock, 10) || 0), 0));
+    next.spec = `${groups.map((g) => `${g.name}${g.values.length}`).join(" · ")} = ${variants.length} 个`;
+  }
+  return next;
+}
+function findSkuIndex(arr: ServerSku[], locator: { index?: number; name?: string }): number {
+  if (typeof locator.index === "number" && locator.index >= 0 && locator.index < arr.length)
+    return locator.index;
+  if (locator.name) {
+    const i = arr.findIndex((s) => (s.name ?? "").trim() === locator.name!.trim());
+    if (i >= 0) return i;
+  }
+  return -1;
 }
 
 export const Route = createFileRoute("/api/chat")({
