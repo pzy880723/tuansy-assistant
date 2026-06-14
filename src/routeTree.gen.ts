@@ -38,6 +38,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AppProjectIdRouteImport } from './routes/app.project.$id'
 import { Route as ApiPublicExportProjectRouteImport } from './routes/api/public/export-project'
 import { Route as ApiPublicWechatCallbackRouteImport } from './routes/api/public/wechat.callback'
+import { Route as ApiPublicSmsTencentCallbackRouteImport } from './routes/api/public/sms.tencent-callback'
 import { Route as ApiPublicOrdersOrderNoRouteImport } from './routes/api/public/orders.$orderNo'
 import { Route as ApiPublicGSlugPlaceOrderRouteImport } from './routes/api/public/g.$slug.place-order'
 
@@ -186,6 +187,12 @@ const ApiPublicWechatCallbackRoute = ApiPublicWechatCallbackRouteImport.update({
   path: '/api/public/wechat/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSmsTencentCallbackRoute =
+  ApiPublicSmsTencentCallbackRouteImport.update({
+    id: '/api/public/sms/tencent-callback',
+    path: '/api/public/sms/tencent-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicOrdersOrderNoRoute = ApiPublicOrdersOrderNoRouteImport.update({
   id: '/api/public/orders/$orderNo',
   path: '/api/public/orders/$orderNo',
@@ -228,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/sms/tencent-callback': typeof ApiPublicSmsTencentCallbackRoute
   '/api/public/wechat/callback': typeof ApiPublicWechatCallbackRoute
   '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
@@ -258,6 +266,7 @@ export interface FileRoutesByTo {
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/sms/tencent-callback': typeof ApiPublicSmsTencentCallbackRoute
   '/api/public/wechat/callback': typeof ApiPublicWechatCallbackRoute
   '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
@@ -292,6 +301,7 @@ export interface FileRoutesById {
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/sms/tencent-callback': typeof ApiPublicSmsTencentCallbackRoute
   '/api/public/wechat/callback': typeof ApiPublicWechatCallbackRoute
   '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
+    | '/api/public/sms/tencent-callback'
     | '/api/public/wechat/callback'
     | '/api/public/g/$slug/place-order'
   fileRoutesByTo: FileRoutesByTo
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
+    | '/api/public/sms/tencent-callback'
     | '/api/public/wechat/callback'
     | '/api/public/g/$slug/place-order'
   id:
@@ -390,6 +402,7 @@ export interface FileRouteTypes {
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
+    | '/api/public/sms/tencent-callback'
     | '/api/public/wechat/callback'
     | '/api/public/g/$slug/place-order'
   fileRoutesById: FileRoutesById
@@ -410,6 +423,7 @@ export interface RootRouteChildren {
   OOrderNoRoute: typeof OOrderNoRoute
   ApiPublicExportProjectRoute: typeof ApiPublicExportProjectRoute
   ApiPublicOrdersOrderNoRoute: typeof ApiPublicOrdersOrderNoRoute
+  ApiPublicSmsTencentCallbackRoute: typeof ApiPublicSmsTencentCallbackRoute
   ApiPublicWechatCallbackRoute: typeof ApiPublicWechatCallbackRoute
   ApiPublicGSlugPlaceOrderRoute: typeof ApiPublicGSlugPlaceOrderRoute
 }
@@ -619,6 +633,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWechatCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/sms/tencent-callback': {
+      id: '/api/public/sms/tencent-callback'
+      path: '/api/public/sms/tencent-callback'
+      fullPath: '/api/public/sms/tencent-callback'
+      preLoaderRoute: typeof ApiPublicSmsTencentCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/orders/$orderNo': {
       id: '/api/public/orders/$orderNo'
       path: '/api/public/orders/$orderNo'
@@ -706,6 +727,7 @@ const rootRouteChildren: RootRouteChildren = {
   OOrderNoRoute: OOrderNoRoute,
   ApiPublicExportProjectRoute: ApiPublicExportProjectRoute,
   ApiPublicOrdersOrderNoRoute: ApiPublicOrdersOrderNoRoute,
+  ApiPublicSmsTencentCallbackRoute: ApiPublicSmsTencentCallbackRoute,
   ApiPublicWechatCallbackRoute: ApiPublicWechatCallbackRoute,
   ApiPublicGSlugPlaceOrderRoute: ApiPublicGSlugPlaceOrderRoute,
 }
