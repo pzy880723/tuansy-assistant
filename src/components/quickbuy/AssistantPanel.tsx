@@ -43,6 +43,11 @@ export function AssistantPanel({ compact = false }: { compact?: boolean }) {
     setInput("");
     setTimeout(() => inputRef.current?.focus(), 30);
   };
+  const quickSend = (text: string) => {
+    if (busy) return;
+    sendMessage({ text });
+    setInput("");
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
