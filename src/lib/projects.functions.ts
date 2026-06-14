@@ -380,16 +380,19 @@ export const getProjectChat = createServerFn({ method: "GET" })
   });
 
 export const saveProjectChat = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string; messages: unknown[] }) =>
-    z.object({ id: z.string().uuid(), messages: z.array(z.any()).max(2000) }).parse(d),
+  .inputValidator((d: { id: string; messagesJson: string }) =>
+    z.object({ id: z.string().uuid(), messagesJson: z.string().max(5_000_000) }).parse(d),
   )
   .handler(async ({ data }) => {
     const userId = await requireUserId();
     await assertProjectOwner(data.id, userId);
+    let parsed: unknown;
+    try { parsed = JSON.parse(data.messagesJson); } catch { throw new Error("对话记录格式异常"); }
+    if (!Array.isArray(parsed)) throw new Error("对话记录必须是数组");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("projects")
-      .update({ chat_messages: data.messages } as never)
+      .update({ chat_messages: parsed } as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
