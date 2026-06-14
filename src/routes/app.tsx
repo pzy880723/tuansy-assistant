@@ -75,9 +75,10 @@ function TopBar() {
 
 function GlobalNav({ pathname }: { pathname: string }) {
   const nav = [
-    { to: "/app", label: "项目", icon: Package, match: (p: string) => p === "/app" || p.startsWith("/app/project") },
-    { to: "/extension", label: "Chrome 插件", icon: Chrome, match: (p: string) => p === "/extension" },
-    { to: "/settings", label: "设置", icon: SettingsIcon, match: (p: string) => p === "/settings" },
+    { to: "/app", label: "项目", icon: Package, match: (p: string) => p === "/app" || p.startsWith("/app/project"), highlight: false },
+    { to: "/quickbuy", label: "团宝速购", icon: ShoppingBag, match: (p: string) => p.startsWith("/quickbuy"), highlight: true },
+    { to: "/extension", label: "Chrome 插件", icon: Chrome, match: (p: string) => p === "/extension", highlight: false },
+    { to: "/settings", label: "设置", icon: SettingsIcon, match: (p: string) => p === "/settings", highlight: false },
   ] as const;
   return (
     <nav className="ml-2 flex items-center gap-1">
@@ -89,9 +90,10 @@ function GlobalNav({ pathname }: { pathname: string }) {
             to={n.to}
             className={cn(
               "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs transition",
-              active
-                ? "bg-[var(--brand-soft)] text-primary"
-                : "text-muted-foreground hover:text-foreground",
+              n.highlight && !active && "bg-gradient-to-r from-emerald-500/15 to-green-600/15 text-emerald-700 hover:from-emerald-500/25 hover:to-green-600/25",
+              n.highlight && active && "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm",
+              !n.highlight && active && "bg-[var(--brand-soft)] text-primary",
+              !n.highlight && !active && "text-muted-foreground hover:text-foreground",
             )}
           >
             <n.icon className="h-3.5 w-3.5" />
