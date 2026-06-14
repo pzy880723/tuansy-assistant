@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import logoMascot from "@/assets/logo-mascot.png.asset.json";
 import { useImageAttachments } from "@/lib/use-image-attachments";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ResizableHandle,
   ResizablePanel,
