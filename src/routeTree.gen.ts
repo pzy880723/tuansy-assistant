@@ -24,6 +24,7 @@ import { Route as QuickbuyHomeRouteImport } from './routes/quickbuy.home'
 import { Route as QuickbuyGroupsRouteImport } from './routes/quickbuy.groups'
 import { Route as QuickbuyFinanceRouteImport } from './routes/quickbuy.finance'
 import { Route as QuickbuyCustomersRouteImport } from './routes/quickbuy.customers'
+import { Route as QuickbuyAssistantRouteImport } from './routes/quickbuy.assistant'
 import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
 import { Route as MInboxRouteImport } from './routes/m.inbox'
 import { Route as GSlugRouteImport } from './routes/g.$slug'
@@ -112,6 +113,11 @@ const QuickbuyFinanceRoute = QuickbuyFinanceRouteImport.update({
 const QuickbuyCustomersRoute = QuickbuyCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyAssistantRoute = QuickbuyAssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
   getParentRoute: () => QuickbuyRoute,
 } as any)
 const OOrderNoRoute = OOrderNoRouteImport.update({
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/assistant': typeof QuickbuyAssistantRoute
   '/quickbuy/customers': typeof QuickbuyCustomersRoute
   '/quickbuy/finance': typeof QuickbuyFinanceRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/assistant': typeof QuickbuyAssistantRoute
   '/quickbuy/customers': typeof QuickbuyCustomersRoute
   '/quickbuy/finance': typeof QuickbuyFinanceRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/assistant': typeof QuickbuyAssistantRoute
   '/quickbuy/customers': typeof QuickbuyCustomersRoute
   '/quickbuy/finance': typeof QuickbuyFinanceRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/assistant'
     | '/quickbuy/customers'
     | '/quickbuy/finance'
     | '/quickbuy/groups'
@@ -325,6 +335,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/assistant'
     | '/quickbuy/customers'
     | '/quickbuy/finance'
     | '/quickbuy/groups'
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/assistant'
     | '/quickbuy/customers'
     | '/quickbuy/finance'
     | '/quickbuy/groups'
@@ -496,6 +508,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuickbuyCustomersRouteImport
       parentRoute: typeof QuickbuyRoute
     }
+    '/quickbuy/assistant': {
+      id: '/quickbuy/assistant'
+      path: '/assistant'
+      fullPath: '/quickbuy/assistant'
+      preLoaderRoute: typeof QuickbuyAssistantRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
     '/o/$orderNo': {
       id: '/o/$orderNo'
       path: '/o/$orderNo'
@@ -628,6 +647,7 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface QuickbuyRouteChildren {
+  QuickbuyAssistantRoute: typeof QuickbuyAssistantRoute
   QuickbuyCustomersRoute: typeof QuickbuyCustomersRoute
   QuickbuyFinanceRoute: typeof QuickbuyFinanceRoute
   QuickbuyGroupsRoute: typeof QuickbuyGroupsRoute
@@ -637,6 +657,7 @@ interface QuickbuyRouteChildren {
 }
 
 const QuickbuyRouteChildren: QuickbuyRouteChildren = {
+  QuickbuyAssistantRoute: QuickbuyAssistantRoute,
   QuickbuyCustomersRoute: QuickbuyCustomersRoute,
   QuickbuyFinanceRoute: QuickbuyFinanceRoute,
   QuickbuyGroupsRoute: QuickbuyGroupsRoute,
