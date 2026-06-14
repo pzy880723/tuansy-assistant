@@ -26,10 +26,11 @@
       "matches": [
         "https://*.lovable.app/*",
         "https://*.lovableproject.com/*",
-        "https://tuansy-assistant.lovable.app/*"
+        "https://*.lovable.dev/*"
       ],
       "js": ["bridge.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   "icons": { "48": "icons/icon128.png", "128": "icons/icon128.png" }
