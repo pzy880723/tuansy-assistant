@@ -235,7 +235,7 @@ function ChatPane({
         headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
         body: {
           ...body,
-          messages,
+          messages: messages.filter((m) => !m.id.startsWith("inbox-card-")),
           projectId,
           copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
           startupMode: messages[0]?.id.startsWith("seed-plan-") ? "plan" : "draft",
