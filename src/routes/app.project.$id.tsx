@@ -1059,7 +1059,7 @@ function ChatPane({
                 ? "团宝正在处理上一条，回车可加入队列…"
                 : "告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送，Shift+Enter 换行)"
             }
-            className="max-h-[24rem] min-h-[44px] w-full resize-y overflow-y-auto bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            className="max-h-[24rem] min-h-[44px] w-full resize-y overflow-y-auto bg-transparent px-2 py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground md:text-sm"
           />
           <div className="flex items-center justify-between gap-2">
             <button
