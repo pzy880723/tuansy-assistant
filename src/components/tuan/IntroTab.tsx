@@ -1144,6 +1144,7 @@ function BlockCard({
   onPointerDownDrag,
   onAIGenerate,
   onEnrich,
+  onPreviewImage,
 }: {
   refCb: (el: HTMLDivElement | null) => void;
   block: IntroBlock;
@@ -1166,6 +1167,7 @@ function BlockCard({
   /** Per-block "AI 丰富" — receives the user's enrichment prompt;
    *  parent assembles the @mention token. */
   onEnrich?: (prompt: string) => void;
+  onPreviewImage?: (urls: string[], index: number) => void;
 }) {
   const isSmFull = block.type === "image_sm" && block.urls.length >= MAX_SMALL_IMAGES;
   const locked = !!block.locked;
