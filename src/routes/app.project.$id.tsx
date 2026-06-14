@@ -247,7 +247,15 @@ function ChatPane({
         headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
         body: {
           ...body,
-          messages: messages.filter((m) => !m.id.startsWith("inbox-card-")),
+          // 只把真正发给模型的 user/assistant 消息送上去。
+          // system 消息（右侧编辑日志 manual-*、手机收料卡 inbox-card-*）只是 UI 用，
+          // 一旦放进 convertToModelMessages 会让 streamText 挂死、Worker 报 502。
+          messages: messages.filter(
+            (m) =>
+              m.role !== "system" &&
+              !m.id.startsWith("inbox-card-") &&
+              !m.id.startsWith("manual-"),
+          ),
           projectId,
           copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
           startupMode: messages[0]?.id.startsWith("seed-plan-") ? "plan" : "draft",
@@ -284,7 +292,11 @@ function ChatPane({
     try {
       const serverMsgs = JSON.parse(chatData.messagesJson) as UIMessage[];
       if (Array.isArray(serverMsgs) && serverMsgs.length > 0) {
-        setMessages(serverMsgs);
+        // 去重：同 id 只保留最后一条（DB 历史上曾因重试出现过重复 id，
+        // React 会用同一个 key 渲染，看起来"少了几条气泡"）。
+        const seen = new Map<string, UIMessage>();
+        for (const m of serverMsgs) seen.set(m.id, m);
+        setMessages(Array.from(seen.values()));
       }
     } catch {
       // ignore
@@ -301,7 +313,11 @@ function ChatPane({
     if (status === "streaming" || status === "submitted") return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      void saveChatFn({ data: { id: projectId, messagesJson: JSON.stringify(messages) } }).catch(
+      // 同样在保存前去重一次，杜绝重复 id 写回 DB。
+      const seen = new Map<string, UIMessage>();
+      for (const m of messages) seen.set(m.id, m);
+      const deduped = Array.from(seen.values());
+      void saveChatFn({ data: { id: projectId, messagesJson: JSON.stringify(deduped) } }).catch(
         () => {/* silent — localStorage still holds it */},
       );
     }, 600);
