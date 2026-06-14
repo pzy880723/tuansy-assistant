@@ -616,17 +616,190 @@ ${logicPromptBlock}
             }),
             update_skus: tool({
               description:
-                "整体替换 SKU 列表（顶层 skus 列，预览的商品 Tab 直接读这里）。传完整的 SKU 数组，每项至少包含 name、price、stock。",
+                "整体替换 SKU 列表（顶层 skus 列，预览的商品 Tab 直接读这里）。仅在用户要求重排、删除、或一次新建多个商品时使用；改单个商品请用 update_sku_at。每个 SKU 字段名要和编辑器完全对齐：name(必填) / category(必填，如 女装/食品) / images[](必填，至少 1 张) / description / price / stock / specGroups[] / variants[] / strikePrice / costPrice / code / tags / purchaseLimit / isFlashSale 等。",
               inputSchema: z.object({
                 skus: z.array(SkuSchema).min(1).describe("完整的 SKU 数组"),
               }),
               execute: async ({ skus: nextSkus }) => {
+                const normalized = (nextSkus as ServerSku[]).map((s) => {
+                  const groups = ensureSpecIds(s.specGroups);
+                  const variants = (s.variants ?? []).map((v) => ({
+                    ...v,
+                    id: v.id || suid("vr"),
+                  }));
+                  return syncSkuSummary({ ...s, specGroups: groups, variants });
+                });
                 const { error } = await supabaseAdmin
                   .from("projects")
-                  .update({ skus: nextSkus })
+                  .update({ skus: normalized as never })
                   .eq("id", projectId);
                 if (error) return { ok: false, error: error.message };
-                return { ok: true, count: nextSkus.length };
+                return { ok: true, count: normalized.length };
+              },
+            }),
+            update_sku_at: tool({
+              description:
+                "局部更新单个商品（按 index 或 name 定位）。只传要改的字段做浅合并。当用户说『商品叫 XXX』『改价格 / 库存 / 描述 / 图片 / 品类』时优先用此工具，不要重写整张 SKU 数组。如果商品不存在并希望新建，把 createIfMissing 设为 true，未指定 index 时新建在末尾。",
+              inputSchema: z.object({
+                locator: z
+                  .object({
+                    index: z.number().int().min(0).optional(),
+                    name: z.string().optional(),
+                  })
+                  .describe("商品定位，优先 index；index/name 至少给一个"),
+                patch: SkuSchema.partial().describe("要合并的字段"),
+                createIfMissing: z.boolean().optional().describe("找不到时是否新建，默认 false"),
+              }),
+              execute: async ({ locator, patch, createIfMissing }) => {
+                const arr = ((skus as unknown) as ServerSku[]).slice();
+                let idx = findSkuIndex(arr, locator);
+                if (idx < 0) {
+                  if (!createIfMissing)
+                    return { ok: false, error: "找不到商品，可设 createIfMissing=true 来新建" };
+                  if (!patch.name) return { ok: false, error: "新建商品必须提供 name" };
+                  arr.push({ name: patch.name, price: "", stock: "" } as ServerSku);
+                  idx = arr.length - 1;
+                }
+                const merged: ServerSku = { ...arr[idx], ...(patch as ServerSku) };
+                if (patch.specGroups) merged.specGroups = ensureSpecIds(patch.specGroups as ServerSpecGroup[]);
+                if (patch.variants)
+                  merged.variants = (patch.variants as ServerVariant[]).map((v) => ({
+                    ...v,
+                    id: v.id || suid("vr"),
+                  }));
+                arr[idx] = syncSkuSummary(merged);
+                const { error } = await supabaseAdmin
+                  .from("projects")
+                  .update({ skus: arr as never })
+                  .eq("id", projectId);
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, index: idx, sku: arr[idx], total: arr.length };
+              },
+            }),
+            set_variants: tool({
+              description:
+                "为一个商品建立或重建多规格。传 specGroups（例如 颜色:[黑,白,灰]、尺码:[M,L]），服务端会做笛卡尔积生成所有变体；已存在的变体价格/库存会被保留。可选 defaultPrice 给所有新变体填默认价。第一组规格可设 hasImage:true，让每个值挂图。",
+              inputSchema: z.object({
+                locator: z.object({
+                  index: z.number().int().min(0).optional(),
+                  name: z.string().optional(),
+                }),
+                specGroups: z.array(SpecGroupSchema).min(1).max(3),
+                defaultPrice: z.string().optional().describe("可选，给新变体填的默认价"),
+              }),
+              execute: async ({ locator, specGroups: inGroups, defaultPrice }) => {
+                const arr = ((skus as unknown) as ServerSku[]).slice();
+                const idx = findSkuIndex(arr, locator);
+                if (idx < 0) return { ok: false, error: "找不到商品" };
+                const groups = ensureSpecIds(inGroups as ServerSpecGroup[]);
+                const prior = arr[idx].variants ?? [];
+                let variants = reconcileVariants(groups, prior);
+                if (defaultPrice) {
+                  variants = variants.map((v) => (v.price ? v : { ...v, price: defaultPrice }));
+                }
+                arr[idx] = syncSkuSummary({ ...arr[idx], specGroups: groups, variants });
+                const { error } = await supabaseAdmin
+                  .from("projects")
+                  .update({ skus: arr as never })
+                  .eq("id", projectId);
+                if (error) return { ok: false, error: error.message };
+                return {
+                  ok: true,
+                  index: idx,
+                  variantCount: variants.length,
+                  spec: arr[idx].spec,
+                  variants: variants.map((v) => ({
+                    id: v.id,
+                    label: v.optionValueIds
+                      .map((vid, i) => groups[i]?.values.find((x) => x.id === vid)?.label ?? "—")
+                      .join("/"),
+                    price: v.price,
+                    stock: v.stock,
+                  })),
+                };
+              },
+            }),
+            set_variant_stocks: tool({
+              description:
+                "按规格组合批量设置库存（或价格）。用户口报库存、贴库存表（图片/CSV/文字）时调用：先用视觉/文本解析得到映射，再用此工具一次性写回。每条 entries 用 match 描述规格组合，例如 { match: {颜色:'黑色', 尺码:'M'}, stock:'30', price:'19.9' }。规格名/值会做去空格、繁简一致比对。找不到的会列在 unmatched 里。",
+              inputSchema: z.object({
+                locator: z.object({
+                  index: z.number().int().min(0).optional(),
+                  name: z.string().optional(),
+                }),
+                entries: z
+                  .array(
+                    z.object({
+                      match: z
+                        .record(z.string(), z.string())
+                        .describe("规格名 → 规格值，例如 {颜色:'黑色', 尺码:'M'}"),
+                      stock: z.string().optional(),
+                      price: z.string().optional(),
+                    }),
+                  )
+                  .min(1),
+              }),
+              execute: async ({ locator, entries }) => {
+                const arr = ((skus as unknown) as ServerSku[]).slice();
+                const idx = findSkuIndex(arr, locator);
+                if (idx < 0) return { ok: false, error: "找不到商品" };
+                const target = arr[idx];
+                const groups = target.specGroups ?? [];
+                const variants = (target.variants ?? []).slice();
+                if (groups.length === 0 || variants.length === 0) {
+                  return { ok: false, error: "该商品尚未建立多规格，请先调 set_variants" };
+                }
+                const norm = (s: string) => s.replace(/\s+/g, "").trim();
+                const updated: Array<{ label: string; stock?: string; price?: string }> = [];
+                const unmatched: Array<{ match: Record<string, string>; reason: string }> = [];
+                for (const e of entries) {
+                  const ids: string[] = [];
+                  let bad = "";
+                  for (const g of groups) {
+                    const wanted = e.match[g.name] ?? e.match[norm(g.name)];
+                    if (wanted == null) {
+                      bad = `缺少规格 ${g.name}`;
+                      break;
+                    }
+                    const v = g.values.find((x) => norm(x.label) === norm(wanted));
+                    if (!v) {
+                      bad = `${g.name} 找不到值 ${wanted}`;
+                      break;
+                    }
+                    ids.push(v.id);
+                  }
+                  if (bad) {
+                    unmatched.push({ match: e.match, reason: bad });
+                    continue;
+                  }
+                  const vi = variants.findIndex(
+                    (v) => v.optionValueIds.join("|") === ids.join("|"),
+                  );
+                  if (vi < 0) {
+                    unmatched.push({ match: e.match, reason: "组合不存在" });
+                    continue;
+                  }
+                  const next = { ...variants[vi] };
+                  if (e.stock != null) next.stock = e.stock;
+                  if (e.price != null) next.price = e.price;
+                  variants[vi] = next;
+                  updated.push({
+                    label: ids
+                      .map(
+                        (id, i) => groups[i]?.values.find((x) => x.id === id)?.label ?? "—",
+                      )
+                      .join("/"),
+                    stock: e.stock,
+                    price: e.price,
+                  });
+                }
+                arr[idx] = syncSkuSummary({ ...target, variants });
+                const { error } = await supabaseAdmin
+                  .from("projects")
+                  .update({ skus: arr as never })
+                  .eq("id", projectId);
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, index: idx, updatedCount: updated.length, updated, unmatched };
               },
             }),
             update_settings: tool({
