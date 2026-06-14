@@ -11,6 +11,7 @@ import {
   inboxUploadImage,
   listMyRecentProjects,
 } from "@/lib/inbox.functions";
+import logoMascot from "@/assets/logo-mascot.png.asset.json";
 
 export const Route = createFileRoute("/m/inbox")({
   head: () => ({

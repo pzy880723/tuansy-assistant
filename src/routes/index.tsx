@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProjectStarter } from "@/components/project-starter";
 import { ArrowRight, Sparkles, Wand2, Layers, Boxes, Send, ImagePlus, MessageSquare } from "lucide-react";
+import logoDark from "@/assets/logo-dark.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
