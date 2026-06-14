@@ -466,7 +466,11 @@ ${logicPromptBlock}
 - 团购活动标题（短，14-22 字）→ update_intro 的 title
 - 团购正文一律拆成一段一个 type:"text" block，通过 update_intro 的 blocksAppend 逐段追加；绝不允许往 update_intro 的 description 里塞任何内容（该字段已废弃，预览不再显示）
 - 图文模块 blocks：首次阶段 A 按逻辑逐模块使用 blocksAppend；阶段 B 用 blocksReplaceAt；只有用户明确要求整体重排时才传 blocks
-- 改 SKU（增、删、改价格/库存/规格名）→ update_skus，必须传完整的 SKU 数组
+- 改单个商品的某个字段（名称/品类/描述/图片/价格/库存/划线价/编码/标签/可购数量等）→ update_sku_at（局部 patch，不要重写整张数组）
+- 用户首次说"商品叫 XX、品类是 XX"且 skus 为空 → 用 update_sku_at + createIfMissing:true 新建一条
+- 用户要给商品建多规格（"颜色：黑/白/灰，尺码：M/L" 这类） → set_variants 一次建好，服务端会自动做笛卡尔积
+- 用户口报库存或贴库存表（图片/CSV/文字） → 先解析成 [{match:{规格名:规格值,...}, stock:'数字'}]，然后调 set_variant_stocks；如果规格还没建，先 set_variants 再 set_variant_stocks
+- 仅在用户要求整体重排 SKU、批量删除或一次新建很多商品时才用 update_skus（要传完整数组、且字段必须包含 category 和 images，否则前端编辑器会报缺失）
 - 改配送、起团、保障、自提、截团时间等设置项 → update_settings
 - 改商品标题、副标题、服务标签、封面 → update_product_meta
 - 不要把所有改动都塞进 update_product_meta；不同 Tab 的数据走不同工具
