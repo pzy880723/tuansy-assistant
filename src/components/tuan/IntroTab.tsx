@@ -805,13 +805,21 @@ export function IntroTab({
       {/* Intro card */}
       <div
         ref={containerRef}
-        className="relative rounded-xl bg-white p-3"
+        className={
+          "relative rounded-xl bg-white p-3 transition " +
+          (incomingDrag && !drag ? "ring-2 ring-[#07c160]/70 ring-offset-2 ring-offset-[#f4f5f7]" : "")
+        }
         style={
           drag
             ? { filter: "blur(2px) saturate(0.85)", pointerEvents: "none", transition: "filter 160ms" }
             : { transition: "filter 160ms" }
         }
       >
+        {incomingDrag && !drag && (
+          <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-full bg-[#07c160] px-2.5 py-1 text-[11px] font-medium text-white shadow-lg">
+            松手插入到此处
+          </div>
+        )}
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[15px] font-semibold text-[#1a1a1a]">团购介绍</div>
           <div className="flex items-center gap-1.5">
