@@ -90,7 +90,7 @@ function BuyPage() {
 
   // Title source: first text block from intro → fallback to group.title
   const firstTextBlock = (intro.blocks ?? []).find((b): b is Extract<IntroBlock, { type: "text" }> => b.type === "text" && !!b.text?.trim());
-  const heroTitle = firstTextBlock?.text?.trim() || group.title;
+  const heroTitle = (firstTextBlock?.text ?? "").replace(/\\n/g, "\n").replace(/\\r/g, "").trim() || group.title;
   const restBlocks = (intro.blocks ?? []).filter((b) => b.id !== firstTextBlock?.id);
 
   const leaderInitial = (leader?.nickname || "团").slice(0, 1);
@@ -220,7 +220,8 @@ function SkuCard({ sku }: { sku: Sku }) {
 
 function BlockView({ block }: { block: IntroBlock }) {
   if (block.type === "text") {
-    return <div className="whitespace-pre-wrap text-[14px] leading-7">{block.text}</div>;
+    const text = block.text.replace(/\\n/g, "\n").replace(/\\r/g, "").replace(/\n{3,}/g, "\n\n");
+    return <div className="whitespace-pre-wrap text-[14px] leading-7">{text}</div>;
   }
   if (block.type === "image_lg" && block.url) {
     return <img src={block.url} alt="" className="w-full rounded-lg" />;
