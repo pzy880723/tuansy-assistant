@@ -115,7 +115,7 @@ export function AssistantPanel({ compact = false }: { compact?: boolean }) {
               <button
                 key={s}
                 type="button"
-                onClick={() => setInput(s)}
+                onClick={() => quickSend(s)}
                 className="rounded-full border bg-background px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
               >
                 {s}
