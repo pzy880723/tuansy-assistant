@@ -14,28 +14,38 @@ import { createExportToken } from "@/lib/export-project.functions";
 
 // Probe the installed extension via window.postMessage. Resolves to the
 // extension version string when present, or null after timeout.
-function pingExtension(timeoutMs = 600): Promise<string | null> {
+function pingExtension(timeoutMs = 1500): Promise<string | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
   // DOM marker fallback (set by extension bridge.js immediately on load)
   const marker = document.documentElement.getAttribute("data-tb-installed");
   if (marker) return Promise.resolve(marker);
 
   return new Promise((resolve) => {
+    let done = false;
+    const finish = (v: string | null) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMsg);
+      clearInterval(iv);
+      clearTimeout(t);
+      resolve(v);
+    };
     const onMsg = (e: MessageEvent) => {
       if (e.source !== window) return;
       const data = e.data;
       if (data && data.type === "TB_PONG") {
-        window.removeEventListener("message", onMsg);
-        clearTimeout(t);
-        resolve(typeof data.version === "string" ? data.version : "ok");
+        finish(typeof data.version === "string" ? data.version : "ok");
       }
     };
     window.addEventListener("message", onMsg);
-    const t = setTimeout(() => {
-      window.removeEventListener("message", onMsg);
-      resolve(null);
-    }, timeoutMs);
-    window.postMessage({ type: "TB_PING" }, "*");
+    const sendPing = () => {
+      const m = document.documentElement.getAttribute("data-tb-installed");
+      if (m) return finish(m);
+      window.postMessage({ type: "TB_PING" }, "*");
+    };
+    sendPing();
+    const iv = setInterval(sendPing, 200);
+    const t = setTimeout(() => finish(null), timeoutMs);
   });
 }
 
@@ -104,7 +114,9 @@ export function SyncToKttButton({
               检测到你还没装「团宝 · 快团团助手」插件。装好后回到这里点一次"同步到快团团"，
               我会自动打开快团团后台并填入项目内容。
             </p>
-            <p className="text-[11px]">装完插件如果还是检测不到，请刷新这个页面。</p>
+            <p className="text-[11px]">
+              已安装但仍提示？请下载最新版插件（v0.3.0+），在 chrome://extensions 重新加载，然后刷新本页面。
+            </p>
           </div>
           <DialogFooter className="border-t px-5 py-3">
             <Button
