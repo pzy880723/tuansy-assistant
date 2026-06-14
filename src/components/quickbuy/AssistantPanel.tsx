@@ -20,7 +20,7 @@ type AnyPart = { type: string; text?: string; input?: unknown; output?: unknown;
 export function AssistantPanel({ compact = false }: { compact?: boolean }) {
   const [transport] = useState(() => new DefaultChatTransport({
     api: "/api/quickbuy-chat",
-    headers: () => {
+    headers: (): Record<string, string> => {
       const t = readAuthToken();
       return t ? { "x-tuan-session": t } : {};
     },
