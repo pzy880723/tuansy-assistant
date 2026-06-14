@@ -1,86 +1,38 @@
-## 团宝速购侧栏与 AI 助手修复 + 体验优化
+# 团宝速购 工作台/团购列表 微调
 
-### 一、Bug 根因（必须修）
+## 1. 工作台头部精简 (`src/routes/quickbuy.home.tsx`)
 
-AI 助手收不到回复是因为 `/api/quickbuy-chat` 返回 **401 未授权**（preview 日志多次出现 `POST /api/quickbuy-chat → 401`）。
+- 删除顶部 `工作台 / 今日 · 本周一览` 标题块。
+- 删除右上角 `问问 AI 助手` 按钮（功能已在左侧栏的 AI 模式中提供）。
+- 让 `今日订单 / 今日 GMV / 本周订单 / 进行中团数` 四张 KPI 卡成为页面的第一行，自然与左侧菜单栏顶部对齐（外层 `quickbuy.tsx` 已有 `py-6`，左右两侧顶部 Y 一致）。
+- 保留下方「库存预警」与「进行中团购」区块。
 
-原因：Lovable 预览页跑在 iframe 内属于「跨站上下文」，`SameSite=Lax` 的 `tuan_uid` cookie 不会被发出。项目其他 fetch 调用都通过 `x-tuan-session` header 兜底（见 `src/start.ts`、`src/routes/app.project.$id.tsx#244`、`AIGenerateImageDialog.tsx#111`），但我新写的 `AssistantPanel` 里 `DefaultChatTransport({ api: "/api/quickbuy-chat" })` 没附带这个 header。
+## 2. 团购卡片显示商品第一张图
 
-修复：
+数据库里 `group_orders.cover_image_url` 当前多为空，需要兜底取 `project_images` 表中按 `sort_order` 的第一张图（开团时项目并不一定填了封面，但通常都有商品图）。
 
-```ts
-import { readAuthToken } from "@/lib/use-current-user";
+### 2a. `src/lib/orders.functions.ts` — `dashboardSummary`
 
-const transport = new DefaultChatTransport({
-  api: "/api/quickbuy-chat",
-  headers: () => {
-    const t = readAuthToken();
-    return t ? { "x-tuan-session": t } : {};
-  },
-});
-```
+- 在已选字段基础上增加 `cover_image_url`。
+- 收集返回的 group 的 `project_id`，再用 `supabaseAdmin.from("project_images").select("project_id, url").in("project_id", ids).order("sort_order")` 批量查询，按 project_id 取第一张。
+- 在返回的每个 group 上追加 `cover_image_url: g.cover_image_url ?? imagesByProject[g.project_id] ?? null`。
 
-（headers 用函数形式，确保每次请求都读最新 token）
+### 2b. `src/lib/group-orders.functions.ts` — `listGroupOrders`
 
-### 二、侧栏改动
+- 同样在两处 select 中保留 `cover_image_url`、新增 `project_id`（已存在），并补一次 `project_images` 批量查询，做同样的兜底合并。
 
-**1. 去掉「完全隐藏」状态**
+### 2c. UI
 
-- `SidebarSize` 类型从 `"expanded" | "icon" | "hidden"` 改为 `"expanded" | "icon"`
-- 顶栏左侧那颗 `PanelLeftClose / PanelLeftOpen` 按钮 → 删除
-- localStorage key `quickbuy.sidebar.size` 旧值 `"hidden"` 兼容性处理：读到 `"hidden"` 时回退到 `"expanded"`
+- `src/routes/quickbuy.home.tsx` 「进行中团购」卡片：把目前的 `Package2` 占位换成 `g.cover_image_url ? <img …object-cover …/> : <Package2 …/>`。
+- `src/routes/quickbuy.groups.tsx`：已使用 `g.cover_image_url`，无需改动（兜底由 2b 提供）。
 
-**2. 侧栏可左右拖拽改宽**
+## 不动的部分
 
-在侧栏右边缘加一根 4px 宽的拖拽条（hover 时高亮）：
-- 仅在 `expanded` 状态生效（icon 状态固定 56px）
-- 宽度范围 240–520px，写入 `localStorage` 键 `quickbuy.sidebar.width`
-- 拖拽时给 `<body>` 加 `cursor: col-resize` + `user-select: none`，结束清除
-- 用 inline style 控制宽度（`style={{ width }}`），避免 Tailwind 任意值类带来的 JIT 问题
-- 拖拽到 < 200px 时自动 snap 回 240px（防止用户拖没）
+- 左侧栏、AI 助手面板、路由树、其它页面均不改。
+- 不修改后端表结构、不动 RLS / GRANT。
 
-```tsx
-// 简化逻辑
-<aside style={{ width: size === "icon" ? 56 : width }} className="relative ...">
-  {/* 内容 */}
-  {size === "expanded" && (
-    <div
-      onPointerDown={startDrag}
-      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-emerald-400/40"
-    />
-  )}
-</aside>
-```
+## 受影响文件
 
-### 三、AssistantPanel 预设点击 → 自动发送
-
-当前：点击预设词 → 填入输入框 → 用户还要按发送  
-改为：点击预设词 → 直接 `sendMessage({ text })`，不经过输入框
-
-涉及两处：欢迎页的 3 个示例按钮、底部的 4 个快捷 chip。两处都改为：
-
-```tsx
-const quickSend = (text: string) => {
-  if (status === "submitted" || status === "streaming") return;
-  sendMessage({ text });
-};
-```
-
-（输入框仍保留，用户也可自己输入复杂语句）
-
-### 四、文件改动
-
-- **修改** `src/components/quickbuy/AssistantPanel.tsx`
-  - transport 加 `x-tuan-session` header（修 401）
-  - 预设/示例改为一键发送
-- **修改** `src/routes/quickbuy.tsx`
-  - 删除 hidden 状态、顶栏的隐藏按钮、相关 useEffect 分支
-  - `Sidebar` 增加拖拽条 + 宽度 state + localStorage
-  - 把 `width` 类换成 inline style
-- 不动：`src/routes/api/quickbuy-chat.ts`、聊天工具逻辑、`/quickbuy/assistant` 路由
-
-### 五、不在本次范围
-
-- 移动端拖拽（移动端侧栏暂时仍 hidden md:flex 不显示）
-- 聊天历史持久化
-- 限制宽度的最大值随窗口动态收紧（先用固定 520px 上限）
+- `src/routes/quickbuy.home.tsx`
+- `src/lib/orders.functions.ts`
+- `src/lib/group-orders.functions.ts`

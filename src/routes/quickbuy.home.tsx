@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Package2, ArrowRight, AlertTriangle } from "lucide-react";
+import { Package2, ArrowRight, AlertTriangle } from "lucide-react";
 import { dashboardSummary } from "@/lib/orders.functions";
 import { fenToYuan } from "@/lib/quickbuy-shared";
 
@@ -32,16 +32,6 @@ function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">工作台</h1>
-          <p className="text-sm text-muted-foreground">今日 · 本周一览</p>
-        </div>
-        <Link to="/quickbuy/assistant" className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:brightness-110">
-          <Bot className="h-4 w-4" /> 问问 AI 助手
-        </Link>
-      </div>
-
       <div className="grid gap-3 md:grid-cols-4">
         <Kpi label="今日订单" value={String(kpi.todayCount)} />
         <Kpi label="今日 GMV" value={`¥${fenToYuan(kpi.todayGmv)}`} />
@@ -73,8 +63,12 @@ function HomePage() {
           <div className="grid gap-3 md:grid-cols-2">
             {active.slice(0, 6).map((g) => (
               <Link key={g.id} to="/quickbuy/orders" search={{ groupOrderId: g.id }} className="flex items-center gap-3 rounded-xl border p-3 hover:bg-muted/40">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-                  <Package2 className="h-5 w-5" />
+                <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
+                  {g.cover_image_url ? (
+                    <img src={g.cover_image_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Package2 className="h-5 w-5" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{g.title}</div>

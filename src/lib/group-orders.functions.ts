@@ -133,5 +133,23 @@ export const listGroupOrders = createServerFn({ method: "POST" })
       .eq("owner_id", userId)
       .order("started_at", { ascending: false })
       .limit(100);
-    return { groups: data ?? [] };
+    const groups = data ?? [];
+    const projectIds = Array.from(new Set(groups.map((g) => g.project_id)));
+    const firstImage: Record<string, string> = {};
+    if (projectIds.length > 0) {
+      const { data: imgs } = await supabaseAdmin
+        .from("project_images")
+        .select("project_id, url, sort_order")
+        .in("project_id", projectIds)
+        .order("sort_order", { ascending: true });
+      for (const r of imgs ?? []) {
+        if (!firstImage[r.project_id]) firstImage[r.project_id] = r.url;
+      }
+    }
+    return {
+      groups: groups.map((g) => ({
+        ...g,
+        cover_image_url: g.cover_image_url ?? firstImage[g.project_id] ?? null,
+      })),
+    };
   });

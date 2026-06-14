@@ -295,12 +295,28 @@ export const dashboardSummary = createServerFn({ method: "POST" })
     }
     const { data: groups } = await supabaseAdmin
       .from("group_orders")
-      .select("id, slug, title, status, order_count, items_sold, gmv_cents, snapshot_skus, project_id")
+      .select("id, slug, title, status, cover_image_url, order_count, items_sold, gmv_cents, snapshot_skus, project_id")
       .eq("owner_id", userId)
       .order("started_at", { ascending: false })
       .limit(20);
+    const groupList = groups ?? [];
+    const projectIds = Array.from(new Set(groupList.map((g) => g.project_id)));
+    const firstImage: Record<string, string> = {};
+    if (projectIds.length > 0) {
+      const { data: imgs } = await supabaseAdmin
+        .from("project_images")
+        .select("project_id, url, sort_order")
+        .in("project_id", projectIds)
+        .order("sort_order", { ascending: true });
+      for (const r of imgs ?? []) {
+        if (!firstImage[r.project_id]) firstImage[r.project_id] = r.url;
+      }
+    }
     return {
       kpi: { todayCount, todayGmv, weekCount, weekGmv },
-      groups: groups ?? [],
+      groups: groupList.map((g) => ({
+        ...g,
+        cover_image_url: g.cover_image_url ?? firstImage[g.project_id] ?? null,
+      })),
     };
   });
