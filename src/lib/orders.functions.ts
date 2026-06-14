@@ -258,7 +258,7 @@ export const bulkUploadTracking = createServerFn({ method: "POST" })
         failures.push({ orderNo: row.orderNo, reason: "订单不存在" });
         continue;
       }
-      const patch: Record<string, unknown> = {
+      const patch: OrdersUpdatePatch = {
         tracking_no: row.trackingNo,
         status: "shipped",
         shipped_at: now,
