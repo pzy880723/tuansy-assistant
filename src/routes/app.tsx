@@ -52,9 +52,9 @@ function TopBar() {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
         <Link to="/" className="flex shrink-0 items-center gap-1.5">
-          <img src={logoHorizontal.url} alt="团宝助手" className="h-9 w-auto" />
+          <img src={logoHorizontal.url} alt="团宝助手" className="h-14 w-auto" />
         </Link>
 
         {projectMatch ? (
