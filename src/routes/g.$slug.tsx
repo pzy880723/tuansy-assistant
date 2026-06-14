@@ -220,7 +220,8 @@ function SkuCard({ sku }: { sku: Sku }) {
 
 function BlockView({ block }: { block: IntroBlock }) {
   if (block.type === "text") {
-    return <div className="whitespace-pre-wrap text-[14px] leading-7">{block.text}</div>;
+    const text = block.text.replace(/\\n/g, "\n").replace(/\\r/g, "").replace(/\n{3,}/g, "\n\n");
+    return <div className="whitespace-pre-wrap text-[14px] leading-7">{text}</div>;
   }
   if (block.type === "image_lg" && block.url) {
     return <img src={block.url} alt="" className="w-full rounded-lg" />;
