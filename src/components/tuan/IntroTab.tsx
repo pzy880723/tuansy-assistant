@@ -598,6 +598,84 @@ export function IntroTab({
 
   const draggedBlock = drag ? blocks.find((b) => b.id === drag.id) : null;
 
+  // ============= Cross-pane image drag (from chat) =============
+  // Subscribe to incoming chat-image drags; show drop indicator and accept drop.
+  const incomingDrag = useImageDrag();
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+  const [incomingDropIdx, setIncomingDropIdx] = useState<number | null>(null);
+
+  // Helper: find block index where pointer Y lands (inserts BEFORE this index).
+  const computeIncomingDropIndex = (y: number): number => {
+    const list = blocksRef.current;
+    for (let i = 0; i < list.length; i++) {
+      const el = blockRefs.current.get(list[i].id);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (y < r.top + r.height / 2) return i;
+    }
+    return list.length;
+  };
+
+  // Register the drop handler once; commit insertion when chat releases.
+  useEffect(() => {
+    const off = imageDragBus.registerDropHandler((x, y, url) => {
+      const c = containerRef.current;
+      if (!c) return false;
+      const r = c.getBoundingClientRect();
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false;
+      const idx = computeIncomingDropIndex(y);
+      const next = blocksRef.current.slice();
+      next.splice(idx, 0, { id: genId(), type: "image_lg", url });
+      setBlocks(next);
+      toast.success("已插入大图");
+      setIncomingDropIdx(null);
+      return true;
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track pointer position to show insertion-line indicator.
+  useEffect(() => {
+    if (!incomingDrag) {
+      setIncomingDropIdx(null);
+      return;
+    }
+    const c = containerRef.current;
+    if (!c) return;
+    const r = c.getBoundingClientRect();
+    const inside =
+      incomingDrag.x >= r.left &&
+      incomingDrag.x <= r.right &&
+      incomingDrag.y >= r.top &&
+      incomingDrag.y <= r.bottom;
+    setIncomingDropIdx(inside ? computeIncomingDropIndex(incomingDrag.y) : null);
+  }, [incomingDrag]);
+
+  // Position of the insertion line in viewport coords (rendered via portal).
+  const incomingLineRect = (() => {
+    if (incomingDropIdx == null) return null;
+    const c = containerRef.current;
+    if (!c) return null;
+    const list = blocksRef.current;
+    if (list.length === 0) {
+      const r = c.getBoundingClientRect();
+      return { left: r.left + 12, width: r.width - 24, top: r.top + r.height / 2 };
+    }
+    if (incomingDropIdx >= list.length) {
+      const lastEl = blockRefs.current.get(list[list.length - 1].id);
+      if (!lastEl) return null;
+      const r = lastEl.getBoundingClientRect();
+      return { left: r.left, width: r.width, top: r.bottom + 2 };
+    }
+    const el = blockRefs.current.get(list[incomingDropIdx].id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { left: r.left, width: r.width, top: r.top - 2 };
+  })();
+
+
   return (
     <div className="space-y-2 px-2 pb-3 pt-2">
       {/* hidden file inputs */}
