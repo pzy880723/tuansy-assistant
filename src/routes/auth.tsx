@@ -52,14 +52,9 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-[oklch(0.97_0.02_55)] to-background px-4">
       <div className="w-full max-w-sm rounded-2xl border bg-card p-7 shadow-xl">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-base font-bold text-white shadow">
-            团
-          </span>
-          <div>
-            <div className="text-base font-semibold tracking-tight">团宝助手</div>
-            <div className="text-xs text-muted-foreground">登录后开始创建你的团购</div>
-          </div>
+        <div className="mb-6 flex items-center gap-3">
+          <img src={logoHorizontal.url} alt="团宝助手" className="h-9 w-auto" />
+          <div className="text-xs text-muted-foreground">登录后开始创建你的团购</div>
         </div>
 
         {sessionError ? (

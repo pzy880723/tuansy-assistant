@@ -40,10 +40,7 @@ function TopNav() {
     <header className="sticky top-0 z-40 border-b border-white/5 bg-[oklch(0.13_0.012_50/0.8)] backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
         <Link to="/" className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-sm font-bold text-white shadow-[0_4px_16px_oklch(0.7_0.19_45/0.5)]">
-            团
-          </span>
-          <span className="font-semibold tracking-tight">团宝助手</span>
+          <img src={logoDark.url} alt="团宝助手" className="h-8 w-auto" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
           <a href="#features" className="hover:text-white">产品能力</a>

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Chrome, Download } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
+import logoAppIcon from "@/assets/logo-app-icon.png.asset.json";
 
 export const Route = createFileRoute("/extension")({
   head: () => ({ meta: [{ title: "Chrome 插件 — 团宝助手" }] }),
@@ -37,9 +38,11 @@ function ExtensionPage() {
       </div>
       <main className="mx-auto max-w-3xl px-5 py-16">
         <div className="text-center">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-white shadow-[0_12px_32px_oklch(0.7_0.19_45/0.4)]">
-            <Chrome className="h-7 w-7" />
-          </div>
+          <img
+            src={logoAppIcon.url}
+            alt="团宝助手"
+            className="mx-auto h-20 w-20 rounded-2xl shadow-[0_12px_32px_oklch(0.7_0.19_45/0.4)]"
+          />
           <h1 className="mt-6 text-3xl font-bold tracking-tight">团宝快团团助手</h1>
           <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
             把团宝项目里的标题、介绍、SKU、图片，一键填入快团团 PC 后台

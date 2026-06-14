@@ -76,9 +76,7 @@ function InboxScreen() {
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-orange-100 bg-[#fff7ed]/95 backdrop-blur-xl">
         <div className="flex items-center gap-2 px-4 py-3">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-xs font-bold text-white shadow-[0_3px_10px_oklch(0.7_0.19_45/0.4)]">
-            团
-          </span>
+          <img src={logoMascot.url} alt="团宝" className="h-8 w-8 rounded-lg object-cover" />
           <div className="flex-1">
             <div className="text-[15px] font-semibold leading-tight">收料台</div>
             <div className="text-[11px] text-muted-foreground">把素材丢给团宝，电脑端会自动生成文案</div>
