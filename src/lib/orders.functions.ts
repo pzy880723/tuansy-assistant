@@ -190,7 +190,8 @@ export const listCustomers = createServerFn({ method: "POST" })
       .limit(2000);
     if (data.q) q = q.or(`buyer_phone.ilike.%${data.q}%,buyer_name.ilike.%${data.q}%`);
     const { data: rows } = await q;
-    const map = new Map<string, { phone: string; name: string; lastAddress: unknown; orderCount: number; totalCents: number; lastAt: string }>();
+    type AddrObj = { province?: string; city?: string; district?: string; detail?: string };
+    const map = new Map<string, { phone: string; name: string; lastAddress: AddrObj; orderCount: number; totalCents: number; lastAt: string }>();
     for (const r of rows ?? []) {
       const prev = map.get(r.buyer_phone);
       if (prev) {
