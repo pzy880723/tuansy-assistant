@@ -90,6 +90,16 @@ function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** Convert literal "\n" (backslash+n) into real newlines so whitespace-pre-wrap renders them.
+ *  AI-generated copy often contains escaped newlines; this normalizes for display AND for editing. */
+function normalizeTextNewlines(text: string) {
+  return (text ?? "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 /** Auto-resizing textarea that grows with content. Never overwrites local
  *  state while focused (prevents cursor jump / lost chars). */
 function AutoTextarea({
@@ -1246,7 +1256,7 @@ function BlockCard({
         isEditing ? (
           <AutoTextarea
             autoFocus
-            value={block.text}
+            value={normalizeTextNewlines(block.text)}
             onChange={onChangeText}
             onBlur={(v) => onFinishEditText(v)}
             placeholder="请输入文字内容（支持换行）"
@@ -1258,7 +1268,7 @@ function BlockCard({
             onClick={onStartEditText}
             className="w-full whitespace-pre-wrap rounded-md border border-transparent px-1 py-0.5 text-left text-[13px] text-[#323233] hover:border-[#dcdee0]"
           >
-            {block.text || <span className="text-[#c8c9cc]">点击编辑文字</span>}
+            {normalizeTextNewlines(block.text) || <span className="text-[#c8c9cc]">点击编辑文字</span>}
           </button>
         )
       )}
@@ -1396,7 +1406,7 @@ function BlockGhost({ block }: { block: IntroBlock }) {
     <div>
       {block.type === "text" && (
         <div className="whitespace-pre-wrap text-[13px] leading-snug text-[#323233] line-clamp-3">
-          {block.text || <span className="text-[#c8c9cc]">（空文字）</span>}
+          {normalizeTextNewlines(block.text) || <span className="text-[#c8c9cc]">（空文字）</span>}
         </div>
       )}
       {block.type === "image_lg" && (
