@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import logoMascot from "@/assets/logo-mascot.png.asset.json";
 import { useImageAttachments } from "@/lib/use-image-attachments";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -91,6 +92,7 @@ type ProductData = {
 
 function ProjectEditor() {
   const { id } = Route.useParams();
+  const isMobile = useIsMobile();
 
   const get = useServerFn(getProject);
 
@@ -108,6 +110,30 @@ function ProjectEditor() {
     );
   }
 
+  const availableImages = (data?.images ?? [])
+    .map((i) => i.url)
+    .filter(Boolean) as string[];
+  const projectForPreview = data?.project
+    ? {
+        id: data.project.id,
+        product: (data.project.product ?? undefined) as ProductData | undefined,
+        intro: (data.project.intro ?? undefined) as IntroData | undefined,
+        skus: (data.project.skus ?? undefined) as SkuItem[] | undefined,
+        settings: (data.project.settings ?? undefined) as SettingsData | undefined,
+      }
+    : undefined;
+
+  if (isMobile) {
+    return (
+      <MobileProjectEditor
+        projectId={id}
+        project={data?.project ?? null}
+        availableImages={availableImages}
+        projectForPreview={projectForPreview}
+      />
+    );
+  }
+
   return (
     <div className="flex h-[calc(100vh-2.75rem)] flex-col">
       <DragImageGhost />
@@ -120,22 +146,91 @@ function ProjectEditor() {
         <ResizablePanel defaultSize="62%" minSize="25%">
           <PreviewPane
             projectId={id}
-            availableImages={(data?.images ?? []).map((i) => i.url).filter(Boolean) as string[]}
-            project={
-              data?.project
-                ? {
-                    id: data.project.id,
-                    product: (data.project.product ?? undefined) as ProductData | undefined,
-                    intro: (data.project.intro ?? undefined) as IntroData | undefined,
-                    skus: (data.project.skus ?? undefined) as SkuItem[] | undefined,
-                    settings: (data.project.settings ?? undefined) as SettingsData | undefined,
-                  }
-                : undefined
-            }
+            availableImages={availableImages}
+            project={projectForPreview}
           />
         </ResizablePanel>
 
       </ResizablePanelGroup>
+    </div>
+  );
+}
+
+/* ============== Mobile editor: tab + horizontal swipe ============== */
+function MobileProjectEditor({
+  projectId,
+  project,
+  availableImages,
+  projectForPreview,
+}: {
+  projectId: string;
+  project: Parameters<typeof ChatPane>[0]["project"];
+  availableImages: string[];
+  projectForPreview: Parameters<typeof PreviewPane>[0]["project"];
+}) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [tab, setTab] = useState<"chat" | "preview">("chat");
+
+  const goTo = (next: "chat" | "preview") => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const target = next === "chat" ? 0 : el.clientWidth;
+    el.scrollTo({ left: target, behavior: "smooth" });
+    setTab(next);
+  };
+
+  const onScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const next = el.scrollLeft > el.clientWidth / 2 ? "preview" : "chat";
+    if (next !== tab) setTab(next);
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-2.75rem)] flex-col overflow-hidden">
+      <DragImageGhost />
+      {/* Mobile tab switcher */}
+      <div className="flex shrink-0 items-center justify-center gap-1 border-b bg-background px-2 py-1.5">
+        <div className="inline-flex rounded-full bg-muted p-0.5 text-xs font-medium">
+          {([
+            { v: "chat", label: "对话" },
+            { v: "preview", label: "预览" },
+          ] as const).map((t) => (
+            <button
+              key={t.v}
+              type="button"
+              onClick={() => goTo(t.v)}
+              className={
+                "rounded-full px-4 py-1 transition " +
+                (tab === t.v
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground")
+              }
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Horizontal swipe container */}
+      <div
+        ref={scrollerRef}
+        onScroll={onScroll}
+        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        style={{ scrollbarWidth: "none" }}
+      >
+        <section className="h-full w-screen shrink-0 snap-start overflow-hidden">
+          <ChatPane projectId={projectId} project={project} />
+        </section>
+        <section className="h-full w-screen shrink-0 snap-start overflow-hidden">
+          <PreviewPane
+            projectId={projectId}
+            availableImages={availableImages}
+            project={projectForPreview}
+          />
+        </section>
+      </div>
     </div>
   );
 }
@@ -964,7 +1059,7 @@ function ChatPane({
                 ? "团宝正在处理上一条，回车可加入队列…"
                 : "告诉团宝你想怎么改，或拖/粘贴图片进来 (Enter 发送，Shift+Enter 换行)"
             }
-            className="max-h-[24rem] min-h-[44px] w-full resize-y overflow-y-auto bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            className="max-h-[24rem] min-h-[44px] w-full resize-y overflow-y-auto bg-transparent px-2 py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground md:text-sm"
           />
           <div className="flex items-center justify-between gap-2">
             <button
@@ -1806,7 +1901,7 @@ function PreviewPane({
       </div>
 
 
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto px-2 py-3 md:px-4 md:py-6">
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
           {tab === "intro" && (
             <IntroTab

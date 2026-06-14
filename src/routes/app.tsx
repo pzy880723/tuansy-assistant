@@ -55,9 +55,9 @@ function TopBar() {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-3 md:h-16 md:gap-3 md:px-4">
         <Link to="/" className="flex shrink-0 items-center gap-1.5">
-          <img src={logoHorizontal.url} alt="团宝助手" className="h-14 w-auto" />
+          <img src={logoHorizontal.url} alt="团宝助手" className="h-10 w-auto md:h-14" />
         </Link>
 
         {projectMatch ? (
@@ -97,7 +97,7 @@ function GlobalNav({ pathname }: { pathname: string }) {
             )}
           >
             <n.icon className="h-3.5 w-3.5" />
-            {n.label}
+            <span className="hidden md:inline">{n.label}</span>
           </Link>
         );
       })}
