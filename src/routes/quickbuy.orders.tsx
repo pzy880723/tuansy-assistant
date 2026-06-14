@@ -20,6 +20,13 @@ import {
 import { ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, fenToYuan, type OrderStatus, type PaymentStatus } from "@/lib/quickbuy-shared";
 import { z } from "zod";
 
+type UpdateOrderInput = {
+  id: string;
+  action: "mark_paid" | "mark_unpaid" | "ship" | "complete" | "refund" | "cancel" | "reopen";
+  trackingNo?: string;
+  shippingCarrier?: string;
+};
+
 const searchSchema = z.object({
   groupOrderId: z.string().optional(),
   status: z.enum(["pending", "paid", "shipped", "completed", "refunded", "cancelled"]).optional(),
