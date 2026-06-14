@@ -62,7 +62,7 @@ function OrdersPage() {
   const total = data?.total ?? 0;
 
   const updateStatus = useMutation({
-    mutationFn: (input: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: input }),
+    mutationFn: (input: UpdateOrderInput) => updateFn({ data: input }),
     onSuccess: () => {
       toast.success("已更新");
       qc.invalidateQueries({ queryKey: ["qb-orders"] });
