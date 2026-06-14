@@ -1901,7 +1901,7 @@ function PreviewPane({
       </div>
 
 
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto px-2 py-3 md:px-4 md:py-6">
         <TuanPhoneShell tab={tab} onTabChange={setTab}>
           {tab === "intro" && (
             <IntroTab
