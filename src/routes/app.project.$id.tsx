@@ -188,6 +188,15 @@ function ChatPane({
   });
   const logics = logicsData?.logics ?? [];
 
+  const getChatFn = useServerFn(getProjectChat);
+  const saveChatFn = useServerFn(saveProjectChat);
+  const { data: chatData } = useQuery({
+    queryKey: ["project-chat", projectId],
+    queryFn: () => getChatFn({ data: { id: projectId } }),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+  // Initial messages from localStorage cache for instant render; server hydrates after.
   const initial: UIMessage[] = (() => {
     if (typeof window === "undefined") return [];
     try {
@@ -197,6 +206,7 @@ function ChatPane({
       return [];
     }
   })();
+  const hydratedRef = useRef(false);
 
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     if (typeof window === "undefined") return [];
