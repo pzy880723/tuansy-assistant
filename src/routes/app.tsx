@@ -97,7 +97,7 @@ function GlobalNav({ pathname }: { pathname: string }) {
             )}
           >
             <n.icon className="h-3.5 w-3.5" />
-            {n.label}
+            <span className="hidden md:inline">{n.label}</span>
           </Link>
         );
       })}
