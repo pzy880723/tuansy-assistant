@@ -46,6 +46,12 @@ import { readImageStream } from "@/lib/stream-image";
 import { fillLeaderDefaults } from "@/lib/leader-defaults";
 import { listCopyLogics } from "@/lib/copy-logics.functions";
 import {
+  listProjectPendingInbox,
+  adoptInboxImagesToProject,
+  markInboxConsumed,
+} from "@/lib/inbox.functions";
+import { InboxIntakeCard, type InboxItemLite } from "@/components/tuan/InboxIntakeCard";
+import {
   Select,
   SelectContent,
   SelectItem,
