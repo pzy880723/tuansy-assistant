@@ -18,7 +18,13 @@ const suggestions = [
 type AnyPart = { type: string; text?: string; input?: unknown; output?: unknown; result?: unknown };
 
 export function AssistantPanel({ compact = false }: { compact?: boolean }) {
-  const [transport] = useState(() => new DefaultChatTransport({ api: "/api/quickbuy-chat" }));
+  const [transport] = useState(() => new DefaultChatTransport({
+    api: "/api/quickbuy-chat",
+    headers: () => {
+      const t = readAuthToken();
+      return t ? { "x-tuan-session": t } : {};
+    },
+  }));
   const { messages, sendMessage, status } = useChat({ transport });
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
