@@ -25,7 +25,9 @@ import { toast } from "sonner";
 import { InlineText, MiniBtn } from "./primitives";
 import { type IntroBlock, type IntroData, blockMentionToken } from "./types";
 import { AIGenerateImageDialog } from "./AIGenerateImageDialog";
+import { ImageLightbox } from "./ImageLightbox";
 import { uploadProductImage } from "@/lib/projects.functions";
+import { imageDragBus, useImageDrag } from "@/lib/drag-image-bus";
 import {
   Popover,
   PopoverContent,
