@@ -56,7 +56,7 @@ type Sku = {
 };
 
 function BuyPage() {
-  const { group } = Route.useLoaderData();
+  const { group, leader } = Route.useLoaderData();
   const skus = (group.snapshot_skus ?? []) as Sku[];
   const intro = (group.snapshot_intro ?? {}) as { blocks?: IntroBlock[]; title?: string; description?: string };
   const [open, setOpen] = useState(false);
@@ -85,64 +85,48 @@ function BuyPage() {
   const priceLabel = range.min === 0
     ? "¥0.00"
     : range.min === range.max
-      ? `¥${range.min.toFixed(2)}`
-      : `¥${range.min.toFixed(2)}-${range.max.toFixed(2)}`;
+      ? `¥${range.min.toFixed(2)} 起`
+      : `¥${range.min.toFixed(2)} 起`;
 
-  const firstSkuImg = skus[0]?.image || skus[0]?.images?.[0] || group.cover_image_url || null;
+  // Title source: first text block from intro → fallback to group.title
+  const firstTextBlock = (intro.blocks ?? []).find((b): b is Extract<IntroBlock, { type: "text" }> => b.type === "text" && !!b.text?.trim());
+  const heroTitle = firstTextBlock?.text?.trim() || group.title;
+  const restBlocks = (intro.blocks ?? []).filter((b) => b.id !== firstTextBlock?.id);
+
+  const leaderInitial = (leader?.nickname || "团").slice(0, 1);
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] pb-24 text-[15px]">
       <div className="mx-auto max-w-md">
-        {/* Cover */}
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-          {group.cover_image_url ? (
-            <img src={group.cover_image_url} alt={group.title} className="h-full w-full object-cover" />
-          ) : null}
-        </div>
-
-        {/* Product summary card overlapping cover */}
-        <div className="relative -mt-6 px-3">
-          <div className="rounded-2xl bg-white p-3 shadow-sm">
-            <div className="flex gap-3">
-              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
-                {firstSkuImg ? (
-                  <img src={firstSkuImg} alt="" className="h-full w-full object-cover" />
-                ) : null}
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <h1 className="line-clamp-2 text-[15px] font-semibold leading-snug">{group.title}</h1>
-                {intro.description && (
-                  <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{intro.description}</p>
-                )}
-                <div className="mt-auto flex items-end justify-between pt-2">
-                  <div className="min-w-0">
-                    <span className="text-[18px] font-bold text-red-500">{priceLabel}</span>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">已售 {group.items_sold ?? 0}</div>
-                  </div>
-                  <button
-                    disabled={closed}
-                    onClick={() => setOpen(true)}
-                    className="h-8 shrink-0 rounded-full bg-green-500 px-4 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
-                  >
-                    跟团购买
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* Leader header */}
+        <div className="flex items-center gap-3 border-b border-border/50 bg-white px-4 py-3">
+          <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-sm font-semibold text-white">
+            {leaderInitial}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{leader?.nickname || "团长"}</div>
+            <div className="text-[11px] text-muted-foreground">团长开团</div>
           </div>
         </div>
 
-        {/* Hot indicator */}
-        <div className="px-3 pt-3">
-          <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[12px] font-medium text-orange-600">
-            🔥 {group.items_sold ?? 0} 人在抢
-          </span>
-        </div>
+        {/* Title section */}
+        <section className="bg-white px-4 pt-4 pb-3">
+          <div className="mb-2">
+            <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5 text-[12px] font-medium text-orange-600">
+              🔥 {group.items_sold ?? 0} 人在抢
+            </span>
+          </div>
+          <h1 className="whitespace-pre-wrap text-[18px] font-bold leading-7">{heroTitle}</h1>
+          <div className="mt-2 flex items-center gap-3 text-[12px] text-muted-foreground">
+            <span className="text-[15px] font-bold text-red-500">{priceLabel}</span>
+            <span>已售 {group.items_sold ?? 0}</span>
+          </div>
+        </section>
 
         {/* Intro blocks (body) */}
-        {(intro.blocks?.length ?? 0) > 0 && (
-          <section className="mt-3 space-y-4 bg-white px-4 py-4 text-[15px] leading-7">
-            {(intro.blocks ?? []).map((b) => <BlockView key={b.id} block={b} />)}
+        {restBlocks.length > 0 && (
+          <section className="mt-2 space-y-4 bg-white px-4 py-4 text-[15px] leading-7">
+            {restBlocks.map((b) => <BlockView key={b.id} block={b} />)}
           </section>
         )}
 
@@ -156,6 +140,7 @@ function BuyPage() {
           </section>
         )}
       </div>
+
 
       {/* Fixed bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-md bg-white border-t p-3">
