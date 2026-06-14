@@ -422,3 +422,102 @@ export const saveProjectChat = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============== 素材库 ==============
+
+function genBlockId() {
+  return `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function collectIntroImageUrls(intro: unknown): Set<string> {
+  const out = new Set<string>();
+  const blocks = (intro as { blocks?: Array<Record<string, unknown>> } | null)?.blocks;
+  if (!Array.isArray(blocks)) return out;
+  for (const b of blocks) {
+    if (b?.type === "image_lg" && typeof b.url === "string" && b.url) out.add(b.url);
+    if (b?.type === "image_sm" && Array.isArray(b.urls)) {
+      for (const u of b.urls) if (typeof u === "string" && u) out.add(u);
+    }
+  }
+  return out;
+}
+
+export const listProjectAssets = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => z.object({ projectId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.projectId, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: rows, error }, { data: proj }] = await Promise.all([
+      supabaseAdmin
+        .from("project_images")
+        .select("id, url, source, created_at")
+        .eq("project_id", data.projectId)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin.from("projects").select("intro").eq("id", data.projectId).maybeSingle(),
+    ]);
+    if (error) throw new Error(error.message);
+    const used = collectIntroImageUrls(proj?.intro);
+    const assets = (rows ?? []).map((r) => ({
+      id: r.id as string,
+      url: r.url as string,
+      source: ((r as { source?: string }).source ?? "manual") as "manual" | "ai" | "inbox",
+      created_at: r.created_at as string,
+      used_in_preview: used.has(r.url as string),
+    }));
+    return { assets };
+  });
+
+export const appendImagesToPreview = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        projectId: z.string().uuid(),
+        urls: z.array(z.string().url()).min(1).max(50),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.projectId, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error: ge } = await supabaseAdmin
+      .from("projects")
+      .select("intro")
+      .eq("id", data.projectId)
+      .maybeSingle();
+    if (ge) throw new Error(ge.message);
+    const intro = ((row?.intro as Record<string, unknown> | null) ?? {}) as {
+      blocks?: Array<Record<string, unknown>>;
+    };
+    const blocks = Array.isArray(intro.blocks) ? [...intro.blocks] : [];
+    for (const url of data.urls) {
+      blocks.push({ id: genBlockId(), type: "image_lg", url });
+    }
+    const nextIntro = { ...intro, blocks };
+    const { error } = await supabaseAdmin
+      .from("projects")
+      .update({ intro: nextIntro } as never)
+      .eq("id", data.projectId);
+    if (error) throw new Error(error.message);
+    return { ok: true, appended: data.urls.length };
+  });
+
+export const deleteProjectAsset = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error: ge } = await supabaseAdmin
+      .from("project_images")
+      .select("owner_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (ge) throw new Error(ge.message);
+    if (!row) throw new Error("素材不存在");
+    if (row.owner_id && row.owner_id !== userId) throw new Error("无权删除");
+    const { error } = await supabaseAdmin.from("project_images").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
