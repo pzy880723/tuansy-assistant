@@ -160,8 +160,10 @@ function ProjectInlineHeader({ id }: { id: string }) {
         placeholder="未命名项目"
       />
       <SaveBadge state={savingName} />
+      <AssetLibraryButton projectId={id} />
       <SyncToKttButton projectId={id} projectName={name} />
     </>
+
   );
 }
 
