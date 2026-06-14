@@ -50,6 +50,8 @@ import {
   adoptInboxImagesToProject,
   markInboxConsumed,
 } from "@/lib/inbox.functions";
+import { appendImagesToPreview } from "@/lib/projects.functions";
+
 import { InboxIntakeCard, type InboxItemLite } from "@/components/tuan/InboxIntakeCard";
 import {
   Select,
