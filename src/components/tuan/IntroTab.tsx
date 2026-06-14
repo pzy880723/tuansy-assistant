@@ -897,6 +897,7 @@ export function IntroTab({
                     : undefined
                 }
                 onPreviewImage={openPreviewImage}
+              />
             ))}
           </div>
         )}
