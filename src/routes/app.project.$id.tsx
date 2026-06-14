@@ -156,6 +156,16 @@ type HistoryEntry = {
   messageIndex: number;
 };
 
+function guessMimeFromUrl(url: string): string {
+  const clean = url.split("?")[0].toLowerCase();
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  if (clean.endsWith(".gif")) return "image/gif";
+  if (clean.endsWith(".heic")) return "image/heic";
+  return "image/jpeg";
+}
+
+
 function ChatPane({
   projectId,
   project,
