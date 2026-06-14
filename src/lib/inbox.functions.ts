@@ -169,3 +169,81 @@ export const markInboxConsumed = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------- 电脑端：把一批 inbox 中的图片落地到 project_images，并把整批 ids 标 consumed ----------
+export const adoptInboxImagesToProject = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        projectId: z.string().uuid(),
+        ids: z.array(z.string().uuid()).min(1).max(100),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 验证项目归属
+    const { data: project } = await supabaseAdmin
+      .from("projects")
+      .select("owner_id")
+      .eq("id", data.projectId)
+      .maybeSingle();
+    if (!project || project.owner_id !== userId) throw new Error("无权写入该项目");
+
+    // 拉取这批 inbox（限定本人 + 项目 + 仍 pending）
+    const { data: items, error: itemsErr } = await supabaseAdmin
+      .from("inbox_items")
+      .select("id, kind, payload")
+      .in("id", data.ids)
+      .eq("user_id", userId)
+      .eq("project_id", data.projectId)
+      .eq("status", "pending");
+    if (itemsErr) throw new Error(itemsErr.message);
+
+    const urls: string[] = [];
+    for (const it of items ?? []) {
+      if (it.kind !== "image") continue;
+      const payload = (it.payload ?? {}) as { urls?: unknown };
+      if (Array.isArray(payload.urls)) {
+        for (const u of payload.urls) {
+          if (typeof u === "string" && u.startsWith("http")) urls.push(u);
+        }
+      }
+    }
+
+    let adopted = 0;
+    if (urls.length > 0) {
+      // 计算续号
+      const { data: maxRow } = await supabaseAdmin
+        .from("project_images")
+        .select("sort_order")
+        .eq("project_id", data.projectId)
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let nextOrder = (maxRow?.sort_order ?? -1) + 1;
+
+      const rows = urls.map((url) => ({
+        project_id: data.projectId,
+        owner_id: userId,
+        url,
+        sort_order: nextOrder++,
+        role: "product",
+      }));
+      const { error: insErr } = await supabaseAdmin.from("project_images").insert(rows);
+      if (insErr) throw new Error(insErr.message);
+      adopted = rows.length;
+    }
+
+    // 整批 ids 全部 consumed（含 text/link，便于一次清掉提醒）
+    const { error: updErr } = await supabaseAdmin
+      .from("inbox_items")
+      .update({ status: "consumed", processed_at: new Date().toISOString() })
+      .in("id", data.ids)
+      .eq("user_id", userId);
+    if (updErr) throw new Error(updErr.message);
+
+    return { adopted, urls };
+  });
