@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Chrome, Package, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, Check, Chrome, Package, Settings as SettingsIcon, ShoppingBag } from "lucide-react";
 import { getProject, updateProject } from "@/lib/projects.functions";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
