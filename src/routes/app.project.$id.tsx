@@ -40,7 +40,7 @@ import {
 import { CopyLogicSection } from "@/components/copy-logic/CopyLogicSection";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getProject, updateProject } from "@/lib/projects.functions";
+import { getProject, updateProject, getProjectChat, saveProjectChat } from "@/lib/projects.functions";
 import { uploadAiGeneratedImage } from "@/lib/image-gen.functions";
 import { readImageStream } from "@/lib/stream-image";
 import { fillLeaderDefaults } from "@/lib/leader-defaults";
@@ -188,6 +188,15 @@ function ChatPane({
   });
   const logics = logicsData?.logics ?? [];
 
+  const getChatFn = useServerFn(getProjectChat);
+  const saveChatFn = useServerFn(saveProjectChat);
+  const { data: chatData } = useQuery({
+    queryKey: ["project-chat", projectId],
+    queryFn: () => getChatFn({ data: { id: projectId } }),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+  // Initial messages from localStorage cache for instant render; server hydrates after.
   const initial: UIMessage[] = (() => {
     if (typeof window === "undefined") return [];
     try {
@@ -197,6 +206,7 @@ function ChatPane({
       return [];
     }
   })();
+  const hydratedRef = useRef(false);
 
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     if (typeof window === "undefined") return [];
@@ -248,11 +258,39 @@ function ChatPane({
   const img = useImageAttachments({ projectId });
   const isLoading = status === "submitted" || status === "streaming";
 
+  // Hydrate from server once chat history loads (server wins over localStorage cache).
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    if (!chatData) return;
+    hydratedRef.current = true;
+    try {
+      const serverMsgs = JSON.parse(chatData.messagesJson) as UIMessage[];
+      if (Array.isArray(serverMsgs) && serverMsgs.length > 0) {
+        setMessages(serverMsgs);
+      }
+    } catch {
+      // ignore
+    }
+  }, [chatData, setMessages]);
+
+  // Persist locally (instant) and to server (debounced) on every change after hydration.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(storageKey, JSON.stringify(messages));
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, storageKey]);
+    if (!hydratedRef.current) return;
+    if (status === "streaming" || status === "submitted") return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void saveChatFn({ data: { id: projectId, messagesJson: JSON.stringify(messages) } }).catch(
+        () => {/* silent — localStorage still holds it */},
+      );
+    }, 600);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [messages, storageKey, status, saveChatFn, projectId]);
 
   useEffect(() => {
     if (status !== "streaming") return;

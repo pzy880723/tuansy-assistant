@@ -360,3 +360,40 @@ export const updateProjectMeta = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+export const getProjectChat = createServerFn({ method: "GET" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.id, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("projects")
+      .select("chat_messages")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const arr = Array.isArray((row as { chat_messages?: unknown } | null)?.chat_messages)
+      ? (row as { chat_messages: unknown[] }).chat_messages
+      : [];
+    return { messagesJson: JSON.stringify(arr) };
+  });
+
+export const saveProjectChat = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string; messagesJson: string }) =>
+    z.object({ id: z.string().uuid(), messagesJson: z.string().max(5_000_000) }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await assertProjectOwner(data.id, userId);
+    let parsed: unknown;
+    try { parsed = JSON.parse(data.messagesJson); } catch { throw new Error("对话记录格式异常"); }
+    if (!Array.isArray(parsed)) throw new Error("对话记录必须是数组");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("projects")
+      .update({ chat_messages: parsed } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
