@@ -21,6 +21,7 @@ import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as QuickbuyOrdersRouteImport } from './routes/quickbuy.orders'
 import { Route as QuickbuyGroupsRouteImport } from './routes/quickbuy.groups'
+import { Route as QuickbuyFinanceRouteImport } from './routes/quickbuy.finance'
 import { Route as QuickbuyCustomersRouteImport } from './routes/quickbuy.customers'
 import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
 import { Route as MInboxRouteImport } from './routes/m.inbox'
@@ -94,6 +95,11 @@ const QuickbuyOrdersRoute = QuickbuyOrdersRouteImport.update({
 const QuickbuyGroupsRoute = QuickbuyGroupsRouteImport.update({
   id: '/groups',
   path: '/groups',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyFinanceRoute = QuickbuyFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
   getParentRoute: () => QuickbuyRoute,
 } as any)
 const QuickbuyCustomersRoute = QuickbuyCustomersRouteImport.update({
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
   '/quickbuy/customers': typeof QuickbuyCustomersRoute
+  '/quickbuy/finance': typeof QuickbuyFinanceRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
   '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin/': typeof AdminIndexRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
   '/quickbuy/customers': typeof QuickbuyCustomersRoute
+  '/quickbuy/finance': typeof QuickbuyFinanceRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
   '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin': typeof AdminIndexRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
   '/quickbuy/customers': typeof QuickbuyCustomersRoute
+  '/quickbuy/finance': typeof QuickbuyFinanceRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
   '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin/': typeof AdminIndexRoute
@@ -270,6 +279,7 @@ export interface FileRouteTypes {
     | '/m/inbox'
     | '/o/$orderNo'
     | '/quickbuy/customers'
+    | '/quickbuy/finance'
     | '/quickbuy/groups'
     | '/quickbuy/orders'
     | '/admin/'
@@ -295,6 +305,7 @@ export interface FileRouteTypes {
     | '/m/inbox'
     | '/o/$orderNo'
     | '/quickbuy/customers'
+    | '/quickbuy/finance'
     | '/quickbuy/groups'
     | '/quickbuy/orders'
     | '/admin'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/m/inbox'
     | '/o/$orderNo'
     | '/quickbuy/customers'
+    | '/quickbuy/finance'
     | '/quickbuy/groups'
     | '/quickbuy/orders'
     | '/admin/'
@@ -436,6 +448,13 @@ declare module '@tanstack/react-router' {
       path: '/groups'
       fullPath: '/quickbuy/groups'
       preLoaderRoute: typeof QuickbuyGroupsRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/finance': {
+      id: '/quickbuy/finance'
+      path: '/finance'
+      fullPath: '/quickbuy/finance'
+      preLoaderRoute: typeof QuickbuyFinanceRouteImport
       parentRoute: typeof QuickbuyRoute
     }
     '/quickbuy/customers': {
@@ -571,6 +590,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface QuickbuyRouteChildren {
   QuickbuyCustomersRoute: typeof QuickbuyCustomersRoute
+  QuickbuyFinanceRoute: typeof QuickbuyFinanceRoute
   QuickbuyGroupsRoute: typeof QuickbuyGroupsRoute
   QuickbuyOrdersRoute: typeof QuickbuyOrdersRoute
   QuickbuyIndexRoute: typeof QuickbuyIndexRoute
@@ -578,6 +598,7 @@ interface QuickbuyRouteChildren {
 
 const QuickbuyRouteChildren: QuickbuyRouteChildren = {
   QuickbuyCustomersRoute: QuickbuyCustomersRoute,
+  QuickbuyFinanceRoute: QuickbuyFinanceRoute,
   QuickbuyGroupsRoute: QuickbuyGroupsRoute,
   QuickbuyOrdersRoute: QuickbuyOrdersRoute,
   QuickbuyIndexRoute: QuickbuyIndexRoute,
