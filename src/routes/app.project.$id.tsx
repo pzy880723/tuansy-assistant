@@ -777,9 +777,21 @@ function ChatPane({
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 && !isLoading && <ChatEmpty onPick={setInput} />}
-        {messages.map((m) => (
-          <MessageRow key={m.id} msg={m} onAnswer={sendText} />
-        ))}
+        {messages.map((m) => {
+          if (m.id.startsWith("inbox-card-")) {
+            return (
+              <InboxIntakeCard
+                key={m.id}
+                items={inboxItems}
+                busy={inboxBusy}
+                onAdoptAll={handleInboxAdoptAll}
+                onLibraryOnly={handleInboxLibraryOnly}
+                onIgnoreAll={handleInboxIgnoreAll}
+              />
+            );
+          }
+          return <MessageRow key={m.id} msg={m} onAnswer={sendText} />;
+        })}
         {status === "submitted" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想… <span className="text-muted-foreground/70">（可点右下方停止）</span>
