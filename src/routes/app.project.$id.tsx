@@ -40,7 +40,7 @@ import {
 import { CopyLogicSection } from "@/components/copy-logic/CopyLogicSection";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getProject, updateProject } from "@/lib/projects.functions";
+import { getProject, updateProject, getProjectChat, saveProjectChat } from "@/lib/projects.functions";
 import { uploadAiGeneratedImage } from "@/lib/image-gen.functions";
 import { readImageStream } from "@/lib/stream-image";
 import { fillLeaderDefaults } from "@/lib/leader-defaults";
