@@ -46,6 +46,12 @@ import { readImageStream } from "@/lib/stream-image";
 import { fillLeaderDefaults } from "@/lib/leader-defaults";
 import { listCopyLogics } from "@/lib/copy-logics.functions";
 import {
+  listProjectPendingInbox,
+  adoptInboxImagesToProject,
+  markInboxConsumed,
+} from "@/lib/inbox.functions";
+import { InboxIntakeCard, type InboxItemLite } from "@/components/tuan/InboxIntakeCard";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -150,6 +156,16 @@ type HistoryEntry = {
   messageIndex: number;
 };
 
+function guessMimeFromUrl(url: string): string {
+  const clean = url.split("?")[0].toLowerCase();
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  if (clean.endsWith(".gif")) return "image/gif";
+  if (clean.endsWith(".heic")) return "image/heic";
+  return "image/jpeg";
+}
+
+
 function ChatPane({
   projectId,
   project,
@@ -229,7 +245,7 @@ function ChatPane({
         headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
         body: {
           ...body,
-          messages,
+          messages: messages.filter((m) => !m.id.startsWith("inbox-card-")),
           projectId,
           copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
           startupMode: messages[0]?.id.startsWith("seed-plan-") ? "plan" : "draft",
@@ -348,6 +364,151 @@ function ChatPane({
     });
     return off;
   }, [projectId, setMessages]);
+
+  // ============ 手机收料台：进入项目时一次性拉 pending 注入到对话末尾 ============
+  const listPendingFn = useServerFn(listProjectPendingInbox);
+  const adoptInboxFn = useServerFn(adoptInboxImagesToProject);
+  const markConsumedFn = useServerFn(markInboxConsumed);
+  const { data: pendingInbox } = useQuery({
+    queryKey: ["project-inbox-pending", projectId],
+    queryFn: () => listPendingFn({ data: { projectId } }),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    enabled: hydratedRef.current || chatData !== undefined,
+  });
+  const inboxInjectedRef = useRef<string | null>(null);
+  const [inboxBusy, setInboxBusy] = useState<"adopt" | "library" | "ignore" | null>(null);
+  const inboxItems = (pendingInbox?.items ?? []) as InboxItemLite[];
+
+  useEffect(() => {
+    if (!chatData) return; // 等服务端 chat 也回来再注入，避免被 hydrate 覆盖
+    if (!inboxItems.length) return;
+    const batchKey = inboxItems.map((it) => it.id).sort().join("|");
+    if (inboxInjectedRef.current === batchKey) return;
+    // 避免重复：如果当前 messages 已含同 batch 的卡，跳过
+    const cardId = `inbox-card-${batchKey.slice(0, 24)}-${inboxItems.length}`;
+    if (messagesRef.current.some((m) => m.id === cardId)) {
+      inboxInjectedRef.current = batchKey;
+      return;
+    }
+    inboxInjectedRef.current = batchKey;
+    const cardMsg: UIMessage = {
+      id: cardId,
+      role: "system",
+      parts: [{ type: "text", text: "__INBOX_INTAKE__" }],
+    };
+    setMessages([...messagesRef.current, cardMsg]);
+  }, [chatData, inboxItems, setMessages]);
+
+  // 清理"陈旧"卡片：另一台设备已处理时本地仍残留
+  useEffect(() => {
+    if (!pendingInbox) return;
+    if (inboxItems.length > 0) return;
+    if (!messagesRef.current.some((m) => m.id.startsWith("inbox-card-"))) return;
+    setMessages(messagesRef.current.filter((m) => !m.id.startsWith("inbox-card-")));
+  }, [pendingInbox, inboxItems.length, setMessages]);
+
+
+  const removeInboxCard = () => {
+    setMessages(messagesRef.current.filter((m) => !m.id.startsWith("inbox-card-")));
+  };
+
+  const buildIntakeUserMessage = (
+    items: InboxItemLite[],
+    imageUrls: string[],
+  ): { text: string; files: Array<{ url: string; mimeType: string }> } => {
+    const parts: string[] = [];
+    if (imageUrls.length > 0) {
+      parts.push(
+        `我从手机收料台导入了 ${imageUrls.length} 张新图，请你结合这些图，把右边预览补充或替换得更合适，并在回答里说明每张图分别用到了哪个模块。`,
+      );
+    }
+    const texts = items
+      .filter((it) => it.kind === "text" && it.payload.text)
+      .map((it) => it.payload.text!.trim())
+      .filter(Boolean);
+    if (texts.length > 0) {
+      parts.push(
+        `用户从手机端补发了 ${texts.length} 段补充资料，请融入到合适模块：\n` +
+          texts.map((t) => `"""\n${t}\n"""`).join("\n"),
+      );
+    }
+    const links = items.filter((it) => it.kind === "link" && it.payload.url);
+    if (links.length > 0) {
+      parts.push(
+        `用户从手机端补发了 ${links.length} 个参考链接，请抓取核心要点融入文案：\n` +
+          links
+            .map((it) => `- ${it.payload.title || "(无标题)"} ${it.payload.url}`)
+            .join("\n"),
+      );
+    }
+    return {
+      text: parts.join("\n\n"),
+      files: imageUrls.map((u) => ({ url: u, mimeType: guessMimeFromUrl(u) })),
+    };
+  };
+
+  const handleInboxAdoptAll = async () => {
+    if (inboxBusy) return;
+    setInboxBusy("adopt");
+    const items = inboxItems;
+    const ids = items.map((it) => it.id);
+    try {
+      const res = await adoptInboxFn({ data: { projectId, ids } });
+      const built = buildIntakeUserMessage(items, res.urls ?? []);
+      removeInboxCard();
+      if (built.text || built.files.length > 0) {
+        const parts: Array<
+          { type: "text"; text: string } | { type: "file"; mediaType: string; url: string }
+        > = [];
+        if (built.text) parts.push({ type: "text", text: built.text });
+        for (const f of built.files) parts.push({ type: "file", mediaType: f.mimeType, url: f.url });
+        void sendMessage({ role: "user", parts });
+      }
+      void qc.invalidateQueries({ queryKey: ["project-inbox-pending", projectId] });
+      void qc.invalidateQueries({ queryKey: ["inbox-pending-counts"] });
+      void qc.invalidateQueries({ queryKey: ["project", projectId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "导入失败");
+    } finally {
+      setInboxBusy(null);
+    }
+  };
+
+  const handleInboxLibraryOnly = async () => {
+    if (inboxBusy) return;
+    setInboxBusy("library");
+    const ids = inboxItems.map((it) => it.id);
+    try {
+      await adoptInboxFn({ data: { projectId, ids } });
+      removeInboxCard();
+      toast.success("已存入素材库");
+      void qc.invalidateQueries({ queryKey: ["project-inbox-pending", projectId] });
+      void qc.invalidateQueries({ queryKey: ["inbox-pending-counts"] });
+      void qc.invalidateQueries({ queryKey: ["project", projectId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setInboxBusy(null);
+    }
+  };
+
+  const handleInboxIgnoreAll = async () => {
+    if (inboxBusy) return;
+    setInboxBusy("ignore");
+    const ids = inboxItems.map((it) => it.id);
+    try {
+      await markConsumedFn({ data: { ids } });
+      removeInboxCard();
+      void qc.invalidateQueries({ queryKey: ["project-inbox-pending", projectId] });
+      void qc.invalidateQueries({ queryKey: ["inbox-pending-counts"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "操作失败");
+    } finally {
+      setInboxBusy(null);
+    }
+  };
+
 
   type QueuedMsg = {
     id: string;
@@ -625,9 +786,21 @@ function ChatPane({
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 && !isLoading && <ChatEmpty onPick={setInput} />}
-        {messages.map((m) => (
-          <MessageRow key={m.id} msg={m} onAnswer={sendText} />
-        ))}
+        {messages.map((m) => {
+          if (m.id.startsWith("inbox-card-")) {
+            return (
+              <InboxIntakeCard
+                key={m.id}
+                items={inboxItems}
+                busy={inboxBusy}
+                onAdoptAll={handleInboxAdoptAll}
+                onLibraryOnly={handleInboxLibraryOnly}
+                onIgnoreAll={handleInboxIgnoreAll}
+              />
+            );
+          }
+          return <MessageRow key={m.id} msg={m} onAnswer={sendText} />;
+        })}
         {status === "submitted" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> 团宝在想… <span className="text-muted-foreground/70">（可点右下方停止）</span>
