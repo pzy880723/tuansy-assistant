@@ -67,9 +67,9 @@ function ExtensionPage() {
         <section className="mt-6 rounded-2xl border bg-card p-6">
           <h2 className="text-base font-semibold">使用方法</h2>
           <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal pl-5">
-            <li>在团宝项目页右上角点「发送到快团团」，复制链接</li>
-            <li>打开快团团 PC 后台「新建团购」或「编辑团购」页</li>
-            <li>点击右下角橙色「团宝助手」浮窗，或点击浏览器插件图标，粘贴链接 → 拉取项目 → 填入当前页</li>
+            <li>装好插件后，回到团宝项目页，刷新一下</li>
+            <li>点右上角「同步到快团团」按钮</li>
+            <li>插件会自动打开快团团后台并把内容填入，无需复制粘贴</li>
           </ol>
           <p className="mt-4 text-xs text-muted-foreground">
             首版支持：标题、富文本介绍、首个 SKU 价格库存、开始/结束时间、介绍区图片。
