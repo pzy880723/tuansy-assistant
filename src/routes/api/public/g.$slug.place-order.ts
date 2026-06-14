@@ -156,7 +156,6 @@ export const Route = createFileRoute("/api/public/g/$slug/place-order")({
         if (itErr) return Response.json({ error: itErr.message }, { status: 500 });
 
         // Update group counters (best-effort).
-        await supabaseAdmin.rpc("noop").catch(() => null);
         const { data: cur } = await supabaseAdmin
           .from("group_orders")
           .select("order_count, items_sold, gmv_cents")

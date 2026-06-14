@@ -201,7 +201,7 @@ export const listCustomers = createServerFn({ method: "POST" })
         map.set(r.buyer_phone, {
           phone: r.buyer_phone,
           name: r.buyer_name,
-          lastAddress: r.address,
+          lastAddress: (r.address ?? {}) as AddrObj,
           orderCount: 1,
           totalCents: r.status === "cancelled" || r.status === "refunded" ? 0 : Number(r.total_cents ?? 0),
           lastAt: r.created_at,
