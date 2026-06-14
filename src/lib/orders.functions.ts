@@ -65,6 +65,18 @@ const UpdateOrderInput = z.object({
   shippingCarrier: z.string().max(40).optional(),
 });
 
+type OrdersUpdatePatch = Partial<{
+  status: OrderStatus;
+  payment_status: PaymentStatus;
+  paid_at: string | null;
+  shipped_at: string | null;
+  completed_at: string | null;
+  refunded_at: string | null;
+  cancelled_at: string | null;
+  tracking_no: string;
+  shipping_carrier: string;
+}>;
+
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => UpdateOrderInput.parse(d))
   .handler(async ({ data }) => {

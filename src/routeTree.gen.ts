@@ -26,6 +26,8 @@ import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AppProjectIdRouteImport } from './routes/app.project.$id'
 import { Route as ApiPublicExportProjectRouteImport } from './routes/api/public/export-project'
+import { Route as ApiPublicOrdersOrderNoRouteImport } from './routes/api/public/orders.$orderNo'
+import { Route as ApiPublicGSlugPlaceOrderRouteImport } from './routes/api/public/g.$slug.place-order'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -112,6 +114,17 @@ const ApiPublicExportProjectRoute = ApiPublicExportProjectRouteImport.update({
   path: '/api/public/export-project',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOrdersOrderNoRoute = ApiPublicOrdersOrderNoRouteImport.update({
+  id: '/api/public/orders/$orderNo',
+  path: '/api/public/orders/$orderNo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGSlugPlaceOrderRoute =
+  ApiPublicGSlugPlaceOrderRouteImport.update({
+    id: '/api/public/g/$slug/place-order',
+    path: '/api/public/g/$slug/place-order',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -131,6 +144,8 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
+  '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -148,6 +163,8 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
+  '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -168,6 +185,8 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
+  '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,6 +208,8 @@ export interface FileRouteTypes {
     | '/app/'
     | '/api/public/export-project'
     | '/app/project/$id'
+    | '/api/public/orders/$orderNo'
+    | '/api/public/g/$slug/place-order'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -206,6 +227,8 @@ export interface FileRouteTypes {
     | '/app'
     | '/api/public/export-project'
     | '/app/project/$id'
+    | '/api/public/orders/$orderNo'
+    | '/api/public/g/$slug/place-order'
   id:
     | '__root__'
     | '/'
@@ -225,6 +248,8 @@ export interface FileRouteTypes {
     | '/app/'
     | '/api/public/export-project'
     | '/app/project/$id'
+    | '/api/public/orders/$orderNo'
+    | '/api/public/g/$slug/place-order'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -238,6 +263,8 @@ export interface RootRouteChildren {
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   MInboxRoute: typeof MInboxRoute
   ApiPublicExportProjectRoute: typeof ApiPublicExportProjectRoute
+  ApiPublicOrdersOrderNoRoute: typeof ApiPublicOrdersOrderNoRoute
+  ApiPublicGSlugPlaceOrderRoute: typeof ApiPublicGSlugPlaceOrderRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -361,6 +388,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicExportProjectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/orders/$orderNo': {
+      id: '/api/public/orders/$orderNo'
+      path: '/api/public/orders/$orderNo'
+      fullPath: '/api/public/orders/$orderNo'
+      preLoaderRoute: typeof ApiPublicOrdersOrderNoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/g/$slug/place-order': {
+      id: '/api/public/g/$slug/place-order'
+      path: '/api/public/g/$slug/place-order'
+      fullPath: '/api/public/g/$slug/place-order'
+      preLoaderRoute: typeof ApiPublicGSlugPlaceOrderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -405,6 +446,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   MInboxRoute: MInboxRoute,
   ApiPublicExportProjectRoute: ApiPublicExportProjectRoute,
+  ApiPublicOrdersOrderNoRoute: ApiPublicOrdersOrderNoRoute,
+  ApiPublicGSlugPlaceOrderRoute: ApiPublicGSlugPlaceOrderRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
