@@ -2,13 +2,12 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Chrome, ExternalLink, Package, Settings as SettingsIcon } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowLeft, Check, Chrome, Package, Settings as SettingsIcon } from "lucide-react";
 import { getProject, updateProject } from "@/lib/projects.functions";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
 import { useCurrentUser } from "@/lib/use-current-user";
+import { SyncToKttButton } from "@/components/tuan/SyncToKttButton";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "工作台 — 团宝助手" }] }),
@@ -160,14 +159,7 @@ function ProjectInlineHeader({ id }: { id: string }) {
         placeholder="未命名项目"
       />
       <SaveBadge state={savingName} />
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 rounded-full px-3 text-xs"
-        onClick={() => toast.info("同步导出页即将上线")}
-      >
-        <ExternalLink className="h-3.5 w-3.5" /> 同步到快团团
-      </Button>
+      <SyncToKttButton projectId={id} projectName={name} />
     </>
   );
 }
