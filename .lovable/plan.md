@@ -1,38 +1,36 @@
-# 团宝速购 工作台/团购列表 微调
+# 团购浏览页改成快团团编辑器同款布局
 
-## 1. 工作台头部精简 (`src/routes/quickbuy.home.tsx`)
+## 目标
 
-- 删除顶部 `工作台 / 今日 · 本周一览` 标题块。
-- 删除右上角 `问问 AI 助手` 按钮（功能已在左侧栏的 AI 模式中提供）。
-- 让 `今日订单 / 今日 GMV / 本周订单 / 进行中团数` 四张 KPI 卡成为页面的第一行，自然与左侧菜单栏顶部对齐（外层 `quickbuy.tsx` 已有 `py-6`，左右两侧顶部 Y 一致）。
-- 保留下方「库存预警」与「进行中团购」区块。
+`/g/$slug` 当前是「顶部大封面 → 价格/标题 → 正文 → 底部下单」的电商首页风格。要改成与编辑器一致：标题在最上面，下面是图文正文，最后才是商品（SKU）。
 
-## 2. 团购卡片显示商品第一张图
+## 改动文件
 
-数据库里 `group_orders.cover_image_url` 当前多为空，需要兜底取 `project_images` 表中按 `sort_order` 的第一张图（开团时项目并不一定填了封面，但通常都有商品图）。
+`src/routes/g.$slug.tsx`
 
-### 2a. `src/lib/orders.functions.ts` — `dashboardSummary`
+## 新版结构（自上而下）
 
-- 在已选字段基础上增加 `cover_image_url`。
-- 收集返回的 group 的 `project_id`，再用 `supabaseAdmin.from("project_images").select("project_id, url").in("project_id", ids).order("sort_order")` 批量查询，按 project_id 取第一张。
-- 在返回的每个 group 上追加 `cover_image_url: g.cover_image_url ?? imagesByProject[g.project_id] ?? null`。
+1. **标题区**（白底，居中容器最大宽 `max-w-md`，移除原顶部全宽封面）
+   - `H1` 团标题
+   - 起步价 `¥xx 起` + 已售 N
+   - `intro.description` 简介一行（若有）
 
-### 2b. `src/lib/group-orders.functions.ts` — `listGroupOrders`
+2. **正文区** — 复用 `BlockView` 渲染 `intro.blocks`（文本 / 大图 / 九宫格小图 / 视频），保持与编辑器 IntroTab 一致的视觉顺序。这是页面主体。
 
-- 同样在两处 select 中保留 `cover_image_url`、新增 `project_id`（已存在），并补一次 `project_images` 批量查询，做同样的兜底合并。
+3. **商品区**（标题"商品规格"）— 把 `snapshot_skus` 以卡片列表形式列出：
+   - 每个 SKU 一张卡：缩略图（`sku.image` 或 `sku.images?.[0]`，无则灰底占位）、名称、描述、价格（有 variants 时显示 `¥min–¥max`，否则单价）、库存。
+   - 有 variants 时下方展示规格 chips（只读预览，不在此选购，下单还在弹窗里选）。
 
-### 2c. UI
+4. **底部固定 CTA** — 保留现有"立即下单"按钮和 `OrderSheet` 弹窗逻辑，不动下单流程。
 
-- `src/routes/quickbuy.home.tsx` 「进行中团购」卡片：把目前的 `Package2` 占位换成 `g.cover_image_url ? <img …object-cover …/> : <Package2 …/>`。
-- `src/routes/quickbuy.groups.tsx`：已使用 `g.cover_image_url`，无需改动（兜底由 2b 提供）。
+## 细节
 
-## 不动的部分
+- 删除最上方 `aspect-square` 封面块；仍保留 `cover_image_url` 给 `<head>` 的 `og:image`。
+- 背景灰、内容卡片白底，圆角分组：标题卡、正文卡、商品卡三段，之间留 8px 间隔，符合快团团式分段视觉。
+- `BlockView` 组件不变。
+- 不改 loader、不改下单 API、不改 OrderSheet 内部表单。
 
-- 左侧栏、AI 助手面板、路由树、其它页面均不改。
-- 不修改后端表结构、不动 RLS / GRANT。
+## 不改动
 
-## 受影响文件
-
-- `src/routes/quickbuy.home.tsx`
-- `src/lib/orders.functions.ts`
-- `src/lib/group-orders.functions.ts`
+- 服务端字段、`group_orders` 表、`snapshot_intro/snapshot_skus` 结构。
+- 编辑器、其它路由、AI 助手、左侧栏。
