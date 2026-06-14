@@ -728,6 +728,47 @@ export type Database = {
           },
         ]
       }
+      wechat_login_states: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          error_message: string | null
+          expires_at: string
+          session_token: string | null
+          state: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string
+          session_token?: string | null
+          state: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string
+          session_token?: string | null
+          state?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wechat_login_states_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

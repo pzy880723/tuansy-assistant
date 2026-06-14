@@ -291,6 +291,79 @@ export const wechatMockLogin = createServerFn({ method: "POST" }).handler(
   },
 );
 
+// === 微信扫码登录（PC 网页应用 OAuth2.0） ===
+
+function hasWechatConfig() {
+  return Boolean(process.env.WECHAT_APP_ID && process.env.WECHAT_APP_SECRET);
+}
+
+function getWechatRedirectUri(origin: string) {
+  return process.env.WECHAT_REDIRECT_URI || `${origin}/api/public/wechat/callback`;
+}
+
+export const initWechatLogin = createServerFn({ method: "POST" })
+  .inputValidator((d: { origin: string }) =>
+    parseOrThrow(z.object({ origin: z.string().url() }), d),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const state = `wx_${crypto.randomUUID().replace(/-/g, "")}`;
+    const { error } = await supabaseAdmin
+      .from("wechat_login_states")
+      .insert({ state });
+    if (error) throw new Error(error.message);
+
+    if (!hasWechatConfig()) {
+      return { state, qrUrl: null as string | null, configured: false as const };
+    }
+    const redirectUri = encodeURIComponent(getWechatRedirectUri(data.origin));
+    const appid = process.env.WECHAT_APP_ID!;
+    const qrUrl =
+      `https://open.weixin.qq.com/connect/qrconnect` +
+      `?appid=${appid}&redirect_uri=${redirectUri}` +
+      `&response_type=code&scope=snsapi_login&state=${state}#wechat_redirect`;
+    return { state, qrUrl, configured: true as const };
+  });
+
+export const pollWechatLogin = createServerFn({ method: "POST" })
+  .inputValidator((d: { state: string }) =>
+    parseOrThrow(z.object({ state: z.string().min(8).max(64) }), d),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("wechat_login_states")
+      .select("status, user_id, session_token, error_message, expires_at, consumed_at")
+      .eq("state", data.state)
+      .maybeSingle();
+    if (!row) return { status: "expired" as const };
+    if (row.consumed_at) return { status: "expired" as const };
+    if (new Date(row.expires_at).getTime() <= Date.now())
+      return { status: "expired" as const };
+    if (row.status === "pending") return { status: "pending" as const };
+    if (row.status === "error")
+      return { status: "error" as const, message: row.error_message || "登录失败" };
+    if (row.status === "done" && row.user_id && row.session_token) {
+      await supabaseAdmin
+        .from("wechat_login_states")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("state", data.state);
+      const { data: u } = await supabaseAdmin
+        .from("app_users")
+        .select("id, nickname, phone, wechat_openid")
+        .eq("id", row.user_id)
+        .maybeSingle();
+      if (!u) return { status: "error" as const, message: "用户不存在" };
+      writeSession(u);
+      return {
+        status: "done" as const,
+        user: toClientUser(u),
+        sessionToken: row.session_token,
+      };
+    }
+    return { status: "pending" as const };
+  });
+
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
   const uid = await readSessionUserIdAsync();
   if (!uid) return { user: null };
