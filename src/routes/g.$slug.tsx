@@ -11,11 +11,9 @@ export const Route = createFileRoute("/g/$slug")({
       .eq("slug", params.slug)
       .maybeSingle();
     if (!group) throw notFound();
-    // Fire-and-forget view count bump.
-    await supabaseAdmin
-      .from("group_orders")
-      .update({ view_count: (await supabaseAdmin.from("group_orders").select("view_count").eq("id", group.id).single()).data?.view_count + 1 || 1 })
-      .eq("id", group.id);
+    const { data: vc } = await supabaseAdmin.from("group_orders").select("view_count").eq("id", group.id).single();
+    const next = (vc?.view_count ?? 0) + 1;
+    await supabaseAdmin.from("group_orders").update({ view_count: next }).eq("id", group.id);
     return { group };
   },
   head: ({ loaderData }) => {
