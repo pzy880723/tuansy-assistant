@@ -424,7 +424,7 @@ function ChatPane({
     const parts: string[] = [];
     if (imageUrls.length > 0) {
       parts.push(
-        `我从手机收料台导入了 ${imageUrls.length} 张新图，请你结合这些图，把右边预览补充或替换得更合适，并在回答里说明每张图分别用到了哪个模块。`,
+        `我从手机收料台导入了 ${imageUrls.length} 张新图，我已经先把它们按顺序追加到右边预览末尾（作为大图块）。请你结合这些图继续优化整体排版与文案：必要时调整它们到更合适的位置/模块、补写说明文字，或合并成九宫格；不要再单独重复插入这些图。`,
       );
     }
     const texts = items
@@ -459,7 +459,16 @@ function ChatPane({
     const ids = items.map((it) => it.id);
     try {
       const res = await adoptInboxFn({ data: { projectId, ids } });
-      const built = buildIntakeUserMessage(items, res.urls ?? []);
+      const urls = res.urls ?? [];
+      // 先把图按顺序追加到预览大图块
+      if (urls.length > 0) {
+        try {
+          await appendPreviewFn({ data: { projectId, urls } });
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "写入预览失败");
+        }
+      }
+      const built = buildIntakeUserMessage(items, urls);
       removeInboxCard();
       if (built.text || built.files.length > 0) {
         const parts: Array<
@@ -472,10 +481,12 @@ function ChatPane({
       void qc.invalidateQueries({ queryKey: ["project-inbox-pending", projectId] });
       void qc.invalidateQueries({ queryKey: ["inbox-pending-counts"] });
       void qc.invalidateQueries({ queryKey: ["project", projectId] });
+      void qc.invalidateQueries({ queryKey: ["project-assets", projectId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "导入失败");
     } finally {
       setInboxBusy(null);
+
     }
   };
 
