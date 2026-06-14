@@ -60,51 +60,93 @@ function BuyPage() {
   const [open, setOpen] = useState(false);
   const closed = group.status !== "active" || (!!group.ends_at && new Date(group.ends_at).getTime() < Date.now());
 
-  const lowest = useMemo(() => {
+  const range = useMemo(() => {
     let min = Infinity;
+    let max = 0;
     for (const s of skus) {
       if (s.variants?.length) {
         for (const v of s.variants) {
           const n = parseFloat(v.price);
-          if (n > 0 && n < min) min = n;
+          if (n > 0) { if (n < min) min = n; if (n > max) max = n; }
         }
       } else {
         const m = String(s.price ?? "").match(/[\d.]+/);
         if (m) {
           const n = parseFloat(m[0]);
-          if (n > 0 && n < min) min = n;
+          if (n > 0) { if (n < min) min = n; if (n > max) max = n; }
         }
       }
     }
-    return min === Infinity ? 0 : min;
+    return { min: min === Infinity ? 0 : min, max };
   }, [skus]);
+
+  const priceLabel = range.min === 0
+    ? "¥0.00"
+    : range.min === range.max
+      ? `¥${range.min.toFixed(2)}`
+      : `¥${range.min.toFixed(2)}-${range.max.toFixed(2)}`;
+
+  const firstSkuImg = skus[0]?.image || skus[0]?.images?.[0] || group.cover_image_url || null;
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] pb-24 text-[15px]">
-      <div className="mx-auto max-w-md space-y-2 pt-2">
-        {/* Title card */}
-        <section className="bg-white px-4 py-4">
-          <h1 className="text-xl font-semibold leading-snug">{group.title}</h1>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-red-500">¥{lowest.toFixed(2)}</span>
-            <span className="text-xs text-muted-foreground">起</span>
-            <span className="ml-auto text-xs text-muted-foreground">已售 {group.items_sold ?? 0}</span>
+      <div className="mx-auto max-w-md">
+        {/* Cover */}
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+          {group.cover_image_url ? (
+            <img src={group.cover_image_url} alt={group.title} className="h-full w-full object-cover" />
+          ) : null}
+        </div>
+
+        {/* Product summary card overlapping cover */}
+        <div className="relative -mt-6 px-3">
+          <div className="rounded-2xl bg-white p-3 shadow-sm">
+            <div className="flex gap-3">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+                {firstSkuImg ? (
+                  <img src={firstSkuImg} alt="" className="h-full w-full object-cover" />
+                ) : null}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <h1 className="line-clamp-2 text-[15px] font-semibold leading-snug">{group.title}</h1>
+                {intro.description && (
+                  <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{intro.description}</p>
+                )}
+                <div className="mt-auto flex items-end justify-between pt-2">
+                  <div className="min-w-0">
+                    <span className="text-[18px] font-bold text-red-500">{priceLabel}</span>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">已售 {group.items_sold ?? 0}</div>
+                  </div>
+                  <button
+                    disabled={closed}
+                    onClick={() => setOpen(true)}
+                    className="h-8 shrink-0 rounded-full bg-green-500 px-4 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
+                  >
+                    跟团购买
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          {intro.description && (
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{intro.description}</p>
-          )}
-        </section>
+        </div>
+
+        {/* Hot indicator */}
+        <div className="px-3 pt-3">
+          <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[12px] font-medium text-orange-600">
+            🔥 {group.items_sold ?? 0} 人在抢
+          </span>
+        </div>
 
         {/* Intro blocks (body) */}
         {(intro.blocks?.length ?? 0) > 0 && (
-          <section className="space-y-3 bg-white px-4 py-4">
+          <section className="mt-3 space-y-4 bg-white px-4 py-4 text-[15px] leading-7">
             {(intro.blocks ?? []).map((b) => <BlockView key={b.id} block={b} />)}
           </section>
         )}
 
         {/* SKU list */}
         {skus.length > 0 && (
-          <section className="bg-white px-4 py-4">
+          <section className="mt-2 bg-white px-4 py-4">
             <div className="mb-3 text-sm font-semibold">商品规格</div>
             <div className="space-y-3">
               {skus.map((s, i) => <SkuCard key={i} sku={s} />)}
