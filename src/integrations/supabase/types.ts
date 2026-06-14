@@ -298,6 +298,7 @@ export type Database = {
           project_id: string
           role: string
           sort_order: number
+          source: string
           url: string
         }
         Insert: {
@@ -308,6 +309,7 @@ export type Database = {
           project_id: string
           role?: string
           sort_order?: number
+          source?: string
           url: string
         }
         Update: {
@@ -318,6 +320,7 @@ export type Database = {
           project_id?: string
           role?: string
           sort_order?: number
+          source?: string
           url?: string
         }
         Relationships: [

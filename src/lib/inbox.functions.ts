@@ -231,7 +231,9 @@ export const adoptInboxImagesToProject = createServerFn({ method: "POST" })
         url,
         sort_order: nextOrder++,
         role: "product",
+        source: "inbox",
       }));
+
       const { error: insErr } = await supabaseAdmin.from("project_images").insert(rows);
       if (insErr) throw new Error(insErr.message);
       adopted = rows.length;

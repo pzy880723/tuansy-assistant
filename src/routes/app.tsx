@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { SyncToKttButton } from "@/components/tuan/SyncToKttButton";
+import { AssetLibraryButton } from "@/components/tuan/AssetLibrarySheet";
+
 import logoHorizontal from "@/assets/logo-horizontal.png.asset.json";
 
 export const Route = createFileRoute("/app")({
@@ -158,8 +160,10 @@ function ProjectInlineHeader({ id }: { id: string }) {
         placeholder="未命名项目"
       />
       <SaveBadge state={savingName} />
+      <AssetLibraryButton projectId={id} />
       <SyncToKttButton projectId={id} projectName={name} />
     </>
+
   );
 }
 

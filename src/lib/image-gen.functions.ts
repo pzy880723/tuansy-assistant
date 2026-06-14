@@ -23,5 +23,24 @@ export const uploadAiGeneratedImage = createServerFn({ method: "POST" })
 
     const { uploadGeneratedImage } = await import("@/lib/image-gen.server");
     const url = await uploadGeneratedImage(data.b64, userId, data.projectId);
+
+    // 入素材库（AI 生成）
+    const { data: maxRow } = await supabaseAdmin
+      .from("project_images")
+      .select("sort_order")
+      .eq("project_id", data.projectId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextOrder = (maxRow?.sort_order ?? -1) + 1;
+    await supabaseAdmin.from("project_images").insert({
+      project_id: data.projectId,
+      owner_id: userId,
+      url,
+      sort_order: nextOrder,
+      role: "product",
+      source: "ai",
+    } as never);
+
     return { url };
   });
