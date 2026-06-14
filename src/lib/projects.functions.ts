@@ -374,7 +374,7 @@ export const getProjectChat = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     const messages = Array.isArray((row as { chat_messages?: unknown } | null)?.chat_messages)
-      ? ((row as { chat_messages: unknown[] }).chat_messages as Array<Record<string, unknown>>)
+      ? ((row as { chat_messages: unknown[] }).chat_messages as unknown as Array<{ id?: string }>)
       : [];
     return { messages };
   });
