@@ -152,20 +152,22 @@ function Sidebar({
       <div className={cn("flex items-center gap-1 border-b p-2", isIcon && "flex-col")}>
         {isIcon ? (
           <>
-            <Tooltip>
-              <TooltipProvider><TooltipTrigger asChild>
-                <button
-                  onClick={() => { onMode(mode === "ai" ? "menu" : "ai"); if (size === "icon") onSize("expanded"); }}
-                  className={cn(
-                    "grid h-9 w-9 place-items-center rounded-lg",
-                    mode === "ai" ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white" : "bg-emerald-500/10 text-emerald-700",
-                  )}
-                >
-                  {mode === "ai" ? <Bot className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">{mode === "ai" ? "切换到菜单" : "切换到 AI 助手"}</TooltipContent></TooltipProvider>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => { onMode(mode === "ai" ? "menu" : "ai"); if (size === "icon") onSize("expanded"); }}
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-lg",
+                      mode === "ai" ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white" : "bg-emerald-500/10 text-emerald-700",
+                    )}
+                  >
+                    {mode === "ai" ? <Bot className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{mode === "ai" ? "切换到菜单" : "切换到 AI 助手"}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <button onClick={onCycle} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted" title="展开">
               <ChevronsRight className="h-3.5 w-3.5" />
             </button>
