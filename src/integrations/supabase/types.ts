@@ -339,6 +339,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          chat_messages: Json
           cover_image_url: string | null
           created_at: string
           delivery: Json
@@ -355,6 +356,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          chat_messages?: Json
           cover_image_url?: string | null
           created_at?: string
           delivery?: Json
@@ -371,6 +373,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          chat_messages?: Json
           cover_image_url?: string | null
           created_at?: string
           delivery?: Json
