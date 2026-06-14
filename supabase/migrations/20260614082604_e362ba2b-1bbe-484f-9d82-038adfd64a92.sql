@@ -1,0 +1,1 @@
+CREATE POLICY "Deny anon on export_tokens" ON public.export_tokens FOR ALL TO anon USING (false) WITH CHECK (false);
