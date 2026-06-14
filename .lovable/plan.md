@@ -1,39 +1,34 @@
-## 目标
-把 `/g/$slug` 团购浏览页改成快团团商品页的视觉顺序与结构（参考截图），保持下单逻辑不变。
+## 在 `/g/$slug` 顶部加团长信息条
 
-## 新版页面结构（从上到下）
+页面最顶部加一条团长信息（参考快团团商品页顶部）：左侧圆形头像，右侧团长昵称。点击不做跳转（暂无团长主页）。
 
-```
-┌─────────────────────────────┐
-│  封面大图 (cover_image_url)  │  ← 顶部满宽，约 9:7 比例
-├─────────────────────────────┤
-│ 商品卡片（白底圆角，叠在封面下方）│
-│  ┌───┐  标题（2 行截断）       │
-│  │图 │  小字描述                │
-│  │片 │  ¥xx-yy ¥原价  [跟团购买]│
-│  └───┘  已团 N · 已售 M        │
-├─────────────────────────────┤
-│ 🔥 N 人在抢   (橙色 pill)     │
-├─────────────────────────────┤
-│ 详情正文 (intro.blocks)       │
-│  - 文本段                     │
-│  - 大图 / 九宫格 / 视频        │
-├─────────────────────────────┤
-│ 商品规格 (snapshot_skus 列表) │
-└─────────────────────────────┘
-   底部固定栏（保持现状）:
-   [立即下单 / 团购已结束] → OrderSheet
+## 数据来源
+
+- 昵称：`app_users.nickname`（通过 `group_orders.owner_id` 关联）
+- 头像：当前 schema 中 `app_users` 没有 avatar 字段。回退方案 = 取昵称首字符渲染为彩色圆形占位头像；后续如要真实头像，再加字段/上传流程。
+
+## 改动
+
+### 1. `src/routes/g.$slug.tsx` loader
+在现有查询后追加一次 `app_users` 查询（owner_id），把 `leader = { nickname }` 一并返回。
+
+```ts
+const { data: owner } = await supabaseAdmin
+  .from("app_users").select("nickname").eq("id", group.owner_id).maybeSingle();
+return { group, leader: { nickname: owner?.nickname || "团长" } };
 ```
 
-## 关键改动（仅 `src/routes/g.$slug.tsx`）
+### 2. `src/routes/g.$slug.tsx` 组件
+在 `<div className="mx-auto max-w-md">` 的最顶部、🔥 pill 之前，插入一行：
 
-1. **顶部封面**：恢复 `group.cover_image_url` 作为首屏满宽图（aspect 4:3）。无图则浅灰占位。
-2. **商品卡（叠层）**：使用 `-mt-6` 让卡片往上压住封面下沿；左侧 96×96 缩略（取第一个 SKU 的 `image || images[0]`），右侧标题/副标题/价格区间/「跟团购买」按钮（点击 = 打开 `OrderSheet`，与底部 CTA 同行为）。「已团 / 已售」放在右下角。
-3. **热度条**：白底卡片下方一条 `🔥 {items_sold ?? 0}人在抢` 橙色 pill。
-4. **详情正文**：保留 `BlockView` 渲染 `intro.blocks`，但改成快团团风格——白卡片、`px-4 py-4`、段间距 16px、文本 15px/26 行高。如果有 `intro.title` 用作小标题。
-5. **商品规格**：保留现有 `SkuCard` 列表，作为正文之后的最后一个 section（不是顶部）。
-6. **底部固定 CTA**：保留「立即下单」按钮 + `OrderSheet`，文案/逻辑不动。
+```
+[圆形头像(首字)]  团长昵称
+```
 
-## 不变项
-- 服务端 loader、`group_orders` 字段、`snapshot_intro/snapshot_skus` 结构、`OrderSheet` 内部逻辑、下单 API、其它路由、AI 助手、侧边栏。
-- 仅样式/布局重排，无业务逻辑改动。
+- 容器：`bg-white px-4 py-3 flex items-center gap-3 border-b border-border/50`
+- 头像：`h-10 w-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white grid place-items-center text-sm font-semibold`，内容 = 昵称首字符
+- 名称：`text-sm font-medium`
+
+### 3. 不变项
+- 其它布局（标题、正文、SKU、底部 CTA、`OrderSheet`）全部保持上一版方案不变。
+- 服务端 API、其它路由不动。
