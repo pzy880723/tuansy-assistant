@@ -17,7 +17,9 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
 import { Route as MInboxRouteImport } from './routes/m.inbox'
+import { Route as GSlugRouteImport } from './routes/g.$slug'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -69,9 +71,19 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const OOrderNoRoute = OOrderNoRouteImport.update({
+  id: '/o/$orderNo',
+  path: '/o/$orderNo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MInboxRoute = MInboxRouteImport.update({
   id: '/m/inbox',
   path: '/m/inbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GSlugRoute = GSlugRouteImport.update({
+  id: '/g/$slug',
+  path: '/g/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
@@ -139,7 +151,9 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
+  '/o/$orderNo': typeof OOrderNoRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
@@ -158,7 +172,9 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
+  '/o/$orderNo': typeof OOrderNoRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
@@ -180,7 +196,9 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
+  '/o/$orderNo': typeof OOrderNoRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
@@ -203,7 +221,9 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/g/$slug'
     | '/m/inbox'
+    | '/o/$orderNo'
     | '/admin/'
     | '/app/'
     | '/api/public/export-project'
@@ -222,7 +242,9 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/g/$slug'
     | '/m/inbox'
+    | '/o/$orderNo'
     | '/admin'
     | '/app'
     | '/api/public/export-project'
@@ -243,7 +265,9 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/g/$slug'
     | '/m/inbox'
+    | '/o/$orderNo'
     | '/admin/'
     | '/app/'
     | '/api/public/export-project'
@@ -261,7 +285,9 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  GSlugRoute: typeof GSlugRoute
   MInboxRoute: typeof MInboxRoute
+  OOrderNoRoute: typeof OOrderNoRoute
   ApiPublicExportProjectRoute: typeof ApiPublicExportProjectRoute
   ApiPublicOrdersOrderNoRoute: typeof ApiPublicOrdersOrderNoRoute
   ApiPublicGSlugPlaceOrderRoute: typeof ApiPublicGSlugPlaceOrderRoute
@@ -325,11 +351,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/o/$orderNo': {
+      id: '/o/$orderNo'
+      path: '/o/$orderNo'
+      fullPath: '/o/$orderNo'
+      preLoaderRoute: typeof OOrderNoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/m/inbox': {
       id: '/m/inbox'
       path: '/m/inbox'
       fullPath: '/m/inbox'
       preLoaderRoute: typeof MInboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/g/$slug': {
+      id: '/g/$slug'
+      path: '/g/$slug'
+      fullPath: '/g/$slug'
+      preLoaderRoute: typeof GSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
@@ -444,7 +484,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  GSlugRoute: GSlugRoute,
   MInboxRoute: MInboxRoute,
+  OOrderNoRoute: OOrderNoRoute,
   ApiPublicExportProjectRoute: ApiPublicExportProjectRoute,
   ApiPublicOrdersOrderNoRoute: ApiPublicOrdersOrderNoRoute,
   ApiPublicGSlugPlaceOrderRoute: ApiPublicGSlugPlaceOrderRoute,
@@ -452,3 +494,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
