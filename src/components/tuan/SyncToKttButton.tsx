@@ -114,7 +114,9 @@ export function SyncToKttButton({
               检测到你还没装「团宝 · 快团团助手」插件。装好后回到这里点一次"同步到快团团"，
               我会自动打开快团团后台并填入项目内容。
             </p>
-            <p className="text-[11px]">装完插件如果还是检测不到，请刷新这个页面。</p>
+            <p className="text-[11px]">
+              已安装但仍提示？请下载最新版插件（v0.3.0+），在 chrome://extensions 重新加载，然后刷新本页面。
+            </p>
           </div>
           <DialogFooter className="border-t px-5 py-3">
             <Button
