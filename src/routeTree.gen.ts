@@ -10,16 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as QuickbuyRouteImport } from './routes/quickbuy'
 import { Route as ExtensionRouteImport } from './routes/extension'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as QuickbuyIndexRouteImport } from './routes/quickbuy.index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as QuickbuyOrdersRouteImport } from './routes/quickbuy.orders'
+import { Route as QuickbuyHomeRouteImport } from './routes/quickbuy.home'
+import { Route as QuickbuyGroupsRouteImport } from './routes/quickbuy.groups'
+import { Route as QuickbuyFinanceRouteImport } from './routes/quickbuy.finance'
+import { Route as QuickbuyCustomersRouteImport } from './routes/quickbuy.customers'
+import { Route as QuickbuyAssistantRouteImport } from './routes/quickbuy.assistant'
 import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
 import { Route as MInboxRouteImport } from './routes/m.inbox'
 import { Route as GSlugRouteImport } from './routes/g.$slug'
+import { Route as ApiQuickbuyChatRouteImport } from './routes/api/quickbuy-chat'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -34,6 +43,11 @@ import { Route as ApiPublicGSlugPlaceOrderRouteImport } from './routes/api/publi
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuickbuyRoute = QuickbuyRouteImport.update({
+  id: '/quickbuy',
+  path: '/quickbuy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExtensionRoute = ExtensionRouteImport.update({
@@ -61,6 +75,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QuickbuyIndexRoute = QuickbuyIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -70,6 +89,36 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const QuickbuyOrdersRoute = QuickbuyOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyHomeRoute = QuickbuyHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyGroupsRoute = QuickbuyGroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyFinanceRoute = QuickbuyFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyCustomersRoute = QuickbuyCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyAssistantRoute = QuickbuyAssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => QuickbuyRoute,
 } as any)
 const OOrderNoRoute = OOrderNoRouteImport.update({
   id: '/o/$orderNo',
@@ -84,6 +133,11 @@ const MInboxRoute = MInboxRouteImport.update({
 const GSlugRoute = GSlugRouteImport.update({
   id: '/g/$slug',
   path: '/g/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiQuickbuyChatRoute = ApiQuickbuyChatRouteImport.update({
+  id: '/api/quickbuy-chat',
+  path: '/api/quickbuy-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
@@ -144,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
+  '/quickbuy': typeof QuickbuyRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -151,11 +206,19 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/quickbuy-chat': typeof ApiQuickbuyChatRoute
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/assistant': typeof QuickbuyAssistantRoute
+  '/quickbuy/customers': typeof QuickbuyCustomersRoute
+  '/quickbuy/finance': typeof QuickbuyFinanceRoute
+  '/quickbuy/groups': typeof QuickbuyGroupsRoute
+  '/quickbuy/home': typeof QuickbuyHomeRoute
+  '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/quickbuy/': typeof QuickbuyIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
@@ -172,11 +235,19 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/quickbuy-chat': typeof ApiQuickbuyChatRoute
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/assistant': typeof QuickbuyAssistantRoute
+  '/quickbuy/customers': typeof QuickbuyCustomersRoute
+  '/quickbuy/finance': typeof QuickbuyFinanceRoute
+  '/quickbuy/groups': typeof QuickbuyGroupsRoute
+  '/quickbuy/home': typeof QuickbuyHomeRoute
+  '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
+  '/quickbuy': typeof QuickbuyIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
@@ -189,6 +260,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
+  '/quickbuy': typeof QuickbuyRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -196,11 +268,19 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/quickbuy-chat': typeof ApiQuickbuyChatRoute
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/assistant': typeof QuickbuyAssistantRoute
+  '/quickbuy/customers': typeof QuickbuyCustomersRoute
+  '/quickbuy/finance': typeof QuickbuyFinanceRoute
+  '/quickbuy/groups': typeof QuickbuyGroupsRoute
+  '/quickbuy/home': typeof QuickbuyHomeRoute
+  '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/quickbuy/': typeof QuickbuyIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
@@ -214,6 +294,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/extension'
+    | '/quickbuy'
     | '/settings'
     | '/admin/audit'
     | '/admin/dashboard'
@@ -221,11 +302,19 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/quickbuy-chat'
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/assistant'
+    | '/quickbuy/customers'
+    | '/quickbuy/finance'
+    | '/quickbuy/groups'
+    | '/quickbuy/home'
+    | '/quickbuy/orders'
     | '/admin/'
     | '/app/'
+    | '/quickbuy/'
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
@@ -242,11 +331,19 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/quickbuy-chat'
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/assistant'
+    | '/quickbuy/customers'
+    | '/quickbuy/finance'
+    | '/quickbuy/groups'
+    | '/quickbuy/home'
+    | '/quickbuy/orders'
     | '/admin'
     | '/app'
+    | '/quickbuy'
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
@@ -258,6 +355,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/extension'
+    | '/quickbuy'
     | '/settings'
     | '/admin/audit'
     | '/admin/dashboard'
@@ -265,11 +363,19 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/quickbuy-chat'
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/assistant'
+    | '/quickbuy/customers'
+    | '/quickbuy/finance'
+    | '/quickbuy/groups'
+    | '/quickbuy/home'
+    | '/quickbuy/orders'
     | '/admin/'
     | '/app/'
+    | '/quickbuy/'
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
@@ -282,9 +388,11 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
   ExtensionRoute: typeof ExtensionRoute
+  QuickbuyRoute: typeof QuickbuyRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  ApiQuickbuyChatRoute: typeof ApiQuickbuyChatRoute
   GSlugRoute: typeof GSlugRoute
   MInboxRoute: typeof MInboxRoute
   OOrderNoRoute: typeof OOrderNoRoute
@@ -300,6 +408,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quickbuy': {
+      id: '/quickbuy'
+      path: '/quickbuy'
+      fullPath: '/quickbuy'
+      preLoaderRoute: typeof QuickbuyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/extension': {
@@ -337,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/quickbuy/': {
+      id: '/quickbuy/'
+      path: '/'
+      fullPath: '/quickbuy/'
+      preLoaderRoute: typeof QuickbuyIndexRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
     '/app/': {
       id: '/app/'
       path: '/'
@@ -350,6 +472,48 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/quickbuy/orders': {
+      id: '/quickbuy/orders'
+      path: '/orders'
+      fullPath: '/quickbuy/orders'
+      preLoaderRoute: typeof QuickbuyOrdersRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/home': {
+      id: '/quickbuy/home'
+      path: '/home'
+      fullPath: '/quickbuy/home'
+      preLoaderRoute: typeof QuickbuyHomeRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/groups': {
+      id: '/quickbuy/groups'
+      path: '/groups'
+      fullPath: '/quickbuy/groups'
+      preLoaderRoute: typeof QuickbuyGroupsRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/finance': {
+      id: '/quickbuy/finance'
+      path: '/finance'
+      fullPath: '/quickbuy/finance'
+      preLoaderRoute: typeof QuickbuyFinanceRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/customers': {
+      id: '/quickbuy/customers'
+      path: '/customers'
+      fullPath: '/quickbuy/customers'
+      preLoaderRoute: typeof QuickbuyCustomersRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/assistant': {
+      id: '/quickbuy/assistant'
+      path: '/assistant'
+      fullPath: '/quickbuy/assistant'
+      preLoaderRoute: typeof QuickbuyAssistantRouteImport
+      parentRoute: typeof QuickbuyRoute
     }
     '/o/$orderNo': {
       id: '/o/$orderNo'
@@ -370,6 +534,13 @@ declare module '@tanstack/react-router' {
       path: '/g/$slug'
       fullPath: '/g/$slug'
       preLoaderRoute: typeof GSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/quickbuy-chat': {
+      id: '/api/quickbuy-chat'
+      path: '/api/quickbuy-chat'
+      fullPath: '/api/quickbuy-chat'
+      preLoaderRoute: typeof ApiQuickbuyChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
@@ -475,15 +646,41 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface QuickbuyRouteChildren {
+  QuickbuyAssistantRoute: typeof QuickbuyAssistantRoute
+  QuickbuyCustomersRoute: typeof QuickbuyCustomersRoute
+  QuickbuyFinanceRoute: typeof QuickbuyFinanceRoute
+  QuickbuyGroupsRoute: typeof QuickbuyGroupsRoute
+  QuickbuyHomeRoute: typeof QuickbuyHomeRoute
+  QuickbuyOrdersRoute: typeof QuickbuyOrdersRoute
+  QuickbuyIndexRoute: typeof QuickbuyIndexRoute
+}
+
+const QuickbuyRouteChildren: QuickbuyRouteChildren = {
+  QuickbuyAssistantRoute: QuickbuyAssistantRoute,
+  QuickbuyCustomersRoute: QuickbuyCustomersRoute,
+  QuickbuyFinanceRoute: QuickbuyFinanceRoute,
+  QuickbuyGroupsRoute: QuickbuyGroupsRoute,
+  QuickbuyHomeRoute: QuickbuyHomeRoute,
+  QuickbuyOrdersRoute: QuickbuyOrdersRoute,
+  QuickbuyIndexRoute: QuickbuyIndexRoute,
+}
+
+const QuickbuyRouteWithChildren = QuickbuyRoute._addFileChildren(
+  QuickbuyRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
   ExtensionRoute: ExtensionRoute,
+  QuickbuyRoute: QuickbuyRouteWithChildren,
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  ApiQuickbuyChatRoute: ApiQuickbuyChatRoute,
   GSlugRoute: GSlugRoute,
   MInboxRoute: MInboxRoute,
   OOrderNoRoute: OOrderNoRoute,
@@ -494,13 +691,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
