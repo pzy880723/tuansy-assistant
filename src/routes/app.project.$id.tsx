@@ -247,7 +247,15 @@ function ChatPane({
         headers: readAuthToken() ? { "x-tuan-session": readAuthToken()! } : undefined,
         body: {
           ...body,
-          messages: messages.filter((m) => !m.id.startsWith("inbox-card-")),
+          // 只把真正发给模型的 user/assistant 消息送上去。
+          // system 消息（右侧编辑日志 manual-*、手机收料卡 inbox-card-*）只是 UI 用，
+          // 一旦放进 convertToModelMessages 会让 streamText 挂死、Worker 报 502。
+          messages: messages.filter(
+            (m) =>
+              m.role !== "system" &&
+              !m.id.startsWith("inbox-card-") &&
+              !m.id.startsWith("manual-"),
+          ),
           projectId,
           copyLogicId: logicIdRef.current === "auto" ? null : logicIdRef.current,
           startupMode: messages[0]?.id.startsWith("seed-plan-") ? "plan" : "draft",
