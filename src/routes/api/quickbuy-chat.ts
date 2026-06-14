@@ -122,7 +122,7 @@ export const Route = createFileRoute("/api/quickbuy-chat")({
                 const { data: existing } = await supabaseAdmin
                   .from("orders").select("id").eq("owner_id", userId).eq("order_no", r.orderNo).maybeSingle();
                 if (!existing) { failures.push({ orderNo: r.orderNo, reason: "订单不存在" }); continue; }
-                const patch: Record<string, unknown> = { tracking_no: r.trackingNo, status: "shipped", shipped_at: now };
+                const patch: Partial<Record<string, string | number | null>> = { tracking_no: r.trackingNo, status: "shipped", shipped_at: now };
                 if (r.carrier) patch.shipping_carrier = r.carrier;
                 const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", existing.id).eq("owner_id", userId);
                 if (error) failures.push({ orderNo: r.orderNo, reason: error.message });
@@ -144,7 +144,7 @@ export const Route = createFileRoute("/api/quickbuy-chat")({
               const { data: existing } = await supabaseAdmin.from("orders").select("id").eq("owner_id", userId).eq("order_no", orderNo).maybeSingle();
               if (!existing) return { error: "订单不存在" };
               const now = new Date().toISOString();
-              const patch: Record<string, unknown> = {};
+              const patch: Partial<Record<string, string | number | null>> = {};
               switch (action) {
                 case "mark_paid": patch.payment_status = "paid"; patch.paid_at = now; patch.status = "paid"; break;
                 case "mark_unpaid": patch.payment_status = "unpaid"; patch.paid_at = null; break;

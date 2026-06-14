@@ -27,6 +27,7 @@ import { Route as QuickbuyCustomersRouteImport } from './routes/quickbuy.custome
 import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
 import { Route as MInboxRouteImport } from './routes/m.inbox'
 import { Route as GSlugRouteImport } from './routes/g.$slug'
+import { Route as ApiQuickbuyChatRouteImport } from './routes/api/quickbuy-chat'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -128,6 +129,11 @@ const GSlugRoute = GSlugRouteImport.update({
   path: '/g/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiQuickbuyChatRoute = ApiQuickbuyChatRouteImport.update({
+  id: '/api/quickbuy-chat',
+  path: '/api/quickbuy-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   id: '/api/generate-image',
   path: '/api/generate-image',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/quickbuy-chat': typeof ApiQuickbuyChatRoute
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/quickbuy-chat': typeof ApiQuickbuyChatRoute
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/quickbuy-chat': typeof ApiQuickbuyChatRoute
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/quickbuy-chat'
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/quickbuy-chat'
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
@@ -341,6 +352,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/quickbuy-chat'
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
@@ -368,6 +380,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  ApiQuickbuyChatRoute: typeof ApiQuickbuyChatRoute
   GSlugRoute: typeof GSlugRoute
   MInboxRoute: typeof MInboxRoute
   OOrderNoRoute: typeof OOrderNoRoute
@@ -502,6 +515,13 @@ declare module '@tanstack/react-router' {
       path: '/g/$slug'
       fullPath: '/g/$slug'
       preLoaderRoute: typeof GSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/quickbuy-chat': {
+      id: '/api/quickbuy-chat'
+      path: '/api/quickbuy-chat'
+      fullPath: '/api/quickbuy-chat'
+      preLoaderRoute: typeof ApiQuickbuyChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
@@ -639,6 +659,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  ApiQuickbuyChatRoute: ApiQuickbuyChatRoute,
   GSlugRoute: GSlugRoute,
   MInboxRoute: MInboxRoute,
   OOrderNoRoute: OOrderNoRoute,
@@ -649,3 +670,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
