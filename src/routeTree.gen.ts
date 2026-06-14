@@ -16,6 +16,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as QuickbuyIndexRouteImport } from './routes/quickbuy.index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
@@ -66,6 +67,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const QuickbuyIndexRoute = QuickbuyIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => QuickbuyRoute,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
@@ -150,7 +156,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
-  '/quickbuy': typeof QuickbuyRoute
+  '/quickbuy': typeof QuickbuyRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/o/$orderNo': typeof OOrderNoRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/quickbuy/': typeof QuickbuyIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
@@ -172,7 +179,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
-  '/quickbuy': typeof QuickbuyRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -185,6 +191,7 @@ export interface FileRoutesByTo {
   '/o/$orderNo': typeof OOrderNoRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
+  '/quickbuy': typeof QuickbuyIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
@@ -197,7 +204,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
-  '/quickbuy': typeof QuickbuyRoute
+  '/quickbuy': typeof QuickbuyRouteWithChildren
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -210,6 +217,7 @@ export interface FileRoutesById {
   '/o/$orderNo': typeof OOrderNoRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/quickbuy/': typeof QuickbuyIndexRoute
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
@@ -236,6 +244,7 @@ export interface FileRouteTypes {
     | '/o/$orderNo'
     | '/admin/'
     | '/app/'
+    | '/quickbuy/'
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
@@ -245,7 +254,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/extension'
-    | '/quickbuy'
     | '/settings'
     | '/admin/audit'
     | '/admin/dashboard'
@@ -258,6 +266,7 @@ export interface FileRouteTypes {
     | '/o/$orderNo'
     | '/admin'
     | '/app'
+    | '/quickbuy'
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/o/$orderNo'
     | '/admin/'
     | '/app/'
+    | '/quickbuy/'
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
@@ -294,7 +304,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
   ExtensionRoute: typeof ExtensionRoute
-  QuickbuyRoute: typeof QuickbuyRoute
+  QuickbuyRoute: typeof QuickbuyRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
@@ -356,6 +366,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/quickbuy/': {
+      id: '/quickbuy/'
+      path: '/'
+      fullPath: '/quickbuy/'
+      preLoaderRoute: typeof QuickbuyIndexRouteImport
+      parentRoute: typeof QuickbuyRoute
     }
     '/app/': {
       id: '/app/'
@@ -495,13 +512,25 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface QuickbuyRouteChildren {
+  QuickbuyIndexRoute: typeof QuickbuyIndexRoute
+}
+
+const QuickbuyRouteChildren: QuickbuyRouteChildren = {
+  QuickbuyIndexRoute: QuickbuyIndexRoute,
+}
+
+const QuickbuyRouteWithChildren = QuickbuyRoute._addFileChildren(
+  QuickbuyRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
   ExtensionRoute: ExtensionRoute,
-  QuickbuyRoute: QuickbuyRoute,
+  QuickbuyRoute: QuickbuyRouteWithChildren,
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,

@@ -160,7 +160,7 @@ function ReturningHome() {
             {groups.slice(0, 4).map((g) => (
               <Link key={g.id} to="/quickbuy/groups" className="flex items-center gap-3 rounded-xl border p-3 hover:bg-muted/40">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-                  {g.cover_image_url ? <img src={g.cover_image_url} className="h-full w-full rounded-lg object-cover" alt="" /> : <Package2 className="h-5 w-5" />}
+                  <Package2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{g.title}</div>
