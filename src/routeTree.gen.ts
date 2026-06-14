@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as QuickbuyRouteImport } from './routes/quickbuy'
 import { Route as ExtensionRouteImport } from './routes/extension'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
@@ -34,6 +35,11 @@ import { Route as ApiPublicGSlugPlaceOrderRouteImport } from './routes/api/publi
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuickbuyRoute = QuickbuyRouteImport.update({
+  id: '/quickbuy',
+  path: '/quickbuy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExtensionRoute = ExtensionRouteImport.update({
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
+  '/quickbuy': typeof QuickbuyRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
+  '/quickbuy': typeof QuickbuyRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/extension': typeof ExtensionRoute
+  '/quickbuy': typeof QuickbuyRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/extension'
+    | '/quickbuy'
     | '/settings'
     | '/admin/audit'
     | '/admin/dashboard'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/extension'
+    | '/quickbuy'
     | '/settings'
     | '/admin/audit'
     | '/admin/dashboard'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/extension'
+    | '/quickbuy'
     | '/settings'
     | '/admin/audit'
     | '/admin/dashboard'
@@ -282,6 +294,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
   ExtensionRoute: typeof ExtensionRoute
+  QuickbuyRoute: typeof QuickbuyRoute
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quickbuy': {
+      id: '/quickbuy'
+      path: '/quickbuy'
+      fullPath: '/quickbuy'
+      preLoaderRoute: typeof QuickbuyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/extension': {
@@ -481,6 +501,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
   ExtensionRoute: ExtensionRoute,
+  QuickbuyRoute: QuickbuyRoute,
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
