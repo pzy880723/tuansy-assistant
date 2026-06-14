@@ -374,14 +374,14 @@ export const getProjectChat = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     const messages = Array.isArray((row as { chat_messages?: unknown } | null)?.chat_messages)
-      ? ((row as { chat_messages: unknown[] }).chat_messages as unknown[])
+      ? ((row as { chat_messages: unknown[] }).chat_messages as Array<Record<string, unknown>>)
       : [];
     return { messages };
   });
 
 export const saveProjectChat = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; messages: unknown[] }) =>
-    z.object({ id: z.string().uuid(), messages: z.array(z.unknown()).max(2000) }).parse(d),
+    z.object({ id: z.string().uuid(), messages: z.array(z.any()).max(2000) }).parse(d),
   )
   .handler(async ({ data }) => {
     const userId = await requireUserId();
