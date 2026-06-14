@@ -240,6 +240,15 @@ export function IntroTab({
   const [aiPrompt, setAiPrompt] = useState("");
   const aiTargetIdRef = useRef<string | null>(null);
 
+  // Lightbox state (for preview-side images)
+  const [lightbox, setLightbox] = useState<{ open: boolean; urls: string[]; index: number }>({
+    open: false,
+    urls: [],
+    index: 0,
+  });
+  const openPreviewImage = (urls: string[], index: number) =>
+    setLightbox({ open: true, urls, index });
+
   // hidden file inputs
   const fileLgRef = useRef<HTMLInputElement | null>(null);
   const fileSmRef = useRef<HTMLInputElement | null>(null);
