@@ -102,6 +102,7 @@ function ProjectEditor() {
 
   return (
     <div className="flex h-[calc(100vh-2.75rem)] flex-col">
+      <DragImageGhost />
       {/* Split layout — header is provided by the app TopBar in /app layout */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
         <ResizablePanel defaultSize="38%" minSize="20%" maxSize="75%">
