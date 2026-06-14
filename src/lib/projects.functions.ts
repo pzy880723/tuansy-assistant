@@ -197,16 +197,9 @@ export const uploadProductImage = createServerFn({ method: "POST" })
     }
 
     return { url: signed.signedUrl, path };
-  });
 
 
-    const { data: signed, error: signErr } = await supabaseAdmin.storage
-      .from("product-images")
-      .createSignedUrl(path, 60 * 60 * 24 * 365);
-    if (signErr || !signed?.signedUrl) throw new Error(signErr?.message ?? "签发链接失败");
 
-    return { url: signed.signedUrl, path };
-  });
 
 
 
