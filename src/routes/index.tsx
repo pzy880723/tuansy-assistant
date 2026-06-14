@@ -41,7 +41,7 @@ function TopNav() {
     <header className="sticky top-0 z-40 border-b border-white/5 bg-[oklch(0.13_0.012_50/0.8)] backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
         <Link to="/" className="flex items-center gap-2">
-          <img src={logoHorizontal.url} alt="团宝助手" className="h-8 w-auto" />
+          <img src={logoHorizontal.url} alt="团宝助手" className="h-10 w-auto" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
           <a href="#features" className="hover:text-white">产品能力</a>
