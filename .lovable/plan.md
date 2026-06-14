@@ -1,61 +1,76 @@
-## 目标
-1. **修 Bug**：「全部使用 →」目前只把图入了素材库 + 发给团宝，没有出现在右侧预览。改成直接把图按顺序追加为预览大图块，同时仍发给团宝继续优化。
-2. **新增素材库**：项目顶栏「同步快团团」按钮左侧加入口，弹层按来源分 tab（全部 / 手机收料 / AI 生成 / 手动上传），每张图可「插入预览」或「在编辑页编辑」。
+# 让团宝真正会编辑商品
+
+## 问题诊断（已读完代码）
+
+**1. 编辑器和团宝写的字段对不上 → 「点编辑里面是空的」**
+- 编辑器 (`AddProductSheet.tsx`) 读这些字段：`name, category, images[], description, specGroups[], variants[], price, stock, strikePrice, costPrice, code, tags, purchaseLimit, isFlashSale, videoUrl`
+- 团宝的 `update_skus` 工具 schema (`src/routes/api/chat.ts` 第 19-26 行) 只有：`name, price, stock, original_price, image, desc`
+- 所以团宝写出来的 SKU 进了编辑器后，品类/主图/多张图/描述/规格/标签 全是空，验证还过不了（编辑器要求 `category` 和 `images`）。
+
+**2. 团宝不会建多规格**
+- 团购宝传 SKU 数组 = 把"颜色×尺码"扁平塞 N 条 SKU，没有 `specGroups + variants`。所以用户说"3 个颜色 × 2 个尺码"，团宝没法表达成右侧编辑器原生的多规格结构。
+
+**3. 团宝不会"按表设库存"**
+- 没有针对单一变体改库存或批量改库存的工具；也没有处理用户贴库存表（图片/文字/CSV）→ 映射到对应变体的能力。
+
+**4. system prompt 没教团宝任何商品编辑规则**
+- prompt 里关于 SKU 只有一句"改 SKU → update_skus，传完整数组"，没说品类、多规格、库存表等。
 
 ---
 
-## 一、Bug 修复 —「全部使用 →」要写入预览
+## 修复方案
 
-`src/routes/app.project.$id.tsx` 的 `handleInboxAdoptAll` 在 `adoptInboxFn` 成功后，把返回的 `urls` 顺序追加为 `intro.blocks` 末尾的 `image_lg` 块，再写回数据库（`updateProject({ id, patch: { intro } })`），并 invalidate `["project", projectId]` 让右侧预览立刻刷新。然后再 `sendMessage` 让团宝继续优化。
+### A. 把 `SkuSchema` 升级成和编辑器一致的完整 schema
+位置：`src/routes/api/chat.ts`
 
-要点：
-- 用 `qc.getQueryData(["project", id])` 读当前 intro，缺失时用 `{ blocks: [] }` 兜底
-- 新块结构与 IntroTab 里现有 `image_lg` 一致：`{ type: "image_lg", id: 新生成, url }`
-- 在 sendMessage 的提示里把"已经把图放在预览末尾"告知团宝，避免重复插入
+```ts
+// 新 schema — 字段名和 SkuItem 完全对齐
+SpecValueSchema = { id?, label, image? }
+SpecGroupSchema = { id?, name, hasImage?, values: SpecValue[] }
+VariantSchema   = { id?, optionValueIds: string[], price, stock, costPrice?, image?, code? }
+SkuSchema       = {
+  name, category?, description?, images?[], videoUrl?,
+  tags?[], price?, stock?, strikePrice?, costPrice?, code?,
+  purchaseLimit?, isFlashSale?, group?,
+  specGroups?: SpecGroup[], variants?: Variant[],
+}
+```
+服务端 `update_skus` 写库前调一次 `syncSummaryFields` 等价的兜底（补 `image`/`spec`/`price` 汇总字段），让历史列表卡片照常显示。
+
+### B. 新增 3 个聪明的 SKU 工具
+
+1. **`update_sku_at`** — 局部 patch 单个商品（按 index 或 name 定位）。team 改一个字段不用把整张 SKU 数组重写。
+2. **`set_variants`** — 一步建多规格：传 `productIndex + specGroups[]`，服务端自动 `cartesianValueIds + reconcileVariants` 生成所有变体；可同时给一个默认价。
+3. **`set_variant_stocks`** — 按规格组合批量设库存：入参 `productIndex + entries: [{ match: {颜色:"黑",尺码:"M"}, stock:"50" }, ...]`，服务端按 label 反查 `optionValueIds`，更新对应 variant.stock；找不到的条目返回告警让团宝告诉用户。
+
+### C. 让团宝能读"库存表"
+用户在聊天里贴一张库存表图片或一段文本，团宝按现有 system prompt 已经能 OCR / 解析，新增一段规则要求它解析后调用 `set_variant_stocks`；同时教它若规格还没建，先调 `set_variants`，再调 `set_variant_stocks`。
+
+### D. 把 `intro.blocks` 里产品引用的 system prompt 重写
+新增一段【商品编辑工作流】明确：
+
+- 用户说"商品叫 XXX" → `update_sku_at` 改 `name`（或新建第 0 个商品并设 `name`、`category` 留空时主动 `ask_questions` 问品类）
+- 用户说"规格按颜色：黑/白/灰，尺码：M/L" → 一次 `set_variants`，然后回一句"建好 3×2 共 6 个变体，价格和库存呢？"
+- 用户说"库存黑M 30 件、白L 50 件…" 或贴表格 → `set_variant_stocks`
+- 没图片/品类时主动 `ask_questions`（品类 4 选 1：女装/食品/美妆/母婴/其他）
+- 价格、库存、变体规则同步到右侧编辑器后回一句"我把 X 改成 Y 了，去商品 Tab 看看"
+
+### E. 把 `update_product_meta` 工具说明里"不要改 SKU"那段保留，避免团宝串。
 
 ---
 
-## 二、素材库
+## 改动文件清单
 
-### 1. 数据来源标记
-迁移 `project_images`：新增 `source text` 字段（取值 `manual` / `ai` / `inbox`），默认 `manual`；老数据保持 `manual`。
+- `src/routes/api/chat.ts`
+  - 重写 `SkuSchema`，新增 `SpecGroupSchema/VariantSchema`
+  - 升级 `update_skus.execute`：写库前补 summary
+  - 新增 3 个工具：`update_sku_at`、`set_variants`、`set_variant_stocks`
+  - system prompt 追加【商品编辑工作流】与库存表处理规则
+- 无前端改动；编辑器已经支持所有目标字段
 
-写入侧改三处：
-- `adoptInboxImagesToProject`（手机收料采纳）→ `source: "inbox"`
-- AI 生图采纳到预览的流程（团宝调用 `update_intro` 时若引用了新 URL，由前端在镜像 intro 的 image 块时顺手 upsert 到 `project_images` 并标 `source: "ai"`；或在 `uploadAiGeneratedImage` 时就插一行 `source: "ai"`），采更简单的方案：**在 `uploadAiGeneratedImage` 成功后立即 insert `project_images` 一行**
-- `uploadProductImage`（手动上传）→ 现在已经只在团宝调用工具时写入，要补成：用户上传后立刻 insert `project_images` 一行 `source: "manual"`
+## 不在本次范围
+- 商品视频上传（编辑器目前 toast.info「即将上线」）
+- 商品分类自定义（同上）
+- 图片装饰
 
-### 2. 新接口
-`src/lib/projects.functions.ts` 新增：
-- `listProjectAssets({ projectId })` → 返回 `{ assets: Array<{ id, url, source, created_at, used_in_preview: boolean }> }`，`used_in_preview` 通过比对当前 `projects.intro` 的所有 `image_lg.url` / `image_sm.urls` 计算
-- `appendImageToPreview({ projectId, url })` → 把指定 URL 作为 `image_lg` 块追加到 `intro.blocks` 末尾并保存
-- `deleteProjectAsset({ id })` → 仅从素材库删，不动 intro
-
-### 3. UI
-新组件 `src/components/tuan/AssetLibrarySheet.tsx`：
-- 触发器：图片堆叠图标（Lucide `Images`）+「素材库 (N)」，N=素材总数
-- 弹层用 `Sheet`（右侧抽屉，宽 480px），内部 `Tabs`：全部 / 手机收料 / AI 生成 / 手动上传
-- 网格 3 列，每张图悬停时显示三个动作：
-  - **插入预览**：调用 `appendImageToPreview`，invalidate project 查询
-  - **去编辑页用**：关闭抽屉并 `emit` 一个事件给 IntroTab 让左侧弹出"选这张图"的提示（v1 简化为：直接复制 URL 到剪贴板 + toast「已复制图片地址，可在编辑页选择"从已上传图片中选择"贴入」）
-  - **删除**：二次确认后 `deleteProjectAsset`
-- 已在预览中使用的图右上角加 ✓ 角标 + 悬浮文案「已在预览」
-
-接入位置：`src/routes/app.tsx` 在 `<SyncToKttButton>` 前插入 `<AssetLibraryButton projectId={id} />`。
-
----
-
-## 三、文件改动清单
-
-**新建**
-- `src/components/tuan/AssetLibrarySheet.tsx`（含按钮 + 抽屉两个导出）
-
-**编辑**
-- `supabase` 迁移：`project_images` 新增 `source` 列
-- `src/lib/projects.functions.ts`：新增 `listProjectAssets` / `appendImageToPreview` / `deleteProjectAsset`；在 `uploadProductImage` handler 末尾插入 `project_images` 行
-- `src/lib/image-gen.functions.ts`：`uploadAiGeneratedImage` 成功后插入 `project_images` 行（`source: "ai"`）
-- `src/lib/inbox.functions.ts`：`adoptInboxImagesToProject` 写入时带 `source: "inbox"`
-- `src/routes/app.project.$id.tsx`：`handleInboxAdoptAll` 改成"先追加大图块再 sendMessage"
-- `src/routes/app.tsx`：顶栏加入素材库按钮
-
-不动：聊天面板缩略图拖拽、IntroTab 现有"从已上传图片中选择"逻辑保持不变（它已经能列出 availableImages）。
+确认后我直接落地。
