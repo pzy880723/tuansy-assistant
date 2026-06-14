@@ -21,6 +21,7 @@ import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as QuickbuyOrdersRouteImport } from './routes/quickbuy.orders'
 import { Route as QuickbuyGroupsRouteImport } from './routes/quickbuy.groups'
+import { Route as QuickbuyCustomersRouteImport } from './routes/quickbuy.customers'
 import { Route as OOrderNoRouteImport } from './routes/o.$orderNo'
 import { Route as MInboxRouteImport } from './routes/m.inbox'
 import { Route as GSlugRouteImport } from './routes/g.$slug'
@@ -93,6 +94,11 @@ const QuickbuyOrdersRoute = QuickbuyOrdersRouteImport.update({
 const QuickbuyGroupsRoute = QuickbuyGroupsRouteImport.update({
   id: '/groups',
   path: '/groups',
+  getParentRoute: () => QuickbuyRoute,
+} as any)
+const QuickbuyCustomersRoute = QuickbuyCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => QuickbuyRoute,
 } as any)
 const OOrderNoRoute = OOrderNoRouteImport.update({
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/customers': typeof QuickbuyCustomersRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
   '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin/': typeof AdminIndexRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/customers': typeof QuickbuyCustomersRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
   '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin': typeof AdminIndexRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/g/$slug': typeof GSlugRoute
   '/m/inbox': typeof MInboxRoute
   '/o/$orderNo': typeof OOrderNoRoute
+  '/quickbuy/customers': typeof QuickbuyCustomersRoute
   '/quickbuy/groups': typeof QuickbuyGroupsRoute
   '/quickbuy/orders': typeof QuickbuyOrdersRoute
   '/admin/': typeof AdminIndexRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/customers'
     | '/quickbuy/groups'
     | '/quickbuy/orders'
     | '/admin/'
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/customers'
     | '/quickbuy/groups'
     | '/quickbuy/orders'
     | '/admin'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/m/inbox'
     | '/o/$orderNo'
+    | '/quickbuy/customers'
     | '/quickbuy/groups'
     | '/quickbuy/orders'
     | '/admin/'
@@ -424,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/groups'
       fullPath: '/quickbuy/groups'
       preLoaderRoute: typeof QuickbuyGroupsRouteImport
+      parentRoute: typeof QuickbuyRoute
+    }
+    '/quickbuy/customers': {
+      id: '/quickbuy/customers'
+      path: '/customers'
+      fullPath: '/quickbuy/customers'
+      preLoaderRoute: typeof QuickbuyCustomersRouteImport
       parentRoute: typeof QuickbuyRoute
     }
     '/o/$orderNo': {
@@ -551,12 +570,14 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface QuickbuyRouteChildren {
+  QuickbuyCustomersRoute: typeof QuickbuyCustomersRoute
   QuickbuyGroupsRoute: typeof QuickbuyGroupsRoute
   QuickbuyOrdersRoute: typeof QuickbuyOrdersRoute
   QuickbuyIndexRoute: typeof QuickbuyIndexRoute
 }
 
 const QuickbuyRouteChildren: QuickbuyRouteChildren = {
+  QuickbuyCustomersRoute: QuickbuyCustomersRoute,
   QuickbuyGroupsRoute: QuickbuyGroupsRoute,
   QuickbuyOrdersRoute: QuickbuyOrdersRoute,
   QuickbuyIndexRoute: QuickbuyIndexRoute,
