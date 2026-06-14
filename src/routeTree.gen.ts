@@ -32,6 +32,7 @@ import { Route as ApiQuickbuyChatRouteImport } from './routes/api/quickbuy-chat'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSmsRouteImport } from './routes/admin.sms'
 import { Route as AdminPresetsRouteImport } from './routes/admin.presets'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
@@ -157,6 +158,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSmsRoute = AdminSmsRouteImport.update({
+  id: '/sms',
+  path: '/sms',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPresetsRoute = AdminPresetsRouteImport.update({
   id: '/presets',
   path: '/presets',
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/presets': typeof AdminPresetsRoute
+  '/admin/sms': typeof AdminSmsRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/presets': typeof AdminPresetsRoute
+  '/admin/sms': typeof AdminSmsRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
@@ -282,6 +290,7 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/presets': typeof AdminPresetsRoute
+  '/admin/sms': typeof AdminSmsRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
@@ -318,6 +327,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/dashboard'
     | '/admin/presets'
+    | '/admin/sms'
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/dashboard'
     | '/admin/presets'
+    | '/admin/sms'
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
@@ -383,6 +394,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/dashboard'
     | '/admin/presets'
+    | '/admin/sms'
     | '/admin/users'
     | '/api/chat'
     | '/api/generate-image'
@@ -591,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/sms': {
+      id: '/admin/sms'
+      path: '/sms'
+      fullPath: '/admin/sms'
+      preLoaderRoute: typeof AdminSmsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/presets': {
       id: '/admin/presets'
       path: '/presets'
@@ -661,6 +680,7 @@ interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminPresetsRoute: typeof AdminPresetsRoute
+  AdminSmsRoute: typeof AdminSmsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -669,6 +689,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAuditRoute: AdminAuditRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminPresetsRoute: AdminPresetsRoute,
+  AdminSmsRoute: AdminSmsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
