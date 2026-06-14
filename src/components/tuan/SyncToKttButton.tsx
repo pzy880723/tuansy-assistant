@@ -14,28 +14,38 @@ import { createExportToken } from "@/lib/export-project.functions";
 
 // Probe the installed extension via window.postMessage. Resolves to the
 // extension version string when present, or null after timeout.
-function pingExtension(timeoutMs = 600): Promise<string | null> {
+function pingExtension(timeoutMs = 1500): Promise<string | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
   // DOM marker fallback (set by extension bridge.js immediately on load)
   const marker = document.documentElement.getAttribute("data-tb-installed");
   if (marker) return Promise.resolve(marker);
 
   return new Promise((resolve) => {
+    let done = false;
+    const finish = (v: string | null) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMsg);
+      clearInterval(iv);
+      clearTimeout(t);
+      resolve(v);
+    };
     const onMsg = (e: MessageEvent) => {
       if (e.source !== window) return;
       const data = e.data;
       if (data && data.type === "TB_PONG") {
-        window.removeEventListener("message", onMsg);
-        clearTimeout(t);
-        resolve(typeof data.version === "string" ? data.version : "ok");
+        finish(typeof data.version === "string" ? data.version : "ok");
       }
     };
     window.addEventListener("message", onMsg);
-    const t = setTimeout(() => {
-      window.removeEventListener("message", onMsg);
-      resolve(null);
-    }, timeoutMs);
-    window.postMessage({ type: "TB_PING" }, "*");
+    const sendPing = () => {
+      const m = document.documentElement.getAttribute("data-tb-installed");
+      if (m) return finish(m);
+      window.postMessage({ type: "TB_PING" }, "*");
+    };
+    sendPing();
+    const iv = setInterval(sendPing, 200);
+    const t = setTimeout(() => finish(null), timeoutMs);
   });
 }
 
