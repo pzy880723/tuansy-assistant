@@ -358,3 +358,93 @@ export const adminListCopyVersions = createServerFn({ method: "POST" })
     }));
     return { versions: rows, total: count ?? 0 };
   });
+
+// ============ SMS Logs ============
+
+export type AdminSmsRow = {
+  id: string;
+  phone: string;
+  created_at: string;
+  expires_at: string;
+  consumed_at: string | null;
+  attempts: number;
+  provider: string;
+  provider_request_id: string | null;
+  error_message: string | null;
+  delivery_status: string;
+  delivery_code: string | null;
+  delivery_message: string | null;
+  delivered_at: string | null;
+  report_received_at: string | null;
+};
+
+export const adminListSmsLogs = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        search: z.string().optional(),
+        status: z
+          .enum(["all", "sending", "delivered", "failed"])
+          .default("all"),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(30),
+      })
+      .parse(d ?? {}),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let query = supabaseAdmin
+      .from("sms_verification_codes")
+      .select(
+        "id, phone, created_at, expires_at, consumed_at, attempts, provider, provider_request_id, error_message, delivery_status, delivery_code, delivery_message, delivered_at, report_received_at",
+        { count: "exact" },
+      )
+      .order("created_at", { ascending: false });
+    if (data.search) {
+      const s = data.search.replace(/[%_\s]/g, "");
+      query = query.ilike("phone", `%${s}%`);
+    }
+    if (data.status !== "all") {
+      query = query.eq("delivery_status", data.status);
+    }
+    const from = (data.page - 1) * data.pageSize;
+    const to = from + data.pageSize - 1;
+    const { data: rows, count, error } = await query.range(from, to);
+    if (error) throw new Error(error.message);
+
+    // 统计（最近 24 小时）
+    const since = new Date(Date.now() - 86400000).toISOString();
+    const [sent, delivered, failed, sending] = await Promise.all([
+      supabaseAdmin
+        .from("sms_verification_codes")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since),
+      supabaseAdmin
+        .from("sms_verification_codes")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since)
+        .eq("delivery_status", "delivered"),
+      supabaseAdmin
+        .from("sms_verification_codes")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since)
+        .eq("delivery_status", "failed"),
+      supabaseAdmin
+        .from("sms_verification_codes")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since)
+        .eq("delivery_status", "sending"),
+    ]);
+
+    return {
+      rows: (rows ?? []) as AdminSmsRow[],
+      total: count ?? 0,
+      stats24h: {
+        total: sent.count ?? 0,
+        delivered: delivered.count ?? 0,
+        failed: failed.count ?? 0,
+        sending: sending.count ?? 0,
+      },
+    };
+  });
