@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { readAuthToken } from "@/lib/use-current-user";
 
 const suggestions = [
   "导出本周的订单",
