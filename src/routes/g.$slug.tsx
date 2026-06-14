@@ -7,14 +7,16 @@ export const Route = createFileRoute("/g/$slug")({
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: group } = await supabaseAdmin
       .from("group_orders")
-      .select("id, slug, status, title, cover_image_url, snapshot_intro, snapshot_skus, ends_at, items_sold")
+      .select("id, slug, status, title, cover_image_url, snapshot_intro, snapshot_skus, ends_at, items_sold, owner_id")
       .eq("slug", params.slug)
       .maybeSingle();
     if (!group) throw notFound();
+    const { data: owner } = await supabaseAdmin
+      .from("app_users").select("nickname").eq("id", group.owner_id).maybeSingle();
     const { data: vc } = await supabaseAdmin.from("group_orders").select("view_count").eq("id", group.id).single();
     const next = (vc?.view_count ?? 0) + 1;
     await supabaseAdmin.from("group_orders").update({ view_count: next }).eq("id", group.id);
-    return { group };
+    return { group, leader: { nickname: owner?.nickname || "团长" } };
   },
   head: ({ loaderData }) => {
     const g = loaderData?.group;
