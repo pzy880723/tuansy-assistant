@@ -37,6 +37,7 @@ import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AppProjectIdRouteImport } from './routes/app.project.$id'
 import { Route as ApiPublicExportProjectRouteImport } from './routes/api/public/export-project'
+import { Route as ApiPublicWechatCallbackRouteImport } from './routes/api/public/wechat.callback'
 import { Route as ApiPublicOrdersOrderNoRouteImport } from './routes/api/public/orders.$orderNo'
 import { Route as ApiPublicGSlugPlaceOrderRouteImport } from './routes/api/public/g.$slug.place-order'
 
@@ -180,6 +181,11 @@ const ApiPublicExportProjectRoute = ApiPublicExportProjectRouteImport.update({
   path: '/api/public/export-project',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWechatCallbackRoute = ApiPublicWechatCallbackRouteImport.update({
+  id: '/api/public/wechat/callback',
+  path: '/api/public/wechat/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicOrdersOrderNoRoute = ApiPublicOrdersOrderNoRouteImport.update({
   id: '/api/public/orders/$orderNo',
   path: '/api/public/orders/$orderNo',
@@ -222,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/wechat/callback': typeof ApiPublicWechatCallbackRoute
   '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
 export interface FileRoutesByTo {
@@ -251,6 +258,7 @@ export interface FileRoutesByTo {
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/wechat/callback': typeof ApiPublicWechatCallbackRoute
   '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
 export interface FileRoutesById {
@@ -284,6 +292,7 @@ export interface FileRoutesById {
   '/api/public/export-project': typeof ApiPublicExportProjectRoute
   '/app/project/$id': typeof AppProjectIdRoute
   '/api/public/orders/$orderNo': typeof ApiPublicOrdersOrderNoRoute
+  '/api/public/wechat/callback': typeof ApiPublicWechatCallbackRoute
   '/api/public/g/$slug/place-order': typeof ApiPublicGSlugPlaceOrderRoute
 }
 export interface FileRouteTypes {
@@ -318,6 +327,7 @@ export interface FileRouteTypes {
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
+    | '/api/public/wechat/callback'
     | '/api/public/g/$slug/place-order'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
+    | '/api/public/wechat/callback'
     | '/api/public/g/$slug/place-order'
   id:
     | '__root__'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/api/public/export-project'
     | '/app/project/$id'
     | '/api/public/orders/$orderNo'
+    | '/api/public/wechat/callback'
     | '/api/public/g/$slug/place-order'
   fileRoutesById: FileRoutesById
 }
@@ -398,6 +410,7 @@ export interface RootRouteChildren {
   OOrderNoRoute: typeof OOrderNoRoute
   ApiPublicExportProjectRoute: typeof ApiPublicExportProjectRoute
   ApiPublicOrdersOrderNoRoute: typeof ApiPublicOrdersOrderNoRoute
+  ApiPublicWechatCallbackRoute: typeof ApiPublicWechatCallbackRoute
   ApiPublicGSlugPlaceOrderRoute: typeof ApiPublicGSlugPlaceOrderRoute
 }
 
@@ -599,6 +612,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicExportProjectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/wechat/callback': {
+      id: '/api/public/wechat/callback'
+      path: '/api/public/wechat/callback'
+      fullPath: '/api/public/wechat/callback'
+      preLoaderRoute: typeof ApiPublicWechatCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/orders/$orderNo': {
       id: '/api/public/orders/$orderNo'
       path: '/api/public/orders/$orderNo'
@@ -686,6 +706,7 @@ const rootRouteChildren: RootRouteChildren = {
   OOrderNoRoute: OOrderNoRoute,
   ApiPublicExportProjectRoute: ApiPublicExportProjectRoute,
   ApiPublicOrdersOrderNoRoute: ApiPublicOrdersOrderNoRoute,
+  ApiPublicWechatCallbackRoute: ApiPublicWechatCallbackRoute,
   ApiPublicGSlugPlaceOrderRoute: ApiPublicGSlugPlaceOrderRoute,
 }
 export const routeTree = rootRouteImport
