@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/UserMenu";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { SyncToKttButton } from "@/components/tuan/SyncToKttButton";
+import logoHorizontal from "@/assets/logo-horizontal.png.asset.json";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "工作台 — 团宝助手" }] }),
@@ -53,11 +54,9 @@ function TopBar() {
     <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 px-4">
         <Link to="/" className="flex shrink-0 items-center gap-1.5">
-          <span className="grid h-6 w-6 place-items-center rounded-md bg-gradient-to-br from-[oklch(0.78_0.18_55)] to-[oklch(0.62_0.22_35)] text-[11px] font-bold text-white shadow-[0_3px_10px_oklch(0.7_0.19_45/0.4)]">
-            团
-          </span>
-          <span className="text-sm font-semibold tracking-tight">团宝助手</span>
+          <img src={logoHorizontal.url} alt="团宝助手" className="h-6 w-auto" />
         </Link>
+
         {projectMatch ? (
           <ProjectInlineHeader id={projectMatch[1]} />
         ) : (

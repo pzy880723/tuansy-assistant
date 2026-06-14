@@ -1,66 +1,64 @@
 ## 目标
 
-合并两个按钮，把"同步到快团团"做成真正的一键操作：检测插件 → 自动打开快团团 → 自动填入，全程用户只点一下。
+把项目里所有旧的「橙色渐变方块 + 团字」占位 logo，全部换成你新上传的团宝助手 logo 素材。
 
-## 改动总览
+## 素材分工
 
-### 1. 删掉冗余按钮
-- 删除 `ExportToKttDialog`（即"发送到快团团"按钮和对应弹窗）。
-- 项目页 `src/routes/app.project.$id.tsx` 不再渲染 `ExportToKttDialog`。
-- 顶栏 `src/routes/app.tsx` 那个 `toast.info(...)` 占位的"同步到快团团"按钮升级成主入口。
+四张图分别对应不同场景，全部走 Lovable Assets（CDN），原图不入仓：
 
-### 2. 新建 `SyncToKttButton`（替代原按钮）
-位置同顶栏，文案保持"同步到快团团"。点击逻辑：
+| 素材 | 用途 |
+| --- | --- |
+| image-43.png（横版：吉祥物 + 团宝助手字样，白底） | 顶栏 / 登录页 / 首页 header / footer 主 logo |
+| image-47.png（纯吉祥物，白底透明感） | 小尺寸方形头像位（移动端 inbox 头像、project starter 头像、聊天气泡头像，替换现有 tuanbao-avatar） |
+| image-46.png（App 图标，圆角橙底） | favicon、Chrome 插件 icon128、`/extension` 下载页主视觉 |
+| image-45.png（深色底版本） | 暂不使用，先上传备用（深色模式/海报场景） |
 
-1. **探测插件**：向 `window` 发 `postMessage({ type: "TB_PING" })`，等 600ms 拿 `TB_PONG`。
-2. **未安装** → 弹出一个极简 Dialog（只有一段话 + "下载插件"按钮跳 `/extension`，再 + "我已安装，重试"按钮）。
-3. **已安装** → 生成 token（调用现有 `createExportToken`）→ 再发 `postMessage({ type: "TB_SYNC", token, origin, projectName })` → 显示 toast "已发送到插件，正在打开快团团…"。
-4. 任何步骤报错 → toast 红字提示，不阻塞。
+## 改动
 
-无弹窗、无复制粘贴、无 token 可见。
+### 1. 上传四张图到 Lovable Assets
+- `src/assets/logo-horizontal.png.asset.json`（image-43）
+- `src/assets/logo-mascot.png.asset.json`（image-47）—— 同时替换掉旧的 `tuanbao-avatar.png.asset.json`，并删除旧 asset pointer
+- `src/assets/logo-app-icon.png.asset.json`（image-46）
+- `src/assets/logo-dark.png.asset.json`（image-45，备用）
 
-### 3. 插件侧改造
+### 2. 顶栏（`src/routes/app.tsx`）
+把 `<span class="grid ... 团">` + 「团宝助手」文字整体换成横版 logo `<img>`（高度约 24-28px，保持原点击跳首页）。
 
-**`manifest.json`**
-- 给 `content_scripts` 增加一条：匹配 `https://*.lovable.app/*`、`https://*.lovableproject.com/*`、自定义域名 `https://tuansy-assistant.lovable.app/*`，只注入一个新的 `bridge.js`（很轻量，不引 fillers/selectors）。
-- 这样团宝页面就能和插件通信。
+### 3. 首页（`src/routes/index.tsx`）
+- header 左上 logo（行 43-46）：换成横版 logo（高度约 28px），去掉旁边的「团宝助手」文字（图里已含）。
+- 行 122 / 235 的两个装饰性渐变方块（hero 区演示卡 + feature icon）：保留渐变不动（它们不是 logo，是装饰图标），**不替换**。
+- footer 文案不动。
 
-**`extension/bridge.js`（新）**
-- `window.postMessage` 监听：
-  - `TB_PING` → 回 `TB_PONG`（带版本号）。
-  - `TB_SYNC` → `chrome.runtime.sendMessage` 转给 background。
-- 同时在 `<html>` 上加个 `data-tb-installed="0.1.0"` 标记，作为兜底探测。
+### 4. 登录页（`src/routes/auth.tsx` 行 56-60）
+换成横版 logo，去掉 "团宝助手" 文字。
 
-**`extension/background.js`**
-- 新增 `type: "syncToKtt"` 处理：
-  1. 调用现有 `fetchPayload` 逻辑拉项目数据。
-  2. `chrome.storage.local.set({ lastPayload, autoFillPending: true })`。
-  3. `chrome.tabs.query` 找已打开的 KTT 创建/编辑标签；找不到则 `chrome.tabs.create({ url: "https://ktt.pinduoduo.com/groups/create" })`。
-  4. 标签 ready 后向 content.js 发 `{ type: "fill", payload }`。
+### 5. `/extension` 下载页（`src/routes/extension.tsx` 行 40）
+把橙色渐变圆角 + Chrome 图标换成 App 图标 `logo-app-icon`（h-16 w-16，圆角 2xl 直接显示原图）。
 
-**`extension/content.js`**
-- 加载时检查 `autoFillPending`，若为 true 则等页面就绪后自动 `fillAll(lastPayload)`，完成清掉 flag，弹个右下角悬浮提示"已自动填入 X 项"。
-- 浮窗按钮保留，作为手动重试入口。
+### 6. 移动端 inbox（`src/routes/m.inbox.tsx` 行 79）
+小方块换成吉祥物头像 `logo-mascot`。
 
-### 4. 重新打包插件
-- `cd /dev-server/extension && nix run nixpkgs#zip -- -r /dev-server/public/ktt-filler.zip .`
-- `/extension` 下载页文案小调：去掉"复制 token / 粘贴到插件"的旧步骤，强调"装好插件后回到团宝点同步即可"。
+### 7. tuanbao-avatar 全量替换
+- `src/routes/app.project.$id.tsx`、`src/components/project-starter.tsx`、`src/components/tuan/PhoneShell.tsx`、`src/lib/projects.functions.ts` 等所有 import `tuanbao-avatar.png.asset.json` 的位置，改成 import 新的 `logo-mascot.png.asset.json`。
+- 删除旧的 `src/assets/tuanbao-avatar.png.asset.json`（通过 assets--delete_asset）。
 
-## 用户感知
+### 8. Favicon
+在 `src/routes/__root.tsx` 的 `head().links` 加 `{ rel: "icon", href: <app-icon url>, type: "image/png" }`。
 
-- 一次性操作：装插件 → 之后每个项目只点一下"同步到快团团"。
-- 第一次没装：点击会出现安装引导，装完回来重试还是一下。
-- 不再让用户接触 token、链接、复制粘贴。
+### 9. Chrome 插件图标
+- 用 image-46 重新生成 `extension/icons/icon128.png`（覆盖原文件，128×128，缩放保存）。
+- 重新打包 `public/ktt-filler.zip`。
 
-## 受影响文件
+## 不动的东西
 
-- 删：`src/components/tuan/ExportToKttDialog.tsx`
-- 改：`src/routes/app.project.$id.tsx`（去掉导入和使用）
-- 改：`src/routes/app.tsx`（按钮换成新组件）
-- 新：`src/components/tuan/SyncToKttButton.tsx`
-- 改：`extension/manifest.json`、`extension/background.js`、`extension/content.js`
-- 新：`extension/bridge.js`
-- 改：`src/routes/extension.tsx`（文案）
-- 重建：`public/ktt-filler.zip`
+- 业务逻辑（同步、AI、SKU 编辑等）一律不碰。
+- 首页 hero 区那些非 logo 的橙色渐变装饰图标保留。
+- 配色系 `--brand-*` token 不改。
+- 深色版 logo 暂上传不引用。
 
-服务端 `createExportToken` / `/api/public/export-project` 保持不变。
+## 验收
+
+- 顶栏 / 首页 / 登录 / inbox / extension 页 logo 视觉统一。
+- 浏览器 tab 出现新 favicon。
+- 项目编辑页里 AI 助手头像变成新吉祥物。
+- 旧 `tuanbao-avatar` asset 不再被引用。

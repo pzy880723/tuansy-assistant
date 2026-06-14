@@ -18,7 +18,7 @@ import {
   Square,
   SkipForward,
 } from "lucide-react";
-import tuanbaoAvatar from "@/assets/tuanbao-avatar.png.asset.json";
+import logoMascot from "@/assets/logo-mascot.png.asset.json";
 import { useImageAttachments } from "@/lib/use-image-attachments";
 import {
   ResizableHandle,
@@ -485,7 +485,7 @@ function ChatPane({
     >
       <div className="flex items-center gap-2 border-b px-3 py-1.5">
         <img
-          src={tuanbaoAvatar.url}
+          src={logoMascot.url}
           alt="团宝"
           width={20}
           height={20}
@@ -794,7 +794,7 @@ function ChatEmpty({ onPick }: { onPick: (s: string) => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
       <img
-        src={tuanbaoAvatar.url}
+        src={logoMascot.url}
         alt="团宝"
         width={80}
         height={80}
@@ -877,7 +877,7 @@ function MessageRow({
   return (
     <div className="flex gap-2.5">
       <img
-        src={tuanbaoAvatar.url}
+        src={logoMascot.url}
         alt="团宝"
         width={28}
         height={28}
