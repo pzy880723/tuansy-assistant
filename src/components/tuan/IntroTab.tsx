@@ -1088,6 +1088,33 @@ export function IntroTab({
           onComplete={handleAIComplete}
         />
       )}
+
+      <ImageLightbox
+        open={lightbox.open}
+        urls={lightbox.urls}
+        index={lightbox.index}
+        onIndexChange={(i) => setLightbox((s) => ({ ...s, index: i }))}
+        onOpenChange={(v) => setLightbox((s) => ({ ...s, open: v }))}
+      />
+
+      {/* Cross-pane drop insertion-line indicator (rendered via portal) */}
+      {incomingLineRect &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[250]"
+            style={{
+              left: incomingLineRect.left,
+              top: incomingLineRect.top,
+              width: incomingLineRect.width,
+              height: 3,
+              background: "#07c160",
+              borderRadius: 2,
+              boxShadow: "0 0 0 2px rgba(7,193,96,0.25)",
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
