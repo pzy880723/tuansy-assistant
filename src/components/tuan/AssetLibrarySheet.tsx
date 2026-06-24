@@ -254,10 +254,11 @@ function AssetGrid({
               <button
                 disabled={busy}
                 onClick={() => onInsert(a)}
+                title="追加到商品预览图片列表的末尾"
                 className="inline-flex w-[88%] items-center justify-center gap-1 rounded bg-[#07c160] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#06ad56] disabled:opacity-60"
               >
                 {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                插入预览
+                追加到预览末尾
               </button>
               <button
                 disabled={busy}
