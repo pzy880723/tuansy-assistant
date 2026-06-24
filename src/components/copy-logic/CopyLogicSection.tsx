@@ -41,6 +41,8 @@ import {
   type CopyFormatting,
 } from "@/lib/copy-logics.functions";
 import { cn } from "@/lib/utils";
+import { MobileUploadQRDialog } from "./MobileUploadQRDialog";
+
 
 const MODULE_TYPE_LABEL: Record<CopyModuleType, string> = {
   title: "标题",
