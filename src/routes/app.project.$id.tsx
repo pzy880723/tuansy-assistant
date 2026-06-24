@@ -861,7 +861,7 @@ function ChatPane({
                 </p>
               </DialogHeader>
               <div className="max-h-[75vh] overflow-y-auto">
-                <CopyLogicSection embedded />
+                <CopyLogicSection embedded projectId={id} />
               </div>
             </DialogContent>
           </Dialog>
