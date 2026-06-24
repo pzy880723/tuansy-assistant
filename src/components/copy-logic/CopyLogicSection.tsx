@@ -61,7 +61,7 @@ function rid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export function CopyLogicSection({ embedded = false }: { embedded?: boolean }) {
+export function CopyLogicSection({ embedded = false, projectId }: { embedded?: boolean; projectId?: string }) {
   const list = useServerFn(listCopyLogics);
   const upsert = useServerFn(upsertCopyLogic);
   const remove = useServerFn(deleteCopyLogic);
