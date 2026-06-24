@@ -184,6 +184,8 @@ export function CopyLogicSection({ embedded = false, projectId }: { embedded?: b
             <LogicEditor
               key={selected.id}
               logic={selected}
+              projectId={projectId}
+
               onSave={async (patch) => {
                 try {
                   await upsert({
