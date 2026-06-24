@@ -11,7 +11,7 @@ import { SyncToKttButton } from "@/components/tuan/SyncToKttButton";
 import { AssetLibraryButton } from "@/components/tuan/AssetLibrarySheet";
 import { QuickBuyButton } from "@/components/tuan/QuickBuyButton";
 
-import logoHorizontal from "@/assets/logo-horizontal.png.asset.json";
+import logoHorizontal from "@/assets/logo-horizontal.webp.asset.json";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "工作台 — 团宝助手" }] }),
