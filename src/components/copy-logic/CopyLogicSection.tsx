@@ -11,7 +11,6 @@ import {
   ChevronUp,
   ChevronDown,
   Check,
-  QrCode,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -41,7 +40,7 @@ import {
   type CopyFormatting,
 } from "@/lib/copy-logics.functions";
 import { cn } from "@/lib/utils";
-import { MobileUploadQRDialog } from "./MobileUploadQRDialog";
+
 
 
 const MODULE_TYPE_LABEL: Record<CopyModuleType, string> = {
