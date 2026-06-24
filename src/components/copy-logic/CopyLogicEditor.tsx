@@ -56,18 +56,15 @@ export function CopyLogicEditor({
   value,
   onChange,
   readOnly = false,
-  projectId,
 }: {
   value: CopyLogicEditorValue;
   onChange: (next: CopyLogicEditorValue) => void;
   readOnly?: boolean;
-  projectId?: string;
 }) {
   const [name, setName] = useState(value.name);
   const [description, setDescription] = useState(value.description);
   const [modules, setModules] = useState<CopyModule[]>(value.modules);
   const [genLoading, setGenLoading] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
 
 
   // Resync when external value changes (e.g. selection swap)
@@ -82,6 +79,7 @@ export function CopyLogicEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);
+
 
   const emit = (patch: Partial<CopyLogicEditorValue>) => {
     const next: CopyLogicEditorValue = {
