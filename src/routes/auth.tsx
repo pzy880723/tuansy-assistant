@@ -23,7 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import logoHorizontal from "@/assets/logo-horizontal.png.asset.json";
+import logoHorizontal from "@/assets/logo-horizontal.webp.asset.json";
 import logoMascot from "@/assets/logo-mascot.png.asset.json";
 import {
   clearAuthCookies,
