@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Images, Check, Plus, Trash2, Loader2, Smartphone, Sparkles, Upload } from "lucide-react";
+import { Images, Check, Plus, Trash2, Loader2, Smartphone, Sparkles, Upload, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sheet,
