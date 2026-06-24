@@ -14,6 +14,9 @@ import {
 import logoMascot from "@/assets/logo-mascot.png.asset.json";
 
 export const Route = createFileRoute("/m/inbox")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    project: typeof search.project === "string" ? search.project : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "团宝收料台" },
@@ -28,6 +31,7 @@ export const Route = createFileRoute("/m/inbox")({
   }),
   component: MobileInboxPage,
 });
+
 
 type Tab = "image" | "text" | "link";
 
