@@ -28,6 +28,9 @@ import {
   deleteProjectAsset,
 } from "@/lib/projects.functions";
 import { cn } from "@/lib/utils";
+import { MobileUploadQRDialog } from "@/components/copy-logic/MobileUploadQRDialog";
+import { Button } from "@/components/ui/button";
+
 
 type AssetSource = "manual" | "ai" | "inbox";
 type Asset = {
