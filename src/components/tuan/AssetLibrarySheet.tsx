@@ -77,18 +77,21 @@ export function AssetLibraryButton({ projectId }: { projectId: string }) {
       </SheetTrigger>
       <SheetContent side="right" className="flex w-[480px] flex-col gap-0 p-0 sm:max-w-[480px]">
         <SheetHeader className="border-b px-5 py-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <SheetTitle className="flex items-center gap-2 text-base">
-              <Images className="h-4 w-4" /> 项目素材库
-              {total > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">共 {total} 张</span>
-              )}
-            </SheetTitle>
+          <SheetTitle className="flex items-center gap-2 pr-8 text-base">
+            <Images className="h-4 w-4" /> 项目素材库
+            {total > 0 && (
+              <span className="text-xs font-normal text-muted-foreground">共 {total} 张</span>
+            )}
+          </SheetTitle>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">
+              手机收料 / AI 生图 / 上传的图片都在这里
+            </span>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 text-[11px]"
+              className="h-7 gap-1.5 text-[11px]"
               onClick={() => setQrOpen(true)}
             >
               <QrCode className="h-3.5 w-3.5" />
@@ -251,10 +254,11 @@ function AssetGrid({
               <button
                 disabled={busy}
                 onClick={() => onInsert(a)}
+                title="追加到商品预览图片列表的末尾"
                 className="inline-flex w-[88%] items-center justify-center gap-1 rounded bg-[#07c160] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#06ad56] disabled:opacity-60"
               >
                 {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                插入预览
+                追加到预览末尾
               </button>
               <button
                 disabled={busy}
