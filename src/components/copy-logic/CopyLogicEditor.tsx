@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  QrCode,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +19,8 @@ import {
   type CopyModule,
   type CopyModuleType,
 } from "@/lib/copy-logics.functions";
+import { MobileUploadQRDialog } from "./MobileUploadQRDialog";
+
 
 export const MODULE_TYPE_LABEL: Record<CopyModuleType, string> = {
   title: "标题",
