@@ -49,6 +49,7 @@ const sourceMeta: Record<AssetSource, { label: string; icon: typeof Smartphone; 
 
 export function AssetLibraryButton({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const listFn = useServerFn(listProjectAssets);
   const { data } = useQuery({
     queryKey: ["project-assets", projectId],
@@ -76,22 +77,40 @@ export function AssetLibraryButton({ projectId }: { projectId: string }) {
       </SheetTrigger>
       <SheetContent side="right" className="flex w-[480px] flex-col gap-0 p-0 sm:max-w-[480px]">
         <SheetHeader className="border-b px-5 py-3.5">
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <Images className="h-4 w-4" /> 项目素材库
-            {total > 0 && (
-              <span className="text-xs font-normal text-muted-foreground">共 {total} 张</span>
-            )}
-          </SheetTitle>
+          <div className="flex items-center justify-between gap-2">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <Images className="h-4 w-4" /> 项目素材库
+              {total > 0 && (
+                <span className="text-xs font-normal text-muted-foreground">共 {total} 张</span>
+              )}
+            </SheetTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-[11px]"
+              onClick={() => setQrOpen(true)}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              扫码手机上传
+            </Button>
+          </div>
         </SheetHeader>
         <AssetLibraryBody
           projectId={projectId}
           assets={data?.assets ?? []}
           onClose={() => setOpen(false)}
         />
+        <MobileUploadQRDialog
+          projectId={projectId}
+          open={qrOpen}
+          onOpenChange={setQrOpen}
+        />
       </SheetContent>
     </Sheet>
   );
 }
+
 
 function AssetLibraryBody({
   projectId,
