@@ -11,7 +11,9 @@ import {
   ChevronUp,
   ChevronDown,
   Check,
+  QrCode,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,8 @@ import {
   type CopyFormatting,
 } from "@/lib/copy-logics.functions";
 import { cn } from "@/lib/utils";
+import { MobileUploadQRDialog } from "./MobileUploadQRDialog";
+
 
 const MODULE_TYPE_LABEL: Record<CopyModuleType, string> = {
   title: "标题",
@@ -61,7 +65,7 @@ function rid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export function CopyLogicSection({ embedded = false }: { embedded?: boolean }) {
+export function CopyLogicSection({ embedded = false, projectId }: { embedded?: boolean; projectId?: string }) {
   const list = useServerFn(listCopyLogics);
   const upsert = useServerFn(upsertCopyLogic);
   const remove = useServerFn(deleteCopyLogic);
@@ -184,6 +188,8 @@ export function CopyLogicSection({ embedded = false }: { embedded?: boolean }) {
             <LogicEditor
               key={selected.id}
               logic={selected}
+              projectId={projectId}
+
               onSave={async (patch) => {
                 try {
                   await upsert({
@@ -239,6 +245,7 @@ function LogicEditor({
   onSave,
   onActivate,
   onDelete,
+  projectId,
 }: {
   logic: CopyLogic;
   onSave: (patch: {
@@ -249,8 +256,10 @@ function LogicEditor({
   }) => Promise<void>;
   onActivate: () => Promise<void>;
   onDelete: () => Promise<void>;
+  projectId?: string;
 }) {
   const [name, setName] = useState(logic.name);
+
   const [description, setDescription] = useState(logic.description);
   const [modules, setModules] = useState<CopyModule[]>(logic.modules);
   const [formatting, setFormatting] = useState<CopyFormatting>(
@@ -259,6 +268,8 @@ function LogicEditor({
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [genModules, setGenModules] = useState(false);
   const [genText, setGenText] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+
 
   const genMods = useServerFn(generateModulesFromText);
   const genTxt = useServerFn(generateTextFromModules);
@@ -364,6 +375,18 @@ function LogicEditor({
             className="mt-1"
           />
         </div>
+        {projectId && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-5 h-9 shrink-0 gap-1.5 text-[11px]"
+            onClick={() => setQrOpen(true)}
+          >
+            <QrCode className="h-3.5 w-3.5" />
+            扫码上传图片
+          </Button>
+        )}
         <div className="flex flex-col items-end gap-1 pt-5">
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground">启用</span>
@@ -376,6 +399,15 @@ function LogicEditor({
           )}
         </div>
       </div>
+
+      {projectId && (
+        <MobileUploadQRDialog
+          projectId={projectId}
+          open={qrOpen}
+          onOpenChange={setQrOpen}
+        />
+      )}
+
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">

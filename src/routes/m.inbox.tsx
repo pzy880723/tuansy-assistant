@@ -14,6 +14,9 @@ import {
 import logoMascot from "@/assets/logo-mascot.png.asset.json";
 
 export const Route = createFileRoute("/m/inbox")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    project: typeof search.project === "string" ? search.project : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "团宝收料台" },
@@ -28,6 +31,7 @@ export const Route = createFileRoute("/m/inbox")({
   }),
   component: MobileInboxPage,
 });
+
 
 type Tab = "image" | "text" | "link";
 
@@ -53,9 +57,11 @@ function MobileInboxPage() {
 }
 
 function InboxScreen() {
+  const { project: preselectedProject } = Route.useSearch();
   const [tab, setTab] = useState<Tab>("image");
   const [selectedProjectId, setSelectedProjectId] = useState<string | "new" | "">("");
   const [note, setNote] = useState("");
+  const [preselectApplied, setPreselectApplied] = useState(false);
 
   const listProjects = useServerFn(listMyRecentProjects);
   const { data: projData } = useQuery({
@@ -65,12 +71,24 @@ function InboxScreen() {
   const projects = projData?.projects ?? [];
 
   useEffect(() => {
+    if (!projData) return;
+    // Honor ?project= from the desktop QR if it matches one of the user's projects.
+    if (
+      preselectedProject &&
+      !preselectApplied &&
+      projects.find((p) => p.id === preselectedProject)
+    ) {
+      setSelectedProjectId(preselectedProject);
+      setPreselectApplied(true);
+      return;
+    }
     if (!selectedProjectId && projects.length > 0) {
       setSelectedProjectId(projects[0].id);
-    } else if (!selectedProjectId && projects.length === 0 && projData) {
+    } else if (!selectedProjectId && projects.length === 0) {
       setSelectedProjectId("new");
     }
-  }, [projects, selectedProjectId, projData]);
+  }, [projects, selectedProjectId, projData, preselectedProject, preselectApplied]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#fff7ed] via-[#fff7ed] to-[#fde6c8] pb-32">

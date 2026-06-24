@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  QrCode,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +19,8 @@ import {
   type CopyModule,
   type CopyModuleType,
 } from "@/lib/copy-logics.functions";
+import { MobileUploadQRDialog } from "./MobileUploadQRDialog";
+
 
 export const MODULE_TYPE_LABEL: Record<CopyModuleType, string> = {
   title: "标题",
@@ -54,15 +57,19 @@ export function CopyLogicEditor({
   value,
   onChange,
   readOnly = false,
+  projectId,
 }: {
   value: CopyLogicEditorValue;
   onChange: (next: CopyLogicEditorValue) => void;
   readOnly?: boolean;
+  projectId?: string;
 }) {
   const [name, setName] = useState(value.name);
   const [description, setDescription] = useState(value.description);
   const [modules, setModules] = useState<CopyModule[]>(value.modules);
   const [genLoading, setGenLoading] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+
 
   // Resync when external value changes (e.g. selection swap)
   const lastSig = useRef<string>("");
@@ -141,17 +148,40 @@ export function CopyLogicEditor({
     <div className="space-y-5">
       <div>
         <label className="text-[11px] font-medium text-muted-foreground">名称</label>
-        <Input
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            emit({ name: e.target.value });
-          }}
-          disabled={readOnly}
-          placeholder="如：服装文案"
-          className="mt-1"
-        />
+        <div className="mt-1 flex items-center gap-2">
+          <Input
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              emit({ name: e.target.value });
+            }}
+            disabled={readOnly}
+            placeholder="如：服装文案"
+            className="flex-1"
+          />
+          {projectId && !readOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 gap-1.5 text-[11px]"
+              onClick={() => setQrOpen(true)}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              扫码上传图片
+            </Button>
+          )}
+        </div>
       </div>
+
+      {projectId && (
+        <MobileUploadQRDialog
+          projectId={projectId}
+          open={qrOpen}
+          onOpenChange={setQrOpen}
+        />
+      )}
+
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
