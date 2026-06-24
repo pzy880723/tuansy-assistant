@@ -11,7 +11,6 @@ import {
   ChevronUp,
   ChevronDown,
   Check,
-  QrCode,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -41,7 +40,7 @@ import {
   type CopyFormatting,
 } from "@/lib/copy-logics.functions";
 import { cn } from "@/lib/utils";
-import { MobileUploadQRDialog } from "./MobileUploadQRDialog";
+
 
 
 const MODULE_TYPE_LABEL: Record<CopyModuleType, string> = {
@@ -268,7 +267,7 @@ function LogicEditor({
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [genModules, setGenModules] = useState(false);
   const [genText, setGenText] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
+
 
 
   const genMods = useServerFn(generateModulesFromText);
@@ -375,18 +374,6 @@ function LogicEditor({
             className="mt-1"
           />
         </div>
-        {projectId && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-5 h-9 shrink-0 gap-1.5 text-[11px]"
-            onClick={() => setQrOpen(true)}
-          >
-            <QrCode className="h-3.5 w-3.5" />
-            扫码上传图片
-          </Button>
-        )}
         <div className="flex flex-col items-end gap-1 pt-5">
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground">启用</span>
@@ -400,13 +387,7 @@ function LogicEditor({
         </div>
       </div>
 
-      {projectId && (
-        <MobileUploadQRDialog
-          projectId={projectId}
-          open={qrOpen}
-          onOpenChange={setQrOpen}
-        />
-      )}
+
 
 
       <div>
