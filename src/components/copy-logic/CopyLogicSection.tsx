@@ -267,7 +267,7 @@ function LogicEditor({
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [genModules, setGenModules] = useState(false);
   const [genText, setGenText] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
+
 
 
   const genMods = useServerFn(generateModulesFromText);
