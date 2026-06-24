@@ -241,6 +241,7 @@ function LogicEditor({
   onSave,
   onActivate,
   onDelete,
+  projectId,
 }: {
   logic: CopyLogic;
   onSave: (patch: {
@@ -251,8 +252,10 @@ function LogicEditor({
   }) => Promise<void>;
   onActivate: () => Promise<void>;
   onDelete: () => Promise<void>;
+  projectId?: string;
 }) {
   const [name, setName] = useState(logic.name);
+
   const [description, setDescription] = useState(logic.description);
   const [modules, setModules] = useState<CopyModule[]>(logic.modules);
   const [formatting, setFormatting] = useState<CopyFormatting>(
