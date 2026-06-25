@@ -56,8 +56,17 @@ function ExtensionPage() {
           </button>
         </div>
 
-        <section className="mt-12 rounded-2xl border bg-card p-6">
-          <h2 className="text-base font-semibold">安装步骤</h2>
+        <section className="mt-12 rounded-2xl border-2 border-[oklch(0.7_0.19_45)]/40 bg-[oklch(0.7_0.19_45)]/5 p-6">
+          <h2 className="text-base font-semibold text-[oklch(0.55_0.19_45)]">装过旧版？必看</h2>
+          <ol className="mt-3 space-y-2 text-sm text-foreground/80 list-decimal pl-5">
+            <li>打开 <code className="rounded bg-muted px-1.5 py-0.5">chrome://extensions</code>，找到旧的「团宝快团团助手」，点「移除」彻底卸载</li>
+            <li>下载下面的最新 zip（v0.3.0），解压后用「加载已解压的扩展程序」重新装一遍</li>
+            <li><strong>回到团宝项目页按 F5 刷新一次</strong>（关键！否则插件脚本不会注入到已经打开的标签页，按钮还是会提示"先安装"）</li>
+          </ol>
+        </section>
+
+        <section className="mt-6 rounded-2xl border bg-card p-6">
+          <h2 className="text-base font-semibold">首次安装步骤</h2>
           <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal pl-5">
             <li>下载并解压上面的 zip 包</li>
             <li>打开 Chrome / Edge，地址栏访问 <code className="rounded bg-muted px-1.5 py-0.5">chrome://extensions</code></li>
@@ -70,13 +79,13 @@ function ExtensionPage() {
         <section className="mt-6 rounded-2xl border bg-card p-6">
           <h2 className="text-base font-semibold">使用方法</h2>
           <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal pl-5">
-            <li>装好插件后，回到团宝项目页，刷新一下</li>
+            <li>装好（或更新）插件后，回到团宝项目页，<strong>务必刷新一次</strong></li>
             <li>点右上角「同步到快团团」按钮</li>
             <li>插件会自动打开快团团后台并把内容填入，无需复制粘贴</li>
           </ol>
           <p className="mt-4 text-xs text-muted-foreground">
             首版支持：标题、富文本介绍、首个 SKU 价格库存、开始/结束时间、介绍区图片。
-            若快团团页面结构有调整导致填入失败，请反馈我们更新选择器。
+            若快团团页面结构有调整导致填入失败，请把控制台报错反馈给我们更新选择器。
           </p>
         </section>
       </main>
